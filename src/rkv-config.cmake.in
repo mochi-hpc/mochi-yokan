@@ -1,0 +1,17 @@
+#
+# rkv-config.cmake.in
+#
+
+set(RKV_VERSION @RKV_VERSION@)
+
+@PACKAGE_INIT@
+
+set_and_check(RKV_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+
+check_required_components(rkv)
+
+#include (CMakeFindDependencyMacro)
+#find_dependency (PkgConfig)
+#pkg_check_modules (margo REQUIRED margo)
+
+include ("${CMAKE_CURRENT_LIST_DIR}/rkv-targets.cmake")

@@ -1,0 +1,11 @@
+spack:
+  specs:
+  - cmake
+  - pkg-config
+  - uuid
+  - mochi-margo
+  - json-c
+  - mochi-bedrock
+  - berkeley-db @18.1.40 +cxx +stl
+  - leveldb @1.22
+  concretization: together
