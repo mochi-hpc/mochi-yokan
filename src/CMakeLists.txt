@@ -2,6 +2,10 @@
 set (server-src-files
      provider.cpp)
 
+set (backend-src-files
+     backends.cpp
+     backends/map.cpp)
+
 set (client-src-files
      client.c)
 
@@ -21,7 +25,7 @@ set (rkv-pkg "share/cmake/rkv")
 set (rkv-vers "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}")
 
 # server library
-add_library (rkv-server ${server-src-files} ${dummy-src-files})
+add_library (rkv-server ${server-src-files} ${backend-src-files})
 target_link_libraries (rkv-server
     PkgConfig::margo
     PkgConfig::uuid

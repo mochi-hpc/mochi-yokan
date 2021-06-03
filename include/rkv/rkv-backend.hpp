@@ -42,7 +42,8 @@ enum class Status : uint8_t {
     OK,
     InvalidArg,
     NotFound,
-    SizeError
+    SizeError,
+    KeyExists
 };
 
 /**
@@ -121,8 +122,7 @@ class KeyValueStoreInterface {
     /**
      * @brief Get the length of the values associated with the provided keys.
      * If any key does not exists, the corresponding size will be set to
-     * KeyNotFound and the function wil return Status::NotFound.
-     * Keys that have been found will have valid value sizes.
+     * KeyNotFound. Keys that have been found will have valid value sizes.
      * The size vector will be resized to keys.size().
      *
      * @param [in] keys Keys.
@@ -162,6 +162,8 @@ class KeyValueStoreInterface {
      * The user must provide the memory into which to store the value.
      * Upon successfully copying the value into the user-provided memory,
      * the value.size is set to the size of the value.
+     * If the value does not supply enough memory, SizeError is returned
+     * and the size of value is set to the required size.
      *
      * @param [in] key Key.
      * @param [out] value Value.
@@ -240,26 +242,24 @@ class KeyValueStoreInterface {
     virtual Status eraseMulti(const std::vector<UserMem>& keys) = 0;
 
     /**
-     * @brief Lists up to max keys from fromKey to toKey (both included
+     * @brief Lists up to max keys from fromKey (included
      * if inclusive is set to true), returning only the keys with the provided
      * prefix. Using UserMem::Null for fromKey will make the list start from
-     * the beginning. Using UserMem::Null for toKey will make the list end
-     * at the end of the database (or at max elements found, whichever is first).
-     * Using UserMem::Null for the prefix makes the function ignore the prefix.
+     * the beginning.
+     * Using a UserMem of size 0 for the prefix makes the function ignore the prefix.
      *
-     * Note: fromKey and toKey do not need to be keys that exist in the database.
-     * They are used as lower bound and upper bound respectively.
+     * Note: fromKey does not need to be a key that exists in the database.
+     * It is used as lower bound.
      *
      * @param [in] fromKey Starting key.
-     * @param [in] toKey End key.
-     * @param [in] inclusive Whether to include the start and end keys if found.
+     * @param [in] inclusive Whether to include the start key if found.
      * @param [in] prefix Prefix to filter with.
      * @param [in] max Maximum number of keys to return.
      * @param [out] keys Resulting keys.
      *
      * @return Status.
      */
-    virtual Status listKeys(const UserMem& fromKey, const UserMem& toKey,
+    virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             size_t max, std::vector<std::string>& keys) const = 0;
 
@@ -273,14 +273,13 @@ class KeyValueStoreInterface {
      * size field to BufTooSmall.
      *
      * @param [in] fromKey Starting key.
-     * @param [in] toKey End key.
-     * @param [in] inclusive Whether to include the start and end keys if found.
+     * @param [in] inclusive Whether to include the start key if found.
      * @param [in] prefix Prefix to filter with.
      * @param [out] keys Resulting keys.
      *
      * @return Status.
      */
-    virtual Status listKeys(const UserMem& fromKey, const UserMem& toKey,
+    virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             std::vector<UserMem>& keys) const = 0;
 
@@ -288,25 +287,24 @@ class KeyValueStoreInterface {
      * @brief This version of listKeys uses a single contiguous buffer
      * to hold all the keys. Their size is stored in the keySizes user-allocated
      * buffer. After a successful call, keySizes.size holds the number of keys read.
+     * The function will try to read up to keySizes.size keys.
      *
      * @param [in] fromKey Starting key.
-     * @param [in] toKey End key.
-     * @param [in] inclusive Whether to include the start and end keys if found.
+     * @param [in] inclusive Whether to include the start key if found.
      * @param [in] prefix Prefix to filter with.
      * @param [out] keys Resulting keys.
      * @param [out] keySizes Resulting key sizes.
      *
      * @return Status.
      */
-    virtual Status listKeys(const UserMem& fromKey, const UserMem& toKey,
+    virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
-                            size_t max, UserMem& keys,
-                            BasicUserMem<size_t>& keySizes) const = 0;
+                            UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
 
     /**
      * @brief Same as listKeys but also returns the values.
      */
-    virtual Status listKeyValues(const UserMem& fromKey, const UserMem& toKey,
+    virtual Status listKeyValues(const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix, size_t max,
                                  std::vector<std::string>& keys,
                                  std::vector<std::string>& vals) const = 0;
@@ -314,19 +312,19 @@ class KeyValueStoreInterface {
     /**
      * @brief Same as listKeys but also returns the values.
      */
-    virtual Status listKeyValues(const UserMem& fromKey, const UserMem& toKey,
-                                 bool inclusive, const UserMem& prefix, size_t max,
+    virtual Status listKeyValues(const UserMem& fromKey,
+                                 bool inclusive, const UserMem& prefix,
                                  std::vector<UserMem>& keys, std::vector<UserMem>& vals) const = 0;
 
     /**
      * @brief Same as listKeys but also returns the values.
      */
-    virtual Status listKeyValues(const UserMem& fromKey, const UserMem& toKey,
+    virtual Status listKeyValues(const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix,
-                                 size_t max, UserMem& keys,
-                                 std::vector<size_t>& keySizes,
+                                 UserMem& keys,
+                                 BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
-                                 std::vector<size_t>& valSizes) const = 0;
+                                 BasicUserMem<size_t>& valSizes) const = 0;
 };
 
 /**
