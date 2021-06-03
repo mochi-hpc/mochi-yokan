@@ -22,9 +22,6 @@ static int rkv_register_provider(
     rkv_args.config = bedrock_args_get_config(args);
     rkv_args.pool   = bedrock_args_get_pool(args);
 
-    rkv_args.abtio = (abt_io_instance_id)
-        bedrock_args_get_dependency(args, "abt_io", 0);
-
     return rkv_provider_register(mid, provider_id, &rkv_args,
                                    (rkv_provider_t*)provider);
 }

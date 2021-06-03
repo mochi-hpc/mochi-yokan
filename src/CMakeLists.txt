@@ -24,7 +24,6 @@ set (rkv-vers "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}")
 add_library (rkv-server ${server-src-files} ${dummy-src-files})
 target_link_libraries (rkv-server
     PkgConfig::margo
-    PkgConfig::abt-io
     PkgConfig::uuid
     PkgConfig::json-c)
 target_include_directories (rkv-server PUBLIC $<INSTALL_INTERFACE:include>)

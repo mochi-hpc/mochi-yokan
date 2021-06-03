@@ -8,7 +8,6 @@
 
 #include <rkv/rkv-common.h>
 #include <margo.h>
-#include <abt-io.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +23,6 @@ struct rkv_provider_args {
     const char*        token;  // Security token
     const char*        config; // JSON configuration
     ABT_pool           pool;   // Pool used to run RPCs
-    abt_io_instance_id abtio;  // ABT-IO instance
     // ...
 };
 
@@ -32,7 +30,6 @@ struct rkv_provider_args {
     .token = NULL, \
     .config = NULL, \
     .pool = ABT_POOL_NULL, \
-    .abtio = ABT_IO_INSTANCE_NULL \
 }
 
 /**
