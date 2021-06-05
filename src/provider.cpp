@@ -99,6 +99,7 @@ int rkv_provider_register(
 
     /* Client RPCs */
 
+#if 0
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_hello",
             hello_in_t, void,
             rkv_hello_ult, provider_id, p->pool);
@@ -111,7 +112,7 @@ int rkv_provider_register(
             rkv_sum_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->sum_id = id;
-
+#endif
     /* add other RPC registration here */
     /* ... */
 
@@ -138,8 +139,6 @@ static void rkv_finalize_provider(void* p)
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
-    margo_deregister(mid, provider->hello_id);
-    margo_deregister(mid, provider->sum_id);
     /* deregister other RPC ids ... */
     free(provider->token);
     delete provider;
@@ -393,6 +392,7 @@ finish:
 }
 static DEFINE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
 
+#if 0
 static void rkv_hello_ult(hg_handle_t h)
 {
     hg_return_t hret;
@@ -411,7 +411,7 @@ static void rkv_hello_ult(hg_handle_t h)
         margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
         goto finish;
     }
-#if 0
+
     /* find the database */
     rkv_database* database = find_database(provider, &in.database_id);
     if(!database) {
@@ -423,7 +423,7 @@ static void rkv_hello_ult(hg_handle_t h)
     database->fn->hello(database->ctx);
 
     margo_debug(mid, "Called hello RPC");
-#endif
+
 finish:
     margo_destroy(h);
 }
@@ -472,6 +472,7 @@ finish:
     margo_destroy(h);
 }
 static DEFINE_MARGO_RPC_HANDLER(rkv_sum_ult)
+#endif
 
 static inline int check_token(
         rkv_provider_t provider,

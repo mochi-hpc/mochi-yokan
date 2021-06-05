@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2021 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -60,6 +60,7 @@ int main(int argc, char** argv)
         FATAL(mid,"rkv_database_handle_create failed (ret = %d)", ret);
     }
 
+#if 0
     margo_info(mid, "Saying Hello to server");
     ret = rkv_say_hello(rkv_rh);
     if(ret != RKV_SUCCESS) {
@@ -73,6 +74,7 @@ int main(int argc, char** argv)
         FATAL(mid,"rkv_compute_sum failed (ret = %d)", ret);
     }
     margo_info(mid, "45 + 23 = %d", result);
+#endif
 
     margo_info(mid, "Releasing database handle");
     ret = rkv_database_handle_release(rkv_rh);

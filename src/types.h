@@ -14,6 +14,33 @@
 
 static inline hg_return_t hg_proc_rkv_database_id_t(hg_proc_t proc, rkv_database_id_t *id);
 
+typedef struct rkv_data_t {
+    void*  data;
+    size_t size;
+} rkv_data_t;
+
+static inline hg_return_t hg_proc_rkv_data_t(hg_proc_t proc, void* data) {
+    rkv_data_t* mem = (rkv_data_t*)data;
+    hg_return_t ret;
+
+    ret = hg_proc_hg_size_t(proc, &(mem->size));
+    if(ret != HG_SUCCESS) return ret;
+
+    switch(hg_proc_get_op(proc)) {
+    case HG_DECODE:
+        mem->data = calloc(1, mem->size);
+        /* fall through */
+    case HG_ENCODE:
+        if(mem->data)
+            ret = hg_proc_memcpy(proc, mem->data, mem->size);
+        break;
+    case HG_FREE:
+        free(mem->data);
+        break;
+    }
+    return ret;
+};
+
 /* Admin RPC types */
 
 MERCURY_GEN_PROC(open_database_in_t,
@@ -76,18 +103,7 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 }
 
 /* Client RPC types */
-
-MERCURY_GEN_PROC(hello_in_t,
-        ((rkv_database_id_t)(database_id)))
-
-MERCURY_GEN_PROC(sum_in_t,
-        ((rkv_database_id_t)(database_id))\
-        ((int32_t)(x))\
-        ((int32_t)(y)))
-
-MERCURY_GEN_PROC(sum_out_t,
-        ((int32_t)(result))\
-        ((int32_t)(ret)))
+// TODO
 
 /* Extra hand-coded serialization functions */
 

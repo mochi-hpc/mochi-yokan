@@ -120,107 +120,8 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     // test that we can destroy the database handle
     ret = rkv_database_handle_release(rh);
     munit_assert_int(ret, ==, RKV_SUCCESS);
-    // ... and a second time because of the increase ref 
+    // ... and a second time because of the increase ref
     ret = rkv_database_handle_release(rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can free the client object
-    ret = rkv_client_finalize(client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
-    return MUNIT_OK;
-}
-
-
-static MunitResult test_hello(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_client_t client;
-    rkv_database_handle_t rh;
-    rkv_return_t ret;
-    // test that we can create a client object
-    ret = rkv_client_init(context->mid, &client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can create a database handle
-    ret = rkv_database_handle_create(client,
-            context->addr, provider_id, context->id, &rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can send a hello RPC to the database
-    ret = rkv_say_hello(rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can destroy the database handle
-    ret = rkv_database_handle_release(rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can free the client object
-    ret = rkv_client_finalize(client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_sum(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_client_t client;
-    rkv_database_handle_t rh;
-    rkv_return_t ret;
-    // test that we can create a client object
-    ret = rkv_client_init(context->mid, &client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can create a database handle
-    ret = rkv_database_handle_create(client,
-            context->addr, provider_id, context->id, &rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can send a sum RPC to the database
-    int32_t result = 0;
-    ret = rkv_compute_sum(rh, 45, 55, &result);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    munit_assert_int(result, ==, 100);
-    // test that we can destroy the database handle
-    ret = rkv_database_handle_release(rh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can free the client object
-    ret = rkv_client_finalize(client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
-    return MUNIT_OK;
-}
-
-static MunitResult test_invalid(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_client_t client;
-    rkv_database_handle_t rh1, rh2;
-    rkv_database_id_t invalid_id;
-    rkv_return_t ret;
-    // test that we can create a client object
-    ret = rkv_client_init(context->mid, &client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // create a database handle for a wrong database id
-    ret = rkv_database_handle_create(client,
-            context->addr, provider_id, invalid_id, &rh1);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // create a database handle for a wrong provider id
-    ret = rkv_database_handle_create(client,
-            context->addr, provider_id + 1, context->id, &rh2);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test sending to the invalid database id
-    int32_t result;
-    ret = rkv_compute_sum(rh1, 45, 55, &result);
-    munit_assert_int(ret, ==, RKV_ERR_INVALID_DATABASE);
-    // test sending to the invalid provider id
-    ret = rkv_compute_sum(rh2, 45, 55, &result);
-    munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
-    // test that we can destroy the database handle
-    ret = rkv_database_handle_release(rh1);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-    // test that we can destroy the database handle
-    ret = rkv_database_handle_release(rh2);
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // test that we can free the client object
     ret = rkv_client_finalize(client);
@@ -232,13 +133,10 @@ static MunitResult test_invalid(const MunitParameter params[], void* data)
 static MunitTest test_suite_tests[] = {
     { (char*) "/client",   test_client,   test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { (char*) "/database", test_database, test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/hello",    test_hello,    test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/sum",      test_sum,      test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/invalid",  test_invalid,  test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 
-static const MunitSuite test_suite = { 
+static const MunitSuite test_suite = {
     (char*) "/rkv/admin", test_suite_tests, NULL, 1, MUNIT_SUITE_OPTION_NONE
 };
 

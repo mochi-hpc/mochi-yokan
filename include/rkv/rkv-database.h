@@ -1,6 +1,6 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2021 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
 #ifndef __RKV_DATABASE_H
@@ -55,6 +55,7 @@ rkv_return_t rkv_database_handle_ref_incr(
  */
 rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
 
+#if 0
 /**
  * @brief Makes the target RKV database print Hello World.
  *
@@ -83,6 +84,7 @@ rkv_return_t rkv_compute_sum(
         int32_t x,
         int32_t y,
         int32_t* result);
+#endif
 
 #ifdef __cplusplus
 }

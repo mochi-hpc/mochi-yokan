@@ -49,9 +49,32 @@ typedef struct rkv_provider {
     hg_id_t destroy_database_id;
     hg_id_t list_databases_id;
     /* RPC identifiers for clients */
-    hg_id_t hello_id;
-    hg_id_t sum_id;
-    /* ... add other RPC identifiers here ... */
+    /* exists */
+    hg_id_t exists_id;
+    hg_id_t exists_multi_id;
+    hg_id_t exists_packed_id;
+    /* length */
+    hg_id_t length_id;
+    hg_id_t length_multi_id;
+    hg_id_t length_packed_id;
+    /* put */
+    hg_id_t put_id;
+    hg_id_t put_multi_id;
+    hg_id_t put_packed_id;
+    /* get */
+    hg_id_t get_id;
+    hg_id_t get_multi_id;
+    hg_id_t get_packed_id;
+    /* erase */
+    hg_id_t erase_id;
+    hg_id_t erase_multi_id;
+    hg_id_t erase_packed_id;
+    /* list keys */
+    hg_id_t list_keys_id;
+    hg_id_t list_keys_packed_id;
+    /* list key/vals */
+    hg_id_t list_keyvals_id;
+    hg_id_t list_keyvals_packed_id;
 } rkv_provider;
 
 #endif

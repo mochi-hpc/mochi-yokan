@@ -1,6 +1,6 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2021 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
 #include "types.h"
@@ -16,15 +16,19 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 
     hg_bool_t flag;
     hg_id_t id;
-    margo_registered_name(mid, "rkv_sum", &id, &flag);
+    margo_registered_name(mid, "rkv_exists", &id, &flag);
 
     if(flag == HG_TRUE) {
+#if 0
         margo_registered_name(mid, "rkv_sum", &c->sum_id, &flag);
         margo_registered_name(mid, "rkv_hello", &c->hello_id, &flag);
+#endif
     } else {
+#if 0
         c->sum_id = MARGO_REGISTER(mid, "rkv_sum", sum_in_t, sum_out_t, NULL);
         c->hello_id = MARGO_REGISTER(mid, "rkv_hello", hello_in_t, void, NULL);
         margo_registered_disable_response(mid, c->hello_id, HG_TRUE);
+#endif
     }
 
     *client = c;
@@ -96,6 +100,7 @@ rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle)
     return RKV_SUCCESS;
 }
 
+#if 0
 rkv_return_t rkv_say_hello(rkv_database_handle_t handle)
 {
     hg_handle_t   h;
@@ -159,3 +164,4 @@ finish:
     margo_destroy(h);
     return ret;
 }
+#endif
