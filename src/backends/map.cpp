@@ -92,8 +92,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     public:
 
     static KeyValueStoreInterface* create(const std::string& config) {
-        // TODO
-        return nullptr;
+        // TODO handle custom comparator
+        return new MapKeyValueStore();
     }
 
     virtual std::string name() const override {
@@ -102,6 +102,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual std::string config() const override {
         return "{}";
+    }
+
+    virtual void destroy() override {
+        ScopedWriteLock lock(m_lock);
+        m_db.clear();
     }
 
     virtual Status exists(const UserMem& key, bool& b) const override {
@@ -503,6 +508,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     private:
 
     MapKeyValueStore() {
+        ABT_rwlock_create(&m_lock);
+    }
+
+    MapKeyValueStore(MapKeyValueStoreCompare::cmp_type cmp_fun)
+    : m_db(cmp_fun) {
         ABT_rwlock_create(&m_lock);
     }
 

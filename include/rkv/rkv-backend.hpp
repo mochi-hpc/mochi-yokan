@@ -86,6 +86,11 @@ class KeyValueStoreInterface {
     virtual std::string config() const = 0;
 
     /**
+     * @brief Destroy the resources (files, etc.) associated with the database.
+     */
+    virtual void destroy() = 0;
+
+    /**
      * @brief Check if the provided key exists.
      *
      * @param [in] key Key.
@@ -400,5 +405,6 @@ template <typename T> class __RKVBackendRegistration {
 };
 
 using rkv_database = rkv::KeyValueStoreInterface;
+using rkv_database_t = rkv::KeyValueStoreInterface*;
 
 #endif

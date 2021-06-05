@@ -1,6 +1,6 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2021 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
 #ifndef __RKV_ADMIN_H
@@ -38,29 +38,7 @@ rkv_return_t rkv_admin_init(margo_instance_id mid, rkv_admin_t* admin);
 rkv_return_t rkv_admin_finalize(rkv_admin_t admin);
 
 /**
- * @brief Requests the provider to create a database of the
- * specified type and configuration and return a database id.
- *
- * @param[in] admin RKV admin object.
- * @param[in] address address of the provider.
- * @param[in] provider_id provider id.
- * @param[in] type type of database to create.
- * @param[in] config Configuration.
- * @param[out] id resulting database id.
- *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
- */
-rkv_return_t rkv_create_database(
-        rkv_admin_t admin,
-        hg_addr_t address,
-        uint16_t provider_id,
-        const char* token,
-        const char* type,
-        const char* config,
-        rkv_database_id_t* id);
-
-/**
- * @brief Requests the provider to open an existing database of the
+ * @brief Requests the provider to open a database of the
  * specified type and configuration and return a database id.
  *
  * @param[in] admin RKV admin object.

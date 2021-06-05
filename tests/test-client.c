@@ -27,13 +27,16 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     (void) params;
     (void) user_data;
     rkv_return_t      ret;
-    margo_instance_id   mid;
-    hg_addr_t           addr;
+    margo_instance_id mid;
+    hg_addr_t         addr;
     rkv_admin_t       admin;
     rkv_database_id_t id;
     // create margo instance
     mid = margo_init("na+sm", MARGO_SERVER_MODE, 0, 0);
     munit_assert_not_null(mid);
+    // set log level
+    margo_set_global_log_level(MARGO_LOG_CRITICAL);
+    margo_set_log_level(mid, MARGO_LOG_CRITICAL);
     // get address of current process
     hg_return_t hret = margo_addr_self(mid, &addr);
     munit_assert_int(hret, ==, HG_SUCCESS);
@@ -47,9 +50,9 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     // create an admin
     ret = rkv_admin_init(mid, &admin);
     munit_assert_int(ret, ==, RKV_SUCCESS);
-    // create a database using the admin
-    ret = rkv_create_database(admin, addr,
-            provider_id, token, "dummy", backend_config, &id);
+    // open a database using the admin
+    ret = rkv_open_database(admin, addr,
+            provider_id, token, "map", backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // create test context
     struct test_context* context = (struct test_context*)calloc(1, sizeof(*context));

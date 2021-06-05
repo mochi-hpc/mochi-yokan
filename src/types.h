@@ -1,6 +1,6 @@
 /*
- * (C) 2020 The University of Chicago
- * 
+ * (C) 2021 The University of Chicago
+ *
  * See COPYRIGHT in top-level directory.
  */
 #ifndef _PARAMS_H
@@ -15,15 +15,6 @@
 static inline hg_return_t hg_proc_rkv_database_id_t(hg_proc_t proc, rkv_database_id_t *id);
 
 /* Admin RPC types */
-
-MERCURY_GEN_PROC(create_database_in_t,
-        ((hg_string_t)(type))\
-        ((hg_string_t)(config))\
-        ((hg_string_t)(token)))
-
-MERCURY_GEN_PROC(create_database_out_t,
-        ((int32_t)(ret))\
-        ((rkv_database_id_t)(id)))
 
 MERCURY_GEN_PROC(open_database_in_t,
         ((hg_string_t)(type))\

@@ -61,7 +61,7 @@ int rkv_provider_register(
         return RKV_ERR_INVALID_PROVIDER;
     }
 
-    p = (rkv_provider_t)calloc(1, sizeof(*p));
+    p = new rkv_provider;
     if(p == NULL) {
         margo_error(mid, "Could not allocate memory for provider");
         return RKV_ERR_ALLOCATION;
@@ -73,12 +73,6 @@ int rkv_provider_register(
     p->token = (a.token && strlen(a.token)) ? strdup(a.token) : NULL;
 
     /* Admin RPCs */
-    id = MARGO_REGISTER_PROVIDER(mid, "rkv_create_database",
-            create_database_in_t, create_database_out_t,
-            rkv_create_database_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->create_database_id = id;
-
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_open_database",
             open_database_in_t, open_database_out_t,
             rkv_open_database_ult, provider_id, p->pool);
@@ -135,18 +129,21 @@ int rkv_provider_register(
 static void rkv_finalize_provider(void* p)
 {
     rkv_provider_t provider = (rkv_provider_t)p;
-    margo_info(provider->mid, "Finalizing RKV provider");
-    margo_deregister(provider->mid, provider->create_database_id);
-    margo_deregister(provider->mid, provider->open_database_id);
-    margo_deregister(provider->mid, provider->close_database_id);
-    margo_deregister(provider->mid, provider->destroy_database_id);
-    margo_deregister(provider->mid, provider->list_databases_id);
-    margo_deregister(provider->mid, provider->hello_id);
-    margo_deregister(provider->mid, provider->sum_id);
+    margo_instance_id mid = provider->mid;
+    for(auto pair : provider->dbs) {
+        delete pair.second;
+    }
+    margo_info(mid, "Finalizing RKV provider");
+    margo_deregister(mid, provider->open_database_id);
+    margo_deregister(mid, provider->close_database_id);
+    margo_deregister(mid, provider->destroy_database_id);
+    margo_deregister(mid, provider->list_databases_id);
+    margo_deregister(mid, provider->hello_id);
+    margo_deregister(mid, provider->sum_id);
     /* deregister other RPC ids ... */
     free(provider->token);
-    free(provider);
-    margo_info(provider->mid, "RKV provider successfuly finalized");
+    delete provider;
+    margo_info(mid, "RKV provider successfuly finalized");
 }
 
 int rkv_provider_destroy(
@@ -162,86 +159,16 @@ int rkv_provider_destroy(
     return RKV_SUCCESS;
 }
 
-static void rkv_create_database_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    rkv_return_t ret;
-    create_database_in_t  in;
-    create_database_out_t out;
-
-    /* find the margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-
-    /* find the provider */
-    const struct hg_info* info = margo_get_info(h);
-    rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
-
-    /* deserialize the input */
-    hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_info(provider->mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
-
-    /* check the token sent by the admin */
-    if(!check_token(provider, in.token)) {
-        margo_error(provider->mid, "Invalid token");
-        out.ret = RKV_ERR_INVALID_TOKEN;
-        goto finish;
-    }
-
-    /* find the backend implementation for the requested type */
-#if 0
-    rkv_backend_impl* backend = find_backend_impl(provider, in.type);
-    if(!backend) {
-        margo_error(provider->mid, "Could not find backend of type \"%s\"", in.type);
-        out.ret = RKV_ERR_INVALID_BACKEND;
-        goto finish;
-    }
-
-    /* create a uuid for the new database */
-    rkv_database_id_t id;
-    uuid_generate(id.uuid);
-
-    /* create the new database's context */
-    void* context = NULL;
-    ret = backend->create_database(provider, in.config, &context);
-    if(ret != RKV_SUCCESS) {
-        out.ret = ret;
-        margo_error(provider->mid, "Could not create database, backend returned %d", ret);
-        goto finish;
-    }
-
-    /* allocate a database, set it up, and add it to the provider */
-    rkv_database* database = (rkv_database*)calloc(1, sizeof(*database));
-    database->fn  = backend;
-    database->ctx = context;
-    database->id  = id;
-    add_database(provider, database);
-
-    /* set the response */
-    out.ret = RKV_SUCCESS;
-    out.id = id;
-
-    char id_str[37];
-    rkv_database_id_to_string(id, id_str);
-    margo_debug(provider->mid, "Created database %s of type \"%s\"", id_str, in.type);
-
-#endif
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    margo_destroy(h);
-}
-static DEFINE_MARGO_RPC_HANDLER(rkv_create_database_ult)
-
 static void rkv_open_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
     rkv_return_t ret;
     open_database_in_t  in;
     open_database_out_t out;
+    rkv_database_id_t id;
+    bool has_backend_type;
+    rkv_database_t database;
+    char id_str[37];
 
     /* find the margo instance */
     margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -265,43 +192,33 @@ static void rkv_open_database_ult(hg_handle_t h)
         goto finish;
     }
 
-#if 0
-    /* find the backend implementation for the requested type */
-    rkv_backend_impl* backend = find_backend_impl(provider, in.type);
-    if(!backend) {
+    /* check if we can create a database of this type */
+    has_backend_type = rkv::KeyValueStoreFactory::hasBackendType(in.type);
+
+    if(!has_backend_type) {
         margo_error(mid, "Could not find backend of type \"%s\"", in.type);
         out.ret = RKV_ERR_INVALID_BACKEND;
         goto finish;
     }
 
     /* create a uuid for the new database */
-    rkv_database_id_t id;
     uuid_generate(id.uuid);
 
     /* create the new database's context */
-    void* context = NULL;
-    ret = backend->open_database(provider, in.config, &context);
-    if(ret != RKV_SUCCESS) {
-        margo_error(mid, "Backend failed to open database");
-        out.ret = ret;
+    database = rkv::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config);
+    if(database == nullptr) {
+        margo_error(mid, "Failed to open database of type %s", in.type);
+        out.ret = RKV_ERR_OTHER;
         goto finish;
     }
-
-    /* allocate a database, set it up, and add it to the provider */
-    rkv_database* database = (rkv_database*)calloc(1, sizeof(*database));
-    database->fn  = backend;
-    database->ctx = context;
-    database->id  = id;
-    add_database(provider, database);
+    provider->dbs[id] = database;
 
     /* set the response */
     out.ret = RKV_SUCCESS;
     out.id = id;
 
-    char id_str[37];
     rkv_database_id_to_string(id, id_str);
     margo_debug(mid, "Created database %s of type \"%s\"", id_str, in.type);
-#endif
 
 finish:
     hret = margo_respond(h, &out);
@@ -316,6 +233,9 @@ static void rkv_close_database_ult(hg_handle_t h)
     rkv_return_t ret;
     close_database_in_t  in;
     close_database_out_t out;
+    char id_str[37];
+
+    rkv_database_id_to_string(in.id, id_str);
 
     /* find the margo instance */
     margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -339,16 +259,18 @@ static void rkv_close_database_ult(hg_handle_t h)
         goto finish;
     }
 
-    /* remove the database from the provider
-     * (its close function will be called) */
-#if 0
-    ret = remove_database(provider, &in.id, 1);
-    out.ret = ret;
-#endif
+    /* check if the database exists */
+    if(provider->dbs.count(in.id) == 0) {
+        margo_error(mid, "Could not find and close database with id %s", id_str);
+        out.ret = RKV_ERR_INVALID_DATABASE;
+        goto finish;
+    }
 
-    char id_str[37];
-    rkv_database_id_to_string(in.id, id_str);
-    margo_debug(mid, "Removed database with id %s", id_str);
+    /* remove the database */
+    delete provider->dbs[in.id];
+    provider->dbs.erase(in.id);
+
+    margo_debug(mid, "Closed database with id %s", id_str);
 
 finish:
     hret = margo_respond(h, &out);
@@ -363,6 +285,9 @@ static void rkv_destroy_database_ult(hg_handle_t h)
     destroy_database_in_t  in;
     destroy_database_out_t out;
     rkv_database* database = nullptr;
+    char id_str[37];
+
+    rkv_database_id_to_string(in.id, id_str);
 
     /* find the margo instance */
     margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -386,30 +311,26 @@ static void rkv_destroy_database_ult(hg_handle_t h)
         goto finish;
     }
 
-#if 0
-    /* find the database */
-    database = find_database(provider, &in.id);
-    if(!database) {
-        margo_error(mid, "Could not find database");
+    /* check if the database exists */
+    if(provider->dbs.count(in.id) == 0) {
+        margo_error(mid, "Could not find and close database with id %s", id_str);
         out.ret = RKV_ERR_INVALID_DATABASE;
         goto finish;
     }
 
-    /* destroy the database's context */
-    database->fn->destroy_database(database->ctx);
+    /* destroy the database */
+    database = provider->dbs[in.id];
+    database->destroy();
+    delete database;
+    provider->dbs.erase(in.id);
 
-    /* remove the database from the provider
-     * (its close function will NOT be called) */
-    out.ret = remove_database(provider, &in.id, 0);
+    out.ret = RKV_SUCCESS;
 
     if(out.ret == RKV_SUCCESS) {
-        char id_str[37];
-        rkv_database_id_to_string(in.id, id_str);
         margo_debug(mid, "Destroyed database with id %s", id_str);
     } else {
         margo_error(mid, "Could not destroy database, database may be left in an invalid state");
     }
-#endif
 
 finish:
     hret = margo_respond(h, &out);
@@ -423,7 +344,8 @@ static void rkv_list_databases_ult(hg_handle_t h)
     hg_return_t hret;
     list_databases_in_t  in;
     list_databases_out_t out;
-    out.ids = NULL;
+    out.ids = nullptr;
+    unsigned i;
 
     /* find margo instance */
     margo_instance_id mid = margo_hg_handle_get_instance(h);
@@ -448,12 +370,18 @@ static void rkv_list_databases_ult(hg_handle_t h)
     }
 
     /* allocate array of database ids */
-#if 0
     out.ret   = RKV_SUCCESS;
-    out.count = provider->num_databases < in.max_ids ? provider->num_databases : in.max_ids;
-    out.ids   = (rkv_database_id_t*)calloc(provider->num_databases, sizeof(*out.ids));
-#endif
-    // TODO
+    out.count = provider->dbs.size() < in.max_ids ? provider->dbs.size() : in.max_ids;
+    out.ids   = (rkv_database_id_t*)calloc(out.count, sizeof(*out.ids));
+
+    i = 0;
+    for(auto& pair : provider->dbs) {
+        out.ids[i] = pair.first;
+        i += 1;
+        if(i == out.count)
+            break;
+    }
+    out.count = i;
 
     margo_debug(mid, "Listed databases");
 

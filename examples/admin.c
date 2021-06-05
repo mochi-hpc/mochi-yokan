@@ -44,10 +44,10 @@ int main(int argc, char** argv)
     }
 
     margo_info(mid,"Creating database");
-    ret = rkv_create_database(admin, svr_addr, provider_id, NULL,
-                                "dummy", "This is a config", &id);
+    ret = rkv_open_database(admin, svr_addr, provider_id, NULL,
+                                "map", "{}", &id);
     if(ret != RKV_SUCCESS) {
-        FATAL(mid,"rkv_create_database failed (ret = %d)", ret);
+        FATAL(mid,"rkv_open_database failed (ret = %d)", ret);
     }
 
     margo_info(mid,"Listing databases");
