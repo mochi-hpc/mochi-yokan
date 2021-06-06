@@ -103,7 +103,73 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 }
 
 /* Client RPC types */
-// TODO
+
+/* exists */
+MERCURY_GEN_PROC(exists_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((rkv_data_t)(key)))
+MERCURY_GEN_PROC(exists_out_t,
+        ((int32_t)(ret))\
+        ((int32_t)(exists)))
+
+/* exists_multi */
+
+/* exists_packed */
+
+/* length */
+MERCURY_GEN_PROC(length_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((rkv_data_t)(key)))
+MERCURY_GEN_PROC(length_out_t,
+        ((int32_t)(ret))\
+        ((uint64_t)(length)))
+
+/* length_multi */
+
+/* length_packed */
+
+/* put */
+MERCURY_GEN_PROC(put_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((rkv_data_t)(key))\
+        ((rkv_data_t)(val)))
+MERCURY_GEN_PROC(put_out_t,
+        ((int32_t)(ret)))
+
+/* put_multi */
+
+/* put_packed */
+
+/* get */
+MERCURY_GEN_PROC(get_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((rkv_data_t)(key)))
+MERCURY_GEN_PROC(get_out_t,
+        ((int32_t)(ret))\
+        ((rkv_data_t)(val)))
+
+/* get_multi */
+
+/* get_packed */
+
+/* erase */
+MERCURY_GEN_PROC(erase_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((rkv_data_t)(key)))
+MERCURY_GEN_PROC(erase_out_t,
+        ((int32_t)(ret)))
+
+/* erase_multi */
+
+/* erase_packed */
+
+/* list_keys */
+
+/* list_keys_packed */
+
+/* list_keyvals */
+
+/* list_keyvals_packed */
 
 /* Extra hand-coded serialization functions */
 

@@ -38,7 +38,7 @@ typedef struct rkv_provider {
     margo_instance_id  mid;                 // Margo instance
     uint16_t           provider_id;         // Provider id
     ABT_pool           pool;                // Pool on which to post RPC requests
-    char*              token;               // Security token
+    std::string        token;               // Security token
     /* Databases */
     std::unordered_map<rkv_database_id_t, rkv_database_t> dbs;  // Databases
     // Note: in the above map, the std::string keys are actually uuids (32 bytes)

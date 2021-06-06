@@ -6,6 +6,7 @@
 #ifndef __RKV_DATABASE_H
 #define __RKV_DATABASE_H
 
+#include <stdbool.h>
 #include <margo.h>
 #include <rkv/rkv-common.h>
 #include <rkv/rkv-client.h>
@@ -55,36 +56,135 @@ rkv_return_t rkv_database_handle_ref_incr(
  */
 rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
 
-#if 0
-/**
- * @brief Makes the target RKV database print Hello World.
- *
- * @param[in] handle database handle.
- * @param[in] x first number.
- * @param[in] y second number.
- * @param[out] result resulting value.
- *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
- */
-rkv_return_t rkv_say_hello(rkv_database_handle_t handle);
+rkv_return_t rkv_put(rkv_database_handle_t dbh,
+                     const void* key,
+                     size_t ksize,
+                     const void* value,
+                     size_t vsize);
 
-/**
- * @brief Makes the target RKV database compute the sum of the
- * two numbers and return the result.
- *
- * @param[in] handle database handle.
- * @param[in] x first number.
- * @param[in] y second number.
- * @param[out] result resulting value.
- *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
- */
-rkv_return_t rkv_compute_sum(
-        rkv_database_handle_t handle,
-        int32_t x,
-        int32_t y,
-        int32_t* result);
-#endif
+rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
+                           size_t count,
+                           const void* const* keys,
+                           const size_t* ksizes,
+                           const void* const* values,
+                           const size_t* vsizes);
+
+rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
+                            size_t count,
+                            const void* keys,
+                            const size_t* ksizes,
+                            const void* values,
+                            const size_t* vsizes);
+
+rkv_return_t rkv_exists(rkv_database_handle_t dbh,
+                        const void* key,
+                        size_t ksize,
+                        bool* exists);
+
+rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
+                              size_t count,
+                              const void* const* keys,
+                              const size_t* ksizes,
+                              bool* exist);
+
+rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
+                               size_t count,
+                               const void* keys,
+                               const size_t ksizes,
+                               bool* exist);
+
+rkv_return_t rkv_length(rkv_database_handle_t dbh,
+                        const void* key,
+                        size_t ksize,
+                        size_t* vsize);
+
+rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
+                              size_t count,
+                              const void* const* keys,
+                              const size_t* ksizes,
+                              size_t* vsizes);
+
+rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
+                               size_t count,
+                               const void* keys,
+                               const size_t* ksizes,
+                               size_t* vsizes);
+
+rkv_return_t rkv_get(rkv_database_handle_t dbh,
+                     const void* key,
+                     size_t ksize,
+                     void* value,
+                     size_t* vsize);
+
+rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
+                           size_t count,
+                           const void* const* keys,
+                           const size_t* ksizes,
+                           void* const* values,
+                           size_t* vsizes);
+
+rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
+                            size_t count,
+                            const void* keys,
+                            const size_t* ksizes,
+                            void* values,
+                            size_t* vsizes);
+
+rkv_return_t rkv_erase(rkv_database_handle_t dbh,
+                       const void* key,
+                       size_t ksize);
+
+rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
+                             const void* const* keys,
+                             const size_t* ksizes);
+
+rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
+                              const void* keys,
+                              const size_t* ksizes);
+
+rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
+                           size_t max,
+                           bool inclusive,
+                           const void* from_key,
+                           size_t from_ksize,
+                           const void* prefix,
+                           size_t prefix_size,
+                           void* const* keys,
+                           size_t* ksizes);
+
+rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
+                                  size_t max,
+                                  bool inclusive,
+                                  const void* from_key,
+                                  size_t from_ksize,
+                                  const void* prefix,
+                                  size_t prefix_size,
+                                  void* keys,
+                                  size_t* ksizes);
+
+rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
+                              size_t max,
+                              bool inclusive,
+                              const void* from_key,
+                              size_t from_ksize,
+                              const void* prefix,
+                              size_t prefix_size,
+                              void* const* keys,
+                              size_t* ksizes,
+                              void* const* values,
+                              size_t* vsizes);
+
+rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
+                                     size_t max,
+                                     bool inclusive,
+                                     const void* from_key,
+                                     size_t from_ksize,
+                                     const void* prefix,
+                                     size_t prefix_size,
+                                     void* keys,
+                                     size_t* ksizes,
+                                     void* values,
+                                     size_t* vsizes);
 
 #ifdef __cplusplus
 }

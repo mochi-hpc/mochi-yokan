@@ -10,8 +10,8 @@
 static void rkv_finalize_provider(void* p);
 
 /* Function to check the validity of the token sent by an admin
- * (returns 0 is the token is incorrect) */
-static inline int check_token(
+ * (returns false is the token is incorrect) */
+static inline bool check_token(
         rkv_provider_t provider,
         const char* token);
 
@@ -139,8 +139,25 @@ static void rkv_finalize_provider(void* p)
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
-    /* deregister other RPC ids ... */
-    free(provider->token);
+    margo_deregister(mid, provider->exists_id);
+    margo_deregister(mid, provider->exists_multi_id);
+    margo_deregister(mid, provider->exists_packed_id);
+    margo_deregister(mid, provider->length_id);
+    margo_deregister(mid, provider->length_multi_id);
+    margo_deregister(mid, provider->length_packed_id);
+    margo_deregister(mid, provider->put_id);
+    margo_deregister(mid, provider->put_multi_id);
+    margo_deregister(mid, provider->put_packed_id);
+    margo_deregister(mid, provider->get_id);
+    margo_deregister(mid, provider->get_multi_id);
+    margo_deregister(mid, provider->get_packed_id);
+    margo_deregister(mid, provider->erase_id);
+    margo_deregister(mid, provider->erase_multi_id);
+    margo_deregister(mid, provider->erase_packed_id);
+    margo_deregister(mid, provider->list_keys_id);
+    margo_deregister(mid, provider->list_keys_packed_id);
+    margo_deregister(mid, provider->list_keyvals_id);
+    margo_deregister(mid, provider->list_keyvals_packed_id);
     delete provider;
     margo_info(mid, "RKV provider successfuly finalized");
 }
@@ -474,10 +491,10 @@ finish:
 static DEFINE_MARGO_RPC_HANDLER(rkv_sum_ult)
 #endif
 
-static inline int check_token(
+static inline bool check_token(
         rkv_provider_t provider,
         const char* token)
 {
-    if(!provider->token) return 1;
-    return !strcmp(provider->token, token);
+    if(provider->token.empty()) return true;
+    return provider->token == token;
 }
