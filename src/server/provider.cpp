@@ -53,7 +53,7 @@ int rkv_provider_register(
     p->mid = mid;
     p->provider_id = provider_id;
     p->pool = a.pool;
-    p->token = (a.token && strlen(a.token)) ? strdup(a.token) : NULL;
+    p->token = (a.token && strlen(a.token)) ? a.token : "";
 
     /* Admin RPCs */
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_open_database",
@@ -85,6 +85,7 @@ int rkv_provider_register(
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_put",
             put_in_t, put_out_t,
             rkv_put_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
     p->put_id = id;
 
     margo_provider_push_finalize_callback(mid, p, &rkv_finalize_provider, p);
@@ -190,6 +191,7 @@ void rkv_open_database_ult(hg_handle_t h)
     }
     provider->dbs[id] = database;
 
+    out.ret = RKV_SUCCESS;
     out.id = id;
 
     rkv_database_id_to_string(id, id_str);
@@ -233,6 +235,7 @@ void rkv_close_database_ult(hg_handle_t h)
 
     delete provider->dbs[in.id];
     provider->dbs.erase(in.id);
+    out.ret = RKV_SUCCESS;
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_close_database_ult)
 

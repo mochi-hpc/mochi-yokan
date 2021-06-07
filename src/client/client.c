@@ -29,8 +29,6 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
         margo_registered_name(mid, "rkv_length_packed", &c->length_packed_id, &flag);
 
         margo_registered_name(mid, "rkv_put",        &c->put_id,        &flag);
-//        margo_registered_name(mid, "rkv_put_multi",  &c->put_multi_id,  &flag);
-//        margo_registered_name(mid, "rkv_put_packed", &c->put_packed_id, &flag);
 
         margo_registered_name(mid, "rkv_get",        &c->get_id,        &flag);
         margo_registered_name(mid, "rkv_get_multi",  &c->get_multi_id,  &flag);
@@ -144,69 +142,3 @@ rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle)
     }
     return RKV_SUCCESS;
 }
-
-#if 0
-rkv_return_t rkv_say_hello(rkv_database_handle_t handle)
-{
-    hg_handle_t   h;
-    hello_in_t     in;
-    hg_return_t ret;
-
-    memcpy(&in.database_id, &(handle->database_id), sizeof(in.database_id));
-
-    ret = margo_create(handle->client->mid, handle->addr, handle->client->hello_id, &h);
-    if(ret != HG_SUCCESS)
-        return RKV_ERR_FROM_MERCURY;
-
-    ret = margo_provider_forward(handle->provider_id, h, &in);
-    if(ret != HG_SUCCESS) {
-        margo_destroy(h);
-        return RKV_ERR_FROM_MERCURY;
-    }
-
-    margo_destroy(h);
-    return RKV_SUCCESS;
-}
-
-rkv_return_t rkv_compute_sum(
-        rkv_database_handle_t handle,
-        int32_t x,
-        int32_t y,
-        int32_t* result)
-{
-    hg_handle_t   h;
-    sum_in_t     in;
-    sum_out_t   out;
-    hg_return_t hret;
-    rkv_return_t ret;
-
-    memcpy(&in.database_id, &(handle->database_id), sizeof(in.database_id));
-    in.x = x;
-    in.y = y;
-
-    hret = margo_create(handle->client->mid, handle->addr, handle->client->sum_id, &h);
-    if(hret != HG_SUCCESS)
-        return RKV_ERR_FROM_MERCURY;
-
-    hret = margo_provider_forward(handle->provider_id, h, &in);
-    if(hret != HG_SUCCESS) {
-        ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
-
-    hret = margo_get_output(h, &out);
-    if(hret != HG_SUCCESS) {
-        ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
-
-    ret = out.ret;
-    if(ret == RKV_SUCCESS)
-        *result = out.result;
-
-finish:
-    margo_free_output(h, &out);
-    margo_destroy(h);
-    return ret;
-}
-#endif

@@ -89,7 +89,7 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     ret = rkv_admin_init(context->mid, &admin);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
-    // test that we can open a database with type "dummy"
+    // test that we can open a database with type "map"
     ret = rkv_open_database(admin, context->addr,
             provider_id, valid_token, "map", backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);

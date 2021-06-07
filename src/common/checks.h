@@ -37,7 +37,7 @@
 #define CHECK_PROVIDER(__pr__) \
     do { \
         if(!__pr__) { \
-            RKV_LOG_ERROR(mid, "Could not find provider"); \
+            RKV_LOG_ERROR(mid, "could not find provider"); \
             out.ret = RKV_ERR_INVALID_PROVIDER; \
             return; \
         } \
