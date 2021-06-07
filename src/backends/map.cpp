@@ -93,6 +93,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     static KeyValueStoreInterface* create(const std::string& config) {
         // TODO handle custom comparator
+        (void)config;
         return new MapKeyValueStore();
     }
 

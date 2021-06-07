@@ -145,7 +145,6 @@ int rkv_provider_destroy(
 void rkv_open_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
-    rkv_return_t ret;
     open_database_in_t  in;
     open_database_out_t out;
     rkv_database_id_t id;
@@ -203,7 +202,6 @@ DEFINE_MARGO_RPC_HANDLER(rkv_open_database_ult)
 void rkv_close_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
-    rkv_return_t ret;
     close_database_in_t  in;
     close_database_out_t out;
     char id_str[37];

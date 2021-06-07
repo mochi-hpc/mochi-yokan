@@ -26,11 +26,7 @@ struct rkv_provider_args {
     // ...
 };
 
-#define RKV_PROVIDER_ARGS_INIT { \
-    .token = NULL, \
-    .config = NULL, \
-    .pool = ABT_POOL_NULL, \
-}
+#define RKV_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL }
 
 /**
  * @brief Creates a new RKV provider. If RKV_PROVIDER_IGNORE

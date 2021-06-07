@@ -67,7 +67,6 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
                                       const size_t* vsizes)
 {
     hg_bulk_t bulk   = HG_BULK_NULL;
-    rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     std::vector<void*> ptrs(2*count+2, nullptr);
     std::vector<hg_size_t> sizes(2*count+2, 0);
@@ -102,7 +101,6 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                                        const size_t* vsizes)
 {
     hg_bulk_t bulk   = HG_BULK_NULL;
-    rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     std::array<void*,4> ptrs = { const_cast<size_t*>(ksizes),
                                  const_cast<size_t*>(vsizes),

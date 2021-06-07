@@ -39,7 +39,7 @@ static inline hg_return_t hg_proc_rkv_data_t(hg_proc_t proc, void* data) {
         break;
     }
     return ret;
-};
+}
 
 /* Admin RPC types */
 
