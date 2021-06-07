@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "types.h"
+#include "../common/types.h"
 #include "admin.h"
 #include "rkv/rkv-admin.h"
 

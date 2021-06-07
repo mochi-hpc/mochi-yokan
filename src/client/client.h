@@ -6,7 +6,6 @@
 #ifndef _CLIENT_H
 #define _CLIENT_H
 
-#include "types.h"
 #include "rkv/rkv-client.h"
 #include "rkv/rkv-database.h"
 

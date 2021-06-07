@@ -4,12 +4,12 @@
  * See COPYRIGHT in top-level directory.
  */
 #include <bedrock/module.h>
+#include <string.h>
 #include "rkv/rkv-server.h"
 #include "rkv/rkv-client.h"
 #include "rkv/rkv-admin.h"
 #include "rkv/rkv-provider-handle.h"
-#include "client.h"
-#include <string.h>
+#include "../client/client.h"
 
 static int rkv_register_provider(
         bedrock_args_t args,

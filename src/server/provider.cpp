@@ -5,7 +5,7 @@
  */
 #include "rkv/rkv-server.h"
 #include "provider.hpp"
-#include "types.h"
+#include "../common/types.h"
 
 static void rkv_finalize_provider(void* p);
 

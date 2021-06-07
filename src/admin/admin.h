@@ -1,12 +1,11 @@
 /*
  * (C) 2020 The University of Chicago
- * 
+ *
  * See COPYRIGHT in top-level directory.
  */
 #ifndef _ADMIN_H
 #define _ADMIN_H
 
-#include "types.h"
 #include "rkv/rkv-admin.h"
 
 typedef struct rkv_admin {

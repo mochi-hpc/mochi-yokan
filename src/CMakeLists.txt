@@ -1,19 +1,19 @@
 # set source files
 set (server-src-files
-     provider.cpp)
+     server/provider.cpp)
 
 set (backend-src-files
-     backends.cpp
+     backends/backends.cpp
      backends/map.cpp)
 
 set (client-src-files
-     client.c)
+     client/client.c)
 
 set (admin-src-files
-     admin.c)
+     admin/admin.c)
 
 set (bedrock-module-src-files
-     bedrock-module.c)
+     bedrock/bedrock-module.c)
 
 # load package helper for generating cmake CONFIG packages
 include (CMakePackageConfigHelpers)
