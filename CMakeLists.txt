@@ -6,11 +6,7 @@ enable_testing ()
 
 set (CMAKE_CXX_STANDARD 14)
 
-set (CMAKE_CXX_FLAGS "-Wextra -Wall -Wpedantic")
-set (CMAKE_CXX_FLAGS_DEBUG "-g")
-set (CMAKE_CXX_FLAGS_RELEASE "-O3")
-
-#add_definitions (-g -Wextra -Wall -Wpedantic)
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wall -Wpedantic")
 
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_EXAMPLES "Build examples" OFF)
