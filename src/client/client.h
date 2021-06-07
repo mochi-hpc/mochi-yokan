@@ -21,8 +21,6 @@ typedef struct rkv_client {
    hg_id_t           length_packed_id;
    /* put */
    hg_id_t           put_id;
-   hg_id_t           put_multi_id;
-   hg_id_t           put_packed_id;
    /* get */
    hg_id_t           get_id;
    hg_id_t           get_multi_id;

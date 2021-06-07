@@ -7,7 +7,8 @@ set (backend-src-files
      backends/map.cpp)
 
 set (client-src-files
-     client/client.c)
+     client/client.c
+     client/put.cpp)
 
 set (admin-src-files
      admin/admin.c)

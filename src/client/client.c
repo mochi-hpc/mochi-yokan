@@ -29,8 +29,8 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
         margo_registered_name(mid, "rkv_length_packed", &c->length_packed_id, &flag);
 
         margo_registered_name(mid, "rkv_put",        &c->put_id,        &flag);
-        margo_registered_name(mid, "rkv_put_multi",  &c->put_multi_id,  &flag);
-        margo_registered_name(mid, "rkv_put_packed", &c->put_packed_id, &flag);
+//        margo_registered_name(mid, "rkv_put_multi",  &c->put_multi_id,  &flag);
+//        margo_registered_name(mid, "rkv_put_packed", &c->put_packed_id, &flag);
 
         margo_registered_name(mid, "rkv_get",        &c->get_id,        &flag);
         margo_registered_name(mid, "rkv_get_multi",  &c->get_multi_id,  &flag);
@@ -56,7 +56,7 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 //        c->length_multi_id = MARGO_REGISTER(mid, "rkv_length_multi", length_multi_in_t, length_multi_out_t, NULL);
 //        c->length_packed_id = MARGO_REGISTER(mid, "rkv_length_packed", length_packed_in_t, length_packed_out_t, NULL);
 
-//        c->put_id = MARGO_REGISTER(mid, "rkv_put", put_in_t, put_out_t, NULL);
+        c->put_id = MARGO_REGISTER(mid, "rkv_put", put_in_t, put_out_t, NULL);
 //        c->put_multi_id = MARGO_REGISTER(mid, "rkv_put_multi", put_multi_in_t, put_multi_out_t, NULL);
 //        c->put_packed_id = MARGO_REGISTER(mid, "rkv_put_packed", put_packed_in_t, put_packed_out_t, NULL);
 
