@@ -6,6 +6,9 @@
 #include "rkv/rkv-server.h"
 #include "provider.hpp"
 #include "../common/types.h"
+#include "../common/defer.hpp"
+#include "../common/logging.h"
+#include "../common/checks.h"
 
 static void rkv_finalize_provider(void* p);
 
@@ -27,23 +30,23 @@ int rkv_provider_register(
     hg_id_t id;
     hg_bool_t flag;
 
-    margo_info(mid, "Registering RKV provider with provider id %u", provider_id);
+    RKV_LOG_TRACE(mid, "registering RKV provider with provider id %u", provider_id);
 
     flag = margo_is_listening(mid);
     if(flag == HG_FALSE) {
-        margo_error(mid, "Margo instance is not a server");
+        RKV_LOG_ERROR(mid, "margo instance is not a server");
         return RKV_ERR_INVALID_ARGS;
     }
 
     margo_provider_registered_name(mid, "rkv_sum", provider_id, &id, &flag);
     if(flag == HG_TRUE) {
-        margo_error(mid, "Provider with the same provider id (%u) already register", provider_id);
+        RKV_LOG_ERROR(mid, "a provider with id %u is already registered", provider_id);
         return RKV_ERR_INVALID_PROVIDER;
     }
 
     p = new rkv_provider;
     if(p == NULL) {
-        margo_error(mid, "Could not allocate memory for provider");
+        RKV_LOG_ERROR(mid, "could not allocate memory for provider");
         return RKV_ERR_ALLOCATION;
     }
 
@@ -129,12 +132,12 @@ int rkv_provider_destroy(
         rkv_provider_t provider)
 {
     margo_instance_id mid = provider->mid;
-    margo_info(mid, "Destroying RKV provider");
+    RKV_LOG_TRACE(mid, "destroying RKV provider");
     /* pop the finalize callback */
     margo_provider_pop_finalize_callback(provider->mid, provider);
     /* call the callback */
     rkv_finalize_provider(provider);
-    margo_info(mid, "RKV provider successfuly destroyed");
+    RKV_LOG_TRACE(mid, "RKV provider successfuly destroyed");
     return RKV_SUCCESS;
 }
 
@@ -149,60 +152,49 @@ void rkv_open_database_ult(hg_handle_t h)
     rkv_database_t database;
     char id_str[37];
 
-    /* find the margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
 
-    /* find the provider */
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
     const struct hg_info* info = margo_get_info(h);
     rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
 
-    /* deserialize the input */
     hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
 
-    /* check the token sent by the admin */
     if(!check_token(provider, in.token)) {
-        margo_error(mid, "Invalid token");
+        RKV_LOG_ERROR(mid, "invalid token");
         out.ret = RKV_ERR_INVALID_TOKEN;
-        goto finish;
+        return;;
     }
 
-    /* check if we can create a database of this type */
     has_backend_type = rkv::KeyValueStoreFactory::hasBackendType(in.type);
 
     if(!has_backend_type) {
-        margo_error(mid, "Could not find backend of type \"%s\"", in.type);
+        RKV_LOG_ERROR(mid, "could not find backend of type \"%s\"", in.type);
         out.ret = RKV_ERR_INVALID_BACKEND;
-        goto finish;
+        return;
     }
 
-    /* create a uuid for the new database */
     uuid_generate(id.uuid);
 
-    /* create the new database's context */
     database = rkv::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config);
     if(database == nullptr) {
-        margo_error(mid, "Failed to open database of type %s", in.type);
+        RKV_LOG_ERROR(mid, "failed to open database of type %s", in.type);
         out.ret = RKV_ERR_OTHER;
-        goto finish;
+        return;
     }
     provider->dbs[id] = database;
 
-    /* set the response */
-    out.ret = RKV_SUCCESS;
     out.id = id;
 
     rkv_database_id_to_string(id, id_str);
-    margo_debug(mid, "Created database %s of type \"%s\"", id_str, in.type);
+    RKV_LOG_TRACE(mid, "created database %s of type \"%s\"", id_str, in.type);
 
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    margo_destroy(h);
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_open_database_ult)
 
@@ -216,45 +208,31 @@ void rkv_close_database_ult(hg_handle_t h)
 
     rkv_database_id_to_string(in.id, id_str);
 
-    /* find the margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
 
-    /* find the provider */
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
     const struct hg_info* info = margo_get_info(h);
     rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
 
-    /* deserialize the input */
     hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
 
-    /* check the token sent by the admin */
     if(!check_token(provider, in.token)) {
-        margo_error(mid, "Invalid token");
+        RKV_LOG_ERROR(mid, "invalid token");
         out.ret = RKV_ERR_INVALID_TOKEN;
-        goto finish;
+        return;
     }
 
-    /* check if the database exists */
-    if(provider->dbs.count(in.id) == 0) {
-        margo_error(mid, "Could not find and close database with id %s", id_str);
-        out.ret = RKV_ERR_INVALID_DATABASE;
-        goto finish;
-    }
+    auto database = find_database(provider, &in.id);
+    CHECK_DATABASE(database, in.id);
 
-    /* remove the database */
     delete provider->dbs[in.id];
     provider->dbs.erase(in.id);
-
-    margo_debug(mid, "Closed database with id %s", id_str);
-
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    margo_destroy(h);
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_close_database_ult)
 
@@ -263,58 +241,39 @@ void rkv_destroy_database_ult(hg_handle_t h)
     hg_return_t hret;
     destroy_database_in_t  in;
     destroy_database_out_t out;
-    rkv_database* database = nullptr;
-    char id_str[37];
 
-    rkv_database_id_to_string(in.id, id_str);
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
 
-    /* find the margo instance */
     margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
 
-    /* find the provider */
     const struct hg_info* info = margo_get_info(h);
     rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
 
-    /* deserialize the input */
     hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
 
-    /* check the token sent by the admin */
     if(!check_token(provider, in.token)) {
-        margo_error(mid, "Invalid token");
+        RKV_LOG_ERROR(mid, "invalid token");
         out.ret = RKV_ERR_INVALID_TOKEN;
-        goto finish;
+        return;
     }
 
-    /* check if the database exists */
-    if(provider->dbs.count(in.id) == 0) {
-        margo_error(mid, "Could not find and close database with id %s", id_str);
-        out.ret = RKV_ERR_INVALID_DATABASE;
-        goto finish;
-    }
+    auto database = find_database(provider, &in.id);
+    CHECK_DATABASE(database, in.id);
 
-    /* destroy the database */
-    database = provider->dbs[in.id];
     database->destroy();
     delete database;
     provider->dbs.erase(in.id);
 
     out.ret = RKV_SUCCESS;
 
-    if(out.ret == RKV_SUCCESS) {
-        margo_debug(mid, "Destroyed database with id %s", id_str);
-    } else {
-        margo_error(mid, "Could not destroy database, database may be left in an invalid state");
+    if(out.ret != RKV_SUCCESS) {
+        RKV_LOG_ERROR(mid, "could not destroy database, database may be left in an invalid state");
     }
-
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    margo_destroy(h);
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
 
@@ -326,29 +285,27 @@ void rkv_list_databases_ult(hg_handle_t h)
     out.ids = nullptr;
     unsigned i;
 
-    /* find margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    DEFER(free(out.ids));
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
 
-    /* find provider */
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
     const struct hg_info* info = margo_get_info(h);
     rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
 
-    /* deserialize the input */
     hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
 
-    /* check the token sent by the admin */
     if(!check_token(provider, in.token)) {
         margo_error(mid, "Invalid token");
         out.ret = RKV_ERR_INVALID_TOKEN;
-        goto finish;
+        return;
     }
 
-    /* allocate array of database ids */
     out.ret   = RKV_SUCCESS;
     out.count = provider->dbs.size() < in.max_ids ? provider->dbs.size() : in.max_ids;
     out.ids   = (rkv_database_id_t*)calloc(out.count, sizeof(*out.ids));
@@ -361,14 +318,6 @@ void rkv_list_databases_ult(hg_handle_t h)
             break;
     }
     out.count = i;
-
-    margo_debug(mid, "Listed databases");
-
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    free(out.ids);
-    margo_destroy(h);
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
 
