@@ -77,4 +77,28 @@ typedef struct rkv_provider {
     hg_id_t list_keyvals_packed_id;
 } rkv_provider;
 
+/* Admin RPCs */
+DECLARE_MARGO_RPC_HANDLER(rkv_create_database_ult)
+void rkv_create_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_open_database_ult)
+void rkv_open_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_close_database_ult)
+void rkv_close_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
+void rkv_destroy_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
+void rkv_list_databases_ult(hg_handle_t h);
+
+/* Client RPCs */
+DECLARE_MARGO_RPC_HANDLER(rkv_put_ult)
+void rkv_put_ult(hg_handle_t h);
+
+static inline rkv_database_t find_database(rkv_provider_t provider,
+                                           rkv_database_id_t* db_id)
+{
+    auto it = provider->dbs.find(*db_id);
+    if(it == provider->dbs.end()) return nullptr;
+    else return it->second;
+}
+
 #endif

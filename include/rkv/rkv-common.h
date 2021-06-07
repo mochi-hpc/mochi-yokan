@@ -19,6 +19,7 @@ extern "C" {
 typedef enum rkv_return_t {
     RKV_SUCCESS,
     RKV_ERR_ALLOCATION,        /* Allocation error */
+    RKV_ERR_INVALID_MID,       /* Invalid margo instance */
     RKV_ERR_INVALID_ARGS,      /* Invalid argument */
     RKV_ERR_INVALID_PROVIDER,  /* Invalid provider id */
     RKV_ERR_INVALID_DATABASE,  /* Invalid database id */

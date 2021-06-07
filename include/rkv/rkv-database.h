@@ -64,6 +64,7 @@ rkv_return_t rkv_put(rkv_database_handle_t dbh,
 
 rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
                           size_t count,
+                          const char* origin,
                           hg_bulk_t data,
                           size_t offset,
                           size_t size);

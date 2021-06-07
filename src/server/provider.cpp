@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2021 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -14,26 +14,6 @@ static void rkv_finalize_provider(void* p);
 static inline bool check_token(
         rkv_provider_t provider,
         const char* token);
-
-/* Admin RPCs */
-static DECLARE_MARGO_RPC_HANDLER(rkv_create_database_ult)
-static void rkv_create_database_ult(hg_handle_t h);
-static DECLARE_MARGO_RPC_HANDLER(rkv_open_database_ult)
-static void rkv_open_database_ult(hg_handle_t h);
-static DECLARE_MARGO_RPC_HANDLER(rkv_close_database_ult)
-static void rkv_close_database_ult(hg_handle_t h);
-static DECLARE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
-static void rkv_destroy_database_ult(hg_handle_t h);
-static DECLARE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
-static void rkv_list_databases_ult(hg_handle_t h);
-
-/* Client RPCs */
-static DECLARE_MARGO_RPC_HANDLER(rkv_hello_ult)
-static void rkv_hello_ult(hg_handle_t h);
-static DECLARE_MARGO_RPC_HANDLER(rkv_sum_ult)
-static void rkv_sum_ult(hg_handle_t h);
-
-/* add other RPC declarations here */
 
 int rkv_provider_register(
         margo_instance_id mid,
@@ -99,25 +79,10 @@ int rkv_provider_register(
 
     /* Client RPCs */
 
-#if 0
-    id = MARGO_REGISTER_PROVIDER(mid, "rkv_hello",
-            hello_in_t, void,
-            rkv_hello_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->hello_id = id;
-    margo_registered_disable_response(mid, id, HG_TRUE);
-
-    id = MARGO_REGISTER_PROVIDER(mid, "rkv_sum",
-            sum_in_t, sum_out_t,
-            rkv_sum_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->sum_id = id;
-#endif
-    /* add other RPC registration here */
-    /* ... */
-
-    /* add backends available at compiler time (e.g. default/dummy backends) */
-    //rkv_provider_register_dummy_backend(p); // function from "dummy/dummy-backend.h"
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_put",
+            put_in_t, put_out_t,
+            rkv_put_ult, provider_id, p->pool);
+    p->put_id = id;
 
     margo_provider_push_finalize_callback(mid, p, &rkv_finalize_provider, p);
 
@@ -139,25 +104,23 @@ static void rkv_finalize_provider(void* p)
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
-    margo_deregister(mid, provider->exists_id);
-    margo_deregister(mid, provider->exists_multi_id);
-    margo_deregister(mid, provider->exists_packed_id);
-    margo_deregister(mid, provider->length_id);
-    margo_deregister(mid, provider->length_multi_id);
-    margo_deregister(mid, provider->length_packed_id);
+    //margo_deregister(mid, provider->exists_id);
+    //margo_deregister(mid, provider->exists_multi_id);
+    //margo_deregister(mid, provider->exists_packed_id);
+    //margo_deregister(mid, provider->length_id);
+    //margo_deregister(mid, provider->length_multi_id);
+    //margo_deregister(mid, provider->length_packed_id);
     margo_deregister(mid, provider->put_id);
-    margo_deregister(mid, provider->put_multi_id);
-    margo_deregister(mid, provider->put_packed_id);
-    margo_deregister(mid, provider->get_id);
-    margo_deregister(mid, provider->get_multi_id);
-    margo_deregister(mid, provider->get_packed_id);
-    margo_deregister(mid, provider->erase_id);
-    margo_deregister(mid, provider->erase_multi_id);
-    margo_deregister(mid, provider->erase_packed_id);
-    margo_deregister(mid, provider->list_keys_id);
-    margo_deregister(mid, provider->list_keys_packed_id);
-    margo_deregister(mid, provider->list_keyvals_id);
-    margo_deregister(mid, provider->list_keyvals_packed_id);
+    //margo_deregister(mid, provider->get_id);
+    //margo_deregister(mid, provider->get_multi_id);
+    //margo_deregister(mid, provider->get_packed_id);
+    //margo_deregister(mid, provider->erase_id);
+    //margo_deregister(mid, provider->erase_multi_id);
+    //margo_deregister(mid, provider->erase_packed_id);
+    //margo_deregister(mid, provider->list_keys_id);
+    //margo_deregister(mid, provider->list_keys_packed_id);
+    //margo_deregister(mid, provider->list_keyvals_id);
+    //margo_deregister(mid, provider->list_keyvals_packed_id);
     delete provider;
     margo_info(mid, "RKV provider successfuly finalized");
 }
@@ -175,7 +138,7 @@ int rkv_provider_destroy(
     return RKV_SUCCESS;
 }
 
-static void rkv_open_database_ult(hg_handle_t h)
+void rkv_open_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
     rkv_return_t ret;
@@ -241,9 +204,9 @@ finish:
     hret = margo_free_input(h, &in);
     margo_destroy(h);
 }
-static DEFINE_MARGO_RPC_HANDLER(rkv_open_database_ult)
+DEFINE_MARGO_RPC_HANDLER(rkv_open_database_ult)
 
-static void rkv_close_database_ult(hg_handle_t h)
+void rkv_close_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
     rkv_return_t ret;
@@ -293,9 +256,9 @@ finish:
     hret = margo_free_input(h, &in);
     margo_destroy(h);
 }
-static DEFINE_MARGO_RPC_HANDLER(rkv_close_database_ult)
+DEFINE_MARGO_RPC_HANDLER(rkv_close_database_ult)
 
-static void rkv_destroy_database_ult(hg_handle_t h)
+void rkv_destroy_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
     destroy_database_in_t  in;
@@ -353,9 +316,9 @@ finish:
     hret = margo_free_input(h, &in);
     margo_destroy(h);
 }
-static DEFINE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
+DEFINE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
 
-static void rkv_list_databases_ult(hg_handle_t h)
+void rkv_list_databases_ult(hg_handle_t h)
 {
     hg_return_t hret;
     list_databases_in_t  in;
@@ -407,89 +370,7 @@ finish:
     free(out.ids);
     margo_destroy(h);
 }
-static DEFINE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
-
-#if 0
-static void rkv_hello_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    hello_in_t in;
-
-    /* find margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-
-    /* find provider */
-    const struct hg_info* info = margo_get_info(h);
-    rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
-
-    /* deserialize the input */
-    hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        goto finish;
-    }
-
-    /* find the database */
-    rkv_database* database = find_database(provider, &in.database_id);
-    if(!database) {
-        margo_error(mid, "Could not find requested database");
-        goto finish;
-    }
-
-    /* call hello on the database's context */
-    database->fn->hello(database->ctx);
-
-    margo_debug(mid, "Called hello RPC");
-
-finish:
-    margo_destroy(h);
-}
-static DEFINE_MARGO_RPC_HANDLER(rkv_hello_ult)
-
-static void rkv_sum_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    sum_in_t     in;
-    sum_out_t   out;
-
-    /* find the margo instance */
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-
-    /* find the provider */
-    const struct hg_info* info = margo_get_info(h);
-    rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
-
-    /* deserialize the input */
-    hret = margo_get_input(h, &in);
-    if(hret != HG_SUCCESS) {
-        margo_error(mid, "Could not deserialize output (mercury error %d)", hret);
-        out.ret = RKV_ERR_FROM_MERCURY;
-        goto finish;
-    }
-
-#if 0
-    /* find the database */
-    rkv_database* database = find_database(provider, &in.database_id);
-    if(!database) {
-        margo_error(mid, "Could not find requested database");
-        out.ret = RKV_ERR_INVALID_DATABASE;
-        goto finish;
-    }
-
-    /* call hello on the database's context */
-    out.result = database->fn->sum(database->ctx, in.x, in.y);
-    out.ret = RKV_SUCCESS;
-#endif
-
-    margo_debug(mid, "Called sum RPC");
-
-finish:
-    hret = margo_respond(h, &out);
-    hret = margo_free_input(h, &in);
-    margo_destroy(h);
-}
-static DEFINE_MARGO_RPC_HANDLER(rkv_sum_ult)
-#endif
+DEFINE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
 
 static inline bool check_token(
         rkv_provider_t provider,

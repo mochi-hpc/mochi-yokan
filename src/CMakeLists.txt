@@ -1,6 +1,7 @@
 # set source files
 set (server-src-files
-     server/provider.cpp)
+     server/provider.cpp
+     server/put.cpp)
 
 set (backend-src-files
      backends/backends.cpp

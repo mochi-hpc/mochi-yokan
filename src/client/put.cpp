@@ -10,9 +10,11 @@
 #include "../common/defer.hpp"
 #include "../common/types.h"
 #include "../common/logging.h"
+#include "../common/checks.h"
 
 extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
                                      size_t count,
+                                     const char* origin,
                                      hg_bulk_t data,
                                      size_t offset,
                                      size_t size)
@@ -29,7 +31,7 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
     in.bulk   = data;
     in.offset = offset;
     in.size   = size;
-    in.origin = nullptr;
+    in.origin = const_cast<char*>(origin);
 
     hret = margo_create(mid, dbh->addr, dbh->client->put_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -68,7 +70,7 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
     rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     std::vector<void*> ptrs(2*count+2, nullptr);
-    std::vector<size_t> sizes(2*count+2, 0);
+    std::vector<hg_size_t> sizes(2*count+2, 0);
     margo_instance_id mid = dbh->client->mid;
     ptrs[0]  = const_cast<size_t*>(ksizes);
     ptrs[1]  = const_cast<size_t*>(vsizes);
@@ -89,7 +91,7 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, count, bulk, 0, total_size);
+    return rkv_put_bulk(dbh, count, nullptr, bulk, 0, total_size);
 }
 
 extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
@@ -106,10 +108,10 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                                  const_cast<size_t*>(vsizes),
                                  const_cast<void*>(keys),
                                  const_cast<void*>(values) };
-    std::array<size_t,4> sizes = { count*sizeof(*ksizes),
-                                   count*sizeof(*vsizes),
-                                   std::accumulate(ksizes, ksizes+count, (size_t)0),
-                                   std::accumulate(vsizes, vsizes+count, (size_t)0) };
+    std::array<hg_size_t,4> sizes = { count*sizeof(*ksizes),
+                                      count*sizeof(*vsizes),
+                                      std::accumulate(ksizes, ksizes+count, (size_t)0),
+                                      std::accumulate(vsizes, vsizes+count, (size_t)0) };
     margo_instance_id mid = dbh->client->mid;
 
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
@@ -119,5 +121,5 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, count, bulk, 0, total_size);
+    return rkv_put_bulk(dbh, count, nullptr, bulk, 0, total_size);
 }
