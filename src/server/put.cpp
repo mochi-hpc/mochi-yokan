@@ -40,7 +40,7 @@ void rkv_put_ult(hg_handle_t h)
         hret = margo_addr_dup(mid, info->addr, &origin_addr);
         CHECK_HRET_OUT(hret, margo_addr_dup);
     }
-    DEFER(margo_addr_free(origin_addr));
+    DEFER(margo_addr_free(mid, origin_addr));
 
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
