@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <rkv/rkv-common.h>
 
 template <typename T> class __RKVBackendRegistration;
 
@@ -39,11 +40,11 @@ using UserMem = BasicUserMem<void>;
  * @brief Status returned by all the backend functions.
  */
 enum class Status : uint8_t {
-    OK,
-    InvalidArg,
-    NotFound,
-    SizeError,
-    KeyExists
+    OK          = RKV_SUCCESS,
+    InvalidArg  = RKV_ERR_INVALID_ARGS,
+    NotFound    = RKV_ERR_KEY_NOT_FOUND,
+    SizeError   = RKV_ERR_BUFFER_SIZE,
+    KeyExists   = RKV_ERR_KEY_EXISTS
 };
 
 /**

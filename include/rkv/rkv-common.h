@@ -16,23 +16,30 @@ extern "C" {
 /**
  * @brief Error codes that can be returned by RKV functions.
  */
+#define RKV_RETURN_VALUES                              \
+    X(RKV_SUCCESS, "Success")                          \
+    X(RKV_ERR_ALLOCATION, "Allocation error")          \
+    X(RKV_ERR_INVALID_MID, "Invalid margo instance")   \
+    X(RKV_ERR_INVALID_ARGS, "Invalid argument")        \
+    X(RKV_ERR_INVALID_PROVIDER, "Invalid provider id") \
+    X(RKV_ERR_INVALID_DATABASE, "Invalid database id") \
+    X(RKV_ERR_INVALID_BACKEND, "Invalid backend type") \
+    X(RKV_ERR_INVALID_CONFIG, "Invalid configuration") \
+    X(RKV_ERR_INVALID_TOKEN, "Invalid token")          \
+    X(RKV_ERR_FROM_MERCURY, "Mercurt error")           \
+    X(RKV_ERR_FROM_ARGOBOTS, "Argobots error")         \
+    X(RKV_ERR_OP_UNSUPPORTED, "Unsupported operation") \
+    X(RKV_ERR_OP_FORBIDDEN, "Forbidden operation")     \
+    X(RKV_ERR_KEY_NOT_FOUND, "Key not found")          \
+    X(RKV_ERR_BUFFER_SIZE, "Buffer too small")         \
+    X(RKV_ERR_KEY_EXISTS, "Key exists")                \
+    X(RKV_ERR_OTHER, "Other error")
+
+#define X(__err__, __msg__) __err__,
 typedef enum rkv_return_t {
-    RKV_SUCCESS,
-    RKV_ERR_ALLOCATION,        /* Allocation error */
-    RKV_ERR_INVALID_MID,       /* Invalid margo instance */
-    RKV_ERR_INVALID_ARGS,      /* Invalid argument */
-    RKV_ERR_INVALID_PROVIDER,  /* Invalid provider id */
-    RKV_ERR_INVALID_DATABASE,  /* Invalid database id */
-    RKV_ERR_INVALID_BACKEND,   /* Invalid backend type */
-    RKV_ERR_INVALID_CONFIG,    /* Invalid configuration */
-    RKV_ERR_INVALID_TOKEN,     /* Invalid token */
-    RKV_ERR_FROM_MERCURY,      /* Mercurt error */
-    RKV_ERR_FROM_ARGOBOTS,     /* Argobots error */
-    RKV_ERR_OP_UNSUPPORTED,    /* Unsupported operation */
-    RKV_ERR_OP_FORBIDDEN,      /* Forbidden operation */
-    /* ... TODO add more error codes here if needed */
-    RKV_ERR_OTHER              /* Other error */
+    RKV_RETURN_VALUES
 } rkv_return_t;
+#undef X
 
 /**
  * @brief Identifier for a database.
