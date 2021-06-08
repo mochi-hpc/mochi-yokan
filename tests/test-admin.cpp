@@ -77,6 +77,29 @@ static MunitResult test_admin(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitResult test_two_admins(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_admin_t admin1, admin2;
+    rkv_return_t ret;
+
+    ret = rkv_admin_init(context->mid, &admin1);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    ret = rkv_admin_init(context->mid, &admin2);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    ret = rkv_admin_finalize(admin2);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    ret = rkv_admin_finalize(admin1);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    return MUNIT_OK;
+}
+
 static MunitResult test_database(const MunitParameter params[], void* data)
 {
     (void)params;
@@ -172,9 +195,14 @@ static MunitResult test_invalid(const MunitParameter params[], void* data)
 }
 
 static MunitTest test_suite_tests[] = {
-    { (char*) "/admin",    test_admin,    test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/database", test_database, test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/invalid",  test_invalid,  test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/admin", test_admin,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/admin/two", test_two_admins,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/database", test_database,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/invalid", test_invalid,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

@@ -66,6 +66,10 @@ void rkv_put_ult(hg_handle_t h)
         keys[i].data = buffer.data() + current_offset;
         keys[i].size = sizes[i];
         current_offset += sizes[i];
+        if(sizes[i] == 0) {
+            out.ret = RKV_ERR_INVALID_ARGS;
+            return;
+        }
     }
     std::vector<rkv::UserMem> values(in.count);
     size_t j = in.count;

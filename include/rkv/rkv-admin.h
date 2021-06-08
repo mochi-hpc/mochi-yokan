@@ -116,4 +116,8 @@ rkv_return_t rkv_list_databases(
         rkv_database_id_t* ids,
         size_t* count);
 
+#if defined(__cplusplus)
+}
+#endif
+
 #endif

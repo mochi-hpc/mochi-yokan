@@ -1,6 +1,6 @@
 include_directories (${CMAKE_CURRENT_SOURCE_DIR}/munit)
 
-file (GLOB test-sources ${CMAKE_CURRENT_SOURCE_DIR}/test-*.c)
+file (GLOB test-sources ${CMAKE_CURRENT_SOURCE_DIR}/test-*.cpp)
 
 foreach (test-source ${test-sources})
     get_filename_component (test-target ${test-source} NAME_WE)

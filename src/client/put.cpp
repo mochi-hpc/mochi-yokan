@@ -19,6 +19,9 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
                                      size_t offset,
                                      size_t size)
 {
+    if(count != 0 && size == 0)
+        return RKV_ERR_INVALID_ARGS;
+
     margo_instance_id mid = dbh->client->mid;
     rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
@@ -56,6 +59,8 @@ extern "C" rkv_return_t rkv_put(rkv_database_handle_t dbh,
                                 const void* value,
                                 size_t vsize)
 {
+    if(ksize == 0)
+        return RKV_ERR_INVALID_ARGS;
     return rkv_put_packed(dbh, 1, key, &ksize, value, &vsize);
 }
 
@@ -66,26 +71,41 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
                                       const void* const* values,
                                       const size_t* vsizes)
 {
+    if(count == 0)
+        return RKV_SUCCESS;
+    else if(!keys || !ksizes || !values || !vsizes)
+        return RKV_ERR_INVALID_ARGS;
+
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
-    std::vector<void*> ptrs(2*count+2, nullptr);
-    std::vector<hg_size_t> sizes(2*count+2, 0);
+    std::vector<void*> ptrs = {
+        const_cast<size_t*>(ksizes),
+        const_cast<size_t*>(vsizes)
+    };
+    ptrs.reserve(2*count+2);
+    std::vector<hg_size_t> sizes = {
+        count*sizeof(*ksizes),
+        count*sizeof(*vsizes)
+    };
+    sizes.reserve(2*count+2);
     margo_instance_id mid = dbh->client->mid;
-    ptrs[0]  = const_cast<size_t*>(ksizes);
-    ptrs[1]  = const_cast<size_t*>(vsizes);
-    sizes[0] = count*sizeof(*ksizes);
-    sizes[1] = count*sizeof(*vsizes);
 
     for(unsigned i = 0; i < count; i++) {
-        ptrs[2+i]        = const_cast<void*>(keys[i]);
-        ptrs[2+count+i]  = const_cast<void*>(values[i]);
-        sizes[2+i]       = ksizes[i];
-        sizes[2+count+i] = vsizes[i];
+        if(ksizes[i] == 0)
+            return RKV_ERR_INVALID_ARGS;
+        ptrs.push_back(const_cast<void*>(keys[i]));
+        sizes.push_back(ksizes[i]);
+    }
+    for(unsigned i = 0; i < count; i++) {
+        if(vsizes[i] == 0)
+            continue;
+        ptrs.push_back(const_cast<void*>(values[i]));
+        sizes.push_back(vsizes[i]);
     }
 
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
 
-    hret = margo_bulk_create(mid, 2*count+2, ptrs.data(), sizes.data(),
+    hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READ_ONLY, &bulk);
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
@@ -100,6 +120,11 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                                        const void* values,
                                        const size_t* vsizes)
 {
+    if(count == 0)
+        return RKV_SUCCESS;
+    else if(!keys || !ksizes || !vsizes)
+        return RKV_ERR_INVALID_ARGS;
+
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
     std::array<void*,4> ptrs = { const_cast<size_t*>(ksizes),
@@ -114,8 +139,16 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
 
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
 
-    hret = margo_bulk_create(mid, 4, ptrs.data(), sizes.data(),
-                             HG_BULK_READ_ONLY, &bulk);
+    if(sizes[2] == 0)
+        return RKV_ERR_INVALID_ARGS;
+
+    if(sizes[3] != 0)
+        hret = margo_bulk_create(mid, 4, ptrs.data(), sizes.data(),
+                                 HG_BULK_READ_ONLY, &bulk);
+    else
+        hret = margo_bulk_create(mid, 3, ptrs.data(), sizes.data(),
+                                 HG_BULK_READ_ONLY, &bulk);
+
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 

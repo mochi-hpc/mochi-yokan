@@ -40,7 +40,7 @@ struct rkv_provider_args {
  *
  * @return RKV_SUCCESS or error code defined in rkv-common.h
  */
-int rkv_provider_register(
+rkv_return_t rkv_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
         const struct rkv_provider_args* args,
@@ -53,7 +53,7 @@ int rkv_provider_register(
  *
  * @return RKV_SUCCESS or error code defined in rkv-common.h
  */
-int rkv_provider_destroy(
+rkv_return_t rkv_provider_destroy(
         rkv_provider_t provider);
 
 #ifdef __cplusplus

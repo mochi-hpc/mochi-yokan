@@ -18,7 +18,7 @@ static inline bool check_token(
         rkv_provider_t provider,
         const char* token);
 
-int rkv_provider_register(
+rkv_return_t rkv_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
         const struct rkv_provider_args* args,
@@ -129,7 +129,7 @@ static void rkv_finalize_provider(void* p)
     margo_info(mid, "RKV provider successfuly finalized");
 }
 
-int rkv_provider_destroy(
+rkv_return_t rkv_provider_destroy(
         rkv_provider_t provider)
 {
     margo_instance_id mid = provider->mid;

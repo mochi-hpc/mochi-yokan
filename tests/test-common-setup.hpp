@@ -10,14 +10,17 @@
 #include <rkv/rkv-client.h>
 #include <rkv/rkv-database.h>
 #include "munit/munit.h"
+#include <map>
+#include <string>
 
 struct test_context {
-    margo_instance_id     mid;
-    hg_addr_t             addr;
-    rkv_admin_t           admin;
-    rkv_client_t          client;
-    rkv_database_id_t     id;
-    rkv_database_handle_t dbh;
+    margo_instance_id                 mid;
+    hg_addr_t                         addr;
+    rkv_admin_t                       admin;
+    rkv_client_t                      client;
+    rkv_database_id_t                 id;
+    rkv_database_handle_t             dbh;
+    std::map<std::string,std::string> reference;
 };
 
 static const uint16_t provider_id = 42;
@@ -64,7 +67,7 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     ret = rkv_database_handle_create(client,
             addr, provider_id, id, &dbh);
     // create test context
-    struct test_context* context = (struct test_context*)calloc(1, sizeof(*context));
+    struct test_context* context = new test_context;
     munit_assert_not_null(context);
     context->mid    = mid;
     context->addr   = addr;
@@ -72,6 +75,27 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     context->client = client;
     context->id     = id;
     context->dbh    = dbh;
+    // create random key/value pairs
+    for(unsigned i = 0; i < 32; i++) {
+        std::string key;
+        std::string val;
+        int ksize = munit_rand_int_range(8, 16);
+        int vsize = munit_rand_int_range(0, 1024);
+        key.resize(ksize);
+        val.resize(vsize);
+        for(int j = 0; j < ksize; j++) {
+            char c = (char)munit_rand_int_range(33, 126);
+            key[j] = c;
+        }
+        for(int j = 0; j < vsize; j++) {
+            char c = (char)munit_rand_int_range(33, 126);
+            val[j] = c;
+        }
+        context->reference.emplace(
+                std::move(key),
+                std::move(val));
+    }
+
     return context;
 }
 
@@ -97,4 +121,6 @@ static void test_context_tear_down(void* fixture)
     // we are not checking the return value of the above function with
     // munit because we need margo_finalize to be called no matter what.
     margo_finalize(context->mid);
+
+    delete context;
 }

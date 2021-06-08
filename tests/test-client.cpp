@@ -99,6 +99,29 @@ static MunitResult test_client(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitResult test_two_clients(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_client_t client1, client2;
+    rkv_return_t ret;
+    // test that we can create a client object
+    ret = rkv_client_init(context->mid, &client1);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+    // test that we can create a secondclient object
+    ret = rkv_client_init(context->mid, &client2);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+    // test that we can free the second client object
+    ret = rkv_client_finalize(client2);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+    // test that we can first the second client object
+    ret = rkv_client_finalize(client1);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    return MUNIT_OK;
+}
+
 static MunitResult test_database(const MunitParameter params[], void* data)
 {
     (void)params;
@@ -131,8 +154,12 @@ static MunitResult test_database(const MunitParameter params[], void* data)
 }
 
 static MunitTest test_suite_tests[] = {
-    { (char*) "/client",   test_client,   test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/database", test_database, test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/client", test_client,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/client/two", test_two_clients,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+    { (char*) "/database", test_database,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 
