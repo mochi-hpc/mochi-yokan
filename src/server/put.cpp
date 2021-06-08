@@ -30,6 +30,9 @@ void rkv_put_ult(hg_handle_t h)
     rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
     CHECK_PROVIDER(provider);
 
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+
     if(in.origin) {
         hret = margo_addr_lookup(mid, in.origin, &origin_addr);
         CHECK_HRET_OUT(hret, margo_addr_lookup);
@@ -37,9 +40,7 @@ void rkv_put_ult(hg_handle_t h)
         hret = margo_addr_dup(mid, info->addr, &origin_addr);
         CHECK_HRET_OUT(hret, margo_addr_dup);
     }
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_addr_free(origin_addr));
 
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
