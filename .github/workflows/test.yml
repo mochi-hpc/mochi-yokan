@@ -33,5 +33,5 @@ jobs:
       run: |
         eval `/opt/spack/bin/spack env activate --sh .` &&
         mkdir build && cd build &&
-        cmake .. -DENABLE_COVERAGE -DENABLE_TESTS=ON -DENABLE_BEDROCK=ON -DCMAKE_BUILD_TYPE=Debug &&
+        cmake .. -DENABLE_TESTS=ON -DENABLE_BEDROCK=ON -DCMAKE_BUILD_TYPE=Debug &&
         make && ctest --output-on-failure
