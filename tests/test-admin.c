@@ -27,7 +27,7 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     margo_instance_id mid;
     hg_addr_t         addr;
     // create margo instance
-    mid = margo_init("na+sm", MARGO_SERVER_MODE, 0, 0);
+    mid = margo_init("ofi+tcp", MARGO_SERVER_MODE, 0, 0);
     munit_assert_not_null(mid);
     // set log level
     margo_set_global_log_level(MARGO_LOG_CRITICAL);

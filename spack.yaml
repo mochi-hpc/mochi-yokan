@@ -5,5 +5,5 @@ spack:
   - uuid
   - nlohmann-json
   - mochi-margo
-  - mercury~boostsys~ofi
+  - mercury~boostsys ^libfabric fabrics=tcp,rxm
   concretization: together

@@ -32,7 +32,7 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     rkv_admin_t       admin;
     rkv_database_id_t id;
     // create margo instance
-    mid = margo_init("na+sm", MARGO_SERVER_MODE, 0, 0);
+    mid = margo_init("ofi+tcp", MARGO_SERVER_MODE, 0, 0);
     munit_assert_not_null(mid);
     // set log level
     margo_set_global_log_level(MARGO_LOG_CRITICAL);

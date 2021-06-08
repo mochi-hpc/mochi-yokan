@@ -26,7 +26,7 @@ extern "C" {
     X(RKV_ERR_INVALID_BACKEND, "Invalid backend type") \
     X(RKV_ERR_INVALID_CONFIG, "Invalid configuration") \
     X(RKV_ERR_INVALID_TOKEN, "Invalid token")          \
-    X(RKV_ERR_FROM_MERCURY, "Mercurt error")           \
+    X(RKV_ERR_FROM_MERCURY, "Mercury error")           \
     X(RKV_ERR_FROM_ARGOBOTS, "Argobots error")         \
     X(RKV_ERR_OP_UNSUPPORTED, "Unsupported operation") \
     X(RKV_ERR_OP_FORBIDDEN, "Forbidden operation")     \
