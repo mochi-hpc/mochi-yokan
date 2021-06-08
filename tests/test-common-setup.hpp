@@ -75,12 +75,12 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     context->client = client;
     context->id     = id;
     context->dbh    = dbh;
-    // create random key/value pairs
-    for(unsigned i = 0; i < 32; i++) {
+    // create random key/value pairs with an empty value every 8 values
+    for(unsigned i = 0; i < 64; i++) {
         std::string key;
         std::string val;
         int ksize = munit_rand_int_range(8, 16);
-        int vsize = munit_rand_int_range(0, 1024);
+        int vsize = i % 8 == 0 ? 0 : munit_rand_int_range(1, 1024);
         key.resize(ksize);
         val.resize(vsize);
         for(int j = 0; j < ksize; j++) {
