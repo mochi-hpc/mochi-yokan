@@ -29,9 +29,9 @@ set (rkv-vers "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}")
 # server library
 add_library (rkv-server ${server-src-files} ${backend-src-files})
 target_link_libraries (rkv-server
-    PkgConfig::margo
-    PkgConfig::uuid
-    PkgConfig::json-c)
+    PUBLIC PkgConfig::margo
+    PUBLIC PkgConfig::uuid
+    PRIVATE coverage_config)
 target_include_directories (rkv-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -43,7 +43,10 @@ set_target_properties (rkv-server
 
 # client library
 add_library (rkv-client ${client-src-files})
-target_link_libraries (rkv-client PkgConfig::margo PkgConfig::uuid)
+target_link_libraries (rkv-client
+    PUBLIC PkgConfig::margo
+    PUBLIC PkgConfig::uuid
+    PRIVATE coverage_config)
 target_include_directories (rkv-client PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -55,7 +58,10 @@ set_target_properties (rkv-client
 
 # admin library
 add_library (rkv-admin ${admin-src-files})
-target_link_libraries (rkv-admin PkgConfig::margo PkgConfig::uuid)
+target_link_libraries (rkv-admin
+    PUBLIC PkgConfig::margo
+    PUBLIC PkgConfig::uuid
+    PRIVATE coverage_config)
 target_include_directories (rkv-admin PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-admin BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -68,7 +74,12 @@ set_target_properties (rkv-admin
 if (${ENABLE_BEDROCK})
 # bedrock-module library
 add_library (rkv-bedrock-module ${bedrock-module-src-files})
-target_link_libraries (rkv-bedrock-module rkv-server rkv-admin rkv-client bedrock-server)
+target_link_libraries (rkv-bedrock-module
+    PUBLIC rkv-server
+    PUBLIC rkv-admin
+    PUBLIC rkv-client
+    PUBLIC bedrock-server
+    PRIVATE coverage_config)
 target_include_directories (rkv-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-bedrock-module BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
