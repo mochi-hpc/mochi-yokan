@@ -31,6 +31,7 @@ add_library (rkv-server ${server-src-files} ${backend-src-files})
 target_link_libraries (rkv-server
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
+    PRIVATE nlohmann_json
     PRIVATE coverage_config)
 target_include_directories (rkv-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-server BEFORE PUBLIC

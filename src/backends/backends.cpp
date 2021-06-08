@@ -8,7 +8,7 @@
 namespace rkv {
 
 std::unordered_map<std::string,
-            std::function<KeyValueStoreInterface*(const std::string&)>>
+            std::function<Status(const std::string&,KeyValueStoreInterface**)>>
     KeyValueStoreFactory::make_fn;
 
 }

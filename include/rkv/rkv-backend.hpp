@@ -41,6 +41,8 @@ using UserMem = BasicUserMem<void>;
  */
 enum class Status : uint8_t {
     OK          = RKV_SUCCESS,
+    InvalidType = RKV_ERR_INVALID_BACKEND,
+    InvalidConf = RKV_ERR_INVALID_CONFIG,
     InvalidArg  = RKV_ERR_INVALID_ARGS,
     NotFound    = RKV_ERR_KEY_NOT_FOUND,
     SizeError   = RKV_ERR_BUFFER_SIZE,
@@ -350,19 +352,21 @@ class KeyValueStoreFactory {
      * type and return a pointer to it. It is the respondibility of
      * the user to call delete on this pointer.
      *
-     * If the function fails, it will return a nullptr.
+     * If the function fails, it will return a Status error.
      *
      * @param backendType Name of the backend.
      * @param jsonConfig Json-formatted configuration string.
+     * @param kvs Created KeyValueStoreInterface pointer.
      *
-     * @return KeyValueStoreInterface pointer.
+     * @return Status.
      */
-    static KeyValueStoreInterface* makeKeyValueStore(
+    static Status makeKeyValueStore(
             const std::string& backendType,
-            const std::string& jsonConfig) {
+            const std::string& jsonConfig,
+            KeyValueStoreInterface** kvs) {
         if(!hasBackendType(backendType))
-            return nullptr;
-        return make_fn[backendType](jsonConfig);
+            return Status::InvalidType;
+        return make_fn[backendType](jsonConfig, kvs);
     }
 
     /**
@@ -380,7 +384,7 @@ class KeyValueStoreFactory {
 
     static std::unordered_map<
                 std::string,
-                std::function<KeyValueStoreInterface*(const std::string&)>>
+                std::function<Status(const std::string&,KeyValueStoreInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
 };
 
@@ -399,8 +403,8 @@ template <typename T> class __RKVBackendRegistration {
 
     __RKVBackendRegistration(const std::string &backend_name) {
         rkv::KeyValueStoreFactory::make_fn[backend_name] =
-            [](const std::string &config) {
-                return T::create(config);
+            [](const std::string &config, rkv::KeyValueStoreInterface** kvs) {
+                return T::create(config, kvs);
             };
     }
 };

@@ -4,12 +4,15 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
 #include <string>
 #include <cstring>
 
 namespace rkv {
+
+using json = nlohmann::json;
 
 class ScopedWriteLock {
 
@@ -91,10 +94,15 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     public:
 
-    static KeyValueStoreInterface* create(const std::string& config) {
-        // TODO handle custom comparator
-        (void)config;
-        return new MapKeyValueStore();
+    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+        json cfg;
+        try {
+            cfg = json::parse(config);
+        } catch(...) {
+            return Status::InvalidConf;
+        }
+        *kvs = new MapKeyValueStore();
+        return Status::OK;
     }
 
     virtual std::string name() const override {

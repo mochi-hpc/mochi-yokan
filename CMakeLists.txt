@@ -48,6 +48,7 @@ endif ()
 set (CMAKE_PREFIX_PATH "" CACHE STRING "External dependencies path")
 set (BUILD_SHARED_LIBS "ON" CACHE BOOL "Build a shared library")
 
+find_package (nlohmann_json REQUIRED)
 find_package (PkgConfig REQUIRED)
 
 if (${ENABLE_BEDROCK})

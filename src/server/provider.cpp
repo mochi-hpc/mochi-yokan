@@ -182,10 +182,10 @@ void rkv_open_database_ult(hg_handle_t h)
 
     uuid_generate(id.uuid);
 
-    database = rkv::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config);
-    if(database == nullptr) {
+    auto status = rkv::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config, &database);
+    if(status != rkv::Status::OK) {
         RKV_LOG_ERROR(mid, "failed to open database of type %s", in.type);
-        out.ret = RKV_ERR_OTHER;
+        out.ret = static_cast<rkv_return_t>(status);
         return;
     }
     provider->dbs[id] = database;

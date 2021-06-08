@@ -139,12 +139,10 @@ static MunitResult test_invalid(const MunitParameter params[], void* data)
             provider_id, wrong_token, "map", backend_config, &id);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_TOKEN);
 
-#if 0
     // test that calling with the wrong config leads to an error
     ret = rkv_open_database(admin, context->addr,
             provider_id, valid_token, "map", "{ashqw{", &id);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_CONFIG);
-#endif
 
     // test that calling with an unknown backend leads to an error
     ret = rkv_open_database(admin, context->addr,
