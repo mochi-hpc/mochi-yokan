@@ -3,7 +3,8 @@ set (server-src-files
      server/provider.cpp
      server/put.cpp
      server/erase.cpp
-     server/get.cpp)
+     server/get.cpp
+     server/length.cpp)
 
 set (backend-src-files
      backends/backends.cpp
@@ -13,7 +14,8 @@ set (client-src-files
      client/client.c
      client/put.cpp
      client/erase.cpp
-     client/get.cpp)
+     client/get.cpp
+     client/length.cpp)
 
 set (admin-src-files
      admin/admin.c)

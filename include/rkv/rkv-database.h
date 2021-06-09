@@ -100,6 +100,13 @@ rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
                                const size_t ksizes,
                                bool* exist);
 
+rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
+                             size_t count,
+                             const char* origin,
+                             hg_bulk_t data,
+                             size_t offset,
+                             size_t size);
+
 rkv_return_t rkv_length(rkv_database_handle_t dbh,
                         const void* key,
                         size_t ksize,

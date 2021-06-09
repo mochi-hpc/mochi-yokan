@@ -115,10 +115,14 @@ MERCURY_GEN_PROC(exists_out_t,
 /* length */
 MERCURY_GEN_PROC(length_in_t,
         ((rkv_database_id_t)(db_id))\
-        ((rkv_data_t)(key)))
+        ((uint64_t)(count))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bool_t)(packed))\
+        ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(length_out_t,
-        ((int32_t)(ret))\
-        ((uint64_t)(length)))
+        ((int32_t)(ret)))
 
 /* put */
 MERCURY_GEN_PROC(put_in_t,

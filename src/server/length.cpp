@@ -11,11 +11,11 @@
 #include "../common/checks.h"
 #include <numeric>
 
-void rkv_get_ult(hg_handle_t h)
+void rkv_length_ult(hg_handle_t h)
 {
     hg_return_t hret;
-    get_in_t in;
-    get_out_t out;
+    length_in_t in;
+    length_out_t out;
     hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
@@ -55,14 +55,11 @@ void rkv_get_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_bulk_create);
     DEFER(margo_bulk_free(local_bulk));
 
-    const size_t ksizes_offset = 0;
-    const size_t vsizes_offset = in.count*sizeof(size_t);
-    const size_t keys_offset   = vsizes_offset * 2;
-    size_t vals_offset   = 0; // computed later
+    const size_t keys_offset = in.count * sizeof(size_t);
+    size_t vsizes_offset     = 0; // computed later
 
-    // transfer ksizes, and vsizes only if in.packed is false
+    // transfer ksizes
     size_t sizes_to_transfer = in.count*sizeof(size_t);
-    if(!in.packed) sizes_to_transfer *= 2;
 
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset, local_bulk, 0, sizes_to_transfer);
@@ -71,16 +68,12 @@ void rkv_get_ult(hg_handle_t h)
     // build buffer wrappers for key sizes
     auto ptr = buffer.data();
     auto ksizes = rkv::BasicUserMem<size_t>{
-        reinterpret_cast<size_t*>(ptr + ksizes_offset),
-        in.count
-    };
-    auto vsizes = rkv::BasicUserMem<size_t>{
-        reinterpret_cast<size_t*>(ptr + vsizes_offset),
+        reinterpret_cast<size_t*>(ptr),
         in.count
     };
 
     auto total_ksize = std::accumulate(ksizes.data, ksizes.data + in.count, (size_t)0);
-    vals_offset = keys_offset + total_ksize;
+    vsizes_offset = keys_offset + total_ksize;
 
     // check that there is no key of size 0
     auto min_key_size = std::accumulate(ksizes.data, ksizes.data + in.count,
@@ -93,20 +86,10 @@ void rkv_get_ult(hg_handle_t h)
         return;
     }
 
-    // check that the total_ksize found is consistent with in.size
-    if(in.size < vals_offset) {
+    // check that the sizes found is consistent with in.size
+    if(in.size < vsizes_offset + in.count*sizeof(size_t)) {
         out.ret = RKV_ERR_INVALID_ARGS;
         return;
-    }
-
-    // check that the value sizes also don't exceed in.size, if not in.packed
-    // (if in.packed is true, those value sizes are output only)
-    if(!in.packed) {
-        auto total_vsize = std::accumulate(vsizes.data, vsizes.data + in.count, (size_t)0);
-        if(in.size < vals_offset + total_vsize) {
-            out.ret = RKV_ERR_INVALID_ARGS;
-            return;
-        }
     }
 
     // transfer the actual keys from the client
@@ -115,39 +98,25 @@ void rkv_get_ult(hg_handle_t h)
             local_bulk, keys_offset, total_ksize);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    // create UserMem wrapper for keys
+    // create memory wrapper for keys
     auto keys = rkv::UserMem{ ptr + keys_offset, total_ksize };
 
-    // create UserMem wrapper for values
-    size_t remaining_vsize = in.size - vals_offset;
-    auto vals = rkv::UserMem{ ptr + vals_offset, remaining_vsize };
+    // create memory wrapper for value sizes
+    auto vsizes = rkv::BasicUserMem<size_t>{
+        reinterpret_cast<size_t*>(ptr + vsizes_offset),
+        in.count*sizeof(size_t)
+    };
 
-    if(in.packed) {
-        out.ret = static_cast<rkv_return_t>(
-            database->getPacked(keys, ksizes, vals, vsizes));
-    } else {
-        out.ret = static_cast<rkv_return_t>(
-            database->getMulti(keys, ksizes, vals, vsizes));
-    }
+    out.ret = static_cast<rkv_return_t>(
+            database->lengthPacked(keys, ksizes, vsizes));
 
     if(out.ret != RKV_SUCCESS)
         return;
 
-    // transfer the vsizes and values back the client
-    // this is done using two concurrent bulk transfers
-    margo_request req = MARGO_REQUEST_NULL;
-    hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
-            in.bulk, in.offset + vals_offset,
-            local_bulk, vals_offset, remaining_vsize, &req);
-    CHECK_HRET_OUT(hret, margo_bulk_itransfer);
-
+    // transfer the vsizes back the client
     hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
             in.bulk, in.offset + vsizes_offset,
             local_bulk, vsizes_offset, in.count*sizeof(size_t));
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
-
-    hret = margo_wait(req);
-    CHECK_HRET_OUT(hret, margo_wait);
-
 }
-DEFINE_MARGO_RPC_HANDLER(rkv_get_ult)
+DEFINE_MARGO_RPC_HANDLER(rkv_length_ult)
