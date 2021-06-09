@@ -83,22 +83,29 @@ rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                             const void* values,
                             const size_t* vsizes);
 
+rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
+                             size_t count,
+                             const char* origin,
+                             hg_bulk_t data,
+                             size_t offset,
+                             size_t size);
+
 rkv_return_t rkv_exists(rkv_database_handle_t dbh,
                         const void* key,
                         size_t ksize,
-                        bool* exists);
+                        uint8_t* exists);
 
 rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
                               size_t count,
                               const void* const* keys,
                               const size_t* ksizes,
-                              bool* exist);
+                              uint8_t* flags);
 
 rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
                                size_t count,
                                const void* keys,
-                               const size_t ksizes,
-                               bool* exist);
+                               const size_t* ksizes,
+                               uint8_t* flags);
 
 rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
                              size_t count,

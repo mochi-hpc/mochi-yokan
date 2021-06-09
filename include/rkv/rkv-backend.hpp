@@ -47,6 +47,36 @@ struct BasicUserMem {
 using UserMem = BasicUserMem<char>;
 
 /**
+ * @brief The BitField class is used for the "exists" operations
+ * to expose user memory with bitwise operations.
+ */
+struct BitField {
+    uint8_t* data = nullptr; /*!< Pointer to the data */
+    size_t   size = 0;       /*!< Number of bits in the bitfield */
+
+    struct BitFieldAccessor {
+        uint8_t* data;
+        uint8_t  mask;
+
+        operator bool() const {
+            return *data & mask;
+        }
+
+        BitFieldAccessor& operator=(bool b) {
+            if(b) *data |= mask;
+            else *data &= ~mask;
+            return *this;
+        }
+    };
+
+    template<typename I>
+    inline BitFieldAccessor operator[](I index) {
+        uint8_t mask = 1 << (index % 8);
+        return BitFieldAccessor{data + (index/8), mask};
+    }
+};
+
+/**
  * @brief Status returned by all the backend functions.
  */
 enum class Status : uint8_t {
@@ -145,7 +175,7 @@ class KeyValueStoreInterface {
      */
     virtual Status existsPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
-                                BasicUserMem<bool>& b) const = 0;
+                                BitField& b) const = 0;
     /**
      * @brief Get the length of the value associated with the provided key.
      * If the key does not exist, the size is set to KeyNotFound

@@ -12,6 +12,16 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+/**
+ * The put operations uses a single bulk handle exposing data as follows:
+ * - The first count*sizeof(size_t) bytes expose the list of key sizes
+ * - The following count * sizeof(size_t) bytes expose value sizes
+ * - The following N bytes expose keys (packed back to back), where
+ *   N = sum of key sizes
+ * - The following M bytes expose values (packed back to back), where
+ *   M = sum of value sizes
+ */
+
 extern "C" rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
                                        size_t count,
                                        const char* origin,

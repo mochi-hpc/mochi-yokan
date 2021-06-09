@@ -107,10 +107,13 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 /* exists */
 MERCURY_GEN_PROC(exists_in_t,
         ((rkv_database_id_t)(db_id))\
-        ((rkv_data_t)(key)))
+        ((uint64_t)(count))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(exists_out_t,
-        ((int32_t)(ret))\
-        ((int32_t)(exists)))
+        ((int32_t)(ret)))
 
 /* length */
 MERCURY_GEN_PROC(length_in_t,
@@ -119,7 +122,6 @@ MERCURY_GEN_PROC(length_in_t,
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
-        ((hg_bool_t)(packed))\
         ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(length_out_t,
         ((int32_t)(ret)))

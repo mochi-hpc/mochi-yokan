@@ -21,9 +21,6 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
     if(flag == HG_TRUE) {
 
         margo_registered_name(mid, "rkv_exists",        &c->exists_id,        &flag);
-        margo_registered_name(mid, "rkv_exists_multi",  &c->exists_multi_id,  &flag);
-        margo_registered_name(mid, "rkv_exists_packed", &c->exists_packed_id, &flag);
-
         margo_registered_name(mid, "rkv_length",        &c->length_id,        &flag);
         margo_registered_name(mid, "rkv_put",        &c->put_id,        &flag);
         margo_registered_name(mid, "rkv_get",        &c->get_id,        &flag);
@@ -37,10 +34,7 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 
     } else {
 
-//        c->exists_id = MARGO_REGISTER(mid, "rkv_exists", exists_in_t, exists_out_t, NULL);
-//        c->exists_multi_id = MARGO_REGISTER(mid, "rkv_exists_multi", exists_multi_in_t, exists_multi_out_t, NULL);
-//        c->exists_packed_id = MARGO_REGISTER(mid, "rkv_exists_packed", exists_packed_in_t, exists_packed_out_t, NULL);
-
+        c->exists_id = MARGO_REGISTER(mid, "rkv_exists", exists_in_t, exists_out_t, NULL);
         c->length_id = MARGO_REGISTER(mid, "rkv_length", length_in_t, length_out_t, NULL);
         c->put_id = MARGO_REGISTER(mid, "rkv_put", put_in_t, put_out_t, NULL);
         c->get_id = MARGO_REGISTER(mid, "rkv_get", get_in_t, get_out_t, NULL);

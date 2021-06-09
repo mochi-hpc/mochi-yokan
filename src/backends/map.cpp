@@ -136,8 +136,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status existsPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
-                                BasicUserMem<bool>& b) const override {
-        if(ksizes.size != b.size)
+                                BitField& flags) const override {
+        if(ksizes.size > flags.size)
             return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -145,7 +145,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size)
                 return Status::InvalidArg;
-            b.data[i] = m_db.count(key) > 0;
+            flags[i] = m_db.count(key) > 0;
             offset += ksizes[i];
         }
         return Status::OK;

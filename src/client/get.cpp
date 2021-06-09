@@ -12,6 +12,18 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+/**
+ * The get operations use a single bulk handle exposing data as follows:
+ * - The first count*sizeof(size_t) bytes expose the list of key sizes
+ * - The following count * sizeof(size_t) bytes expose value sizes
+ * - The following N bytes expose keys (packed back to back), where
+ *   N = sum of key sizes
+ * - The remaining M bytes are for values.
+ * A "packed" flag is used to indicate whether the server can copy values
+ * back to back in the remaining M bytes, or if it should follow the value
+ * sizes specified by the sender.
+ */
+
 extern "C" rkv_return_t rkv_get_bulk(rkv_database_handle_t dbh,
                                      size_t count,
                                      const char* origin,

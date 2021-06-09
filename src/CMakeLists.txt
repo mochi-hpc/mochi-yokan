@@ -4,7 +4,8 @@ set (server-src-files
      server/put.cpp
      server/erase.cpp
      server/get.cpp
-     server/length.cpp)
+     server/length.cpp
+     server/exists.cpp)
 
 set (backend-src-files
      backends/backends.cpp
@@ -15,7 +16,8 @@ set (client-src-files
      client/put.cpp
      client/erase.cpp
      client/get.cpp
-     client/length.cpp)
+     client/length.cpp
+     client/exists.cpp)
 
 set (admin-src-files
      admin/admin.c)

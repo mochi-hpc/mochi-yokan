@@ -106,6 +106,12 @@ rkv_return_t rkv_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->length_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_exists",
+            exists_in_t, exists_out_t,
+            rkv_exists_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->exists_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &rkv_finalize_provider, p);
 
     if(provider)

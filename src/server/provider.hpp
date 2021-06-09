@@ -79,7 +79,8 @@ DECLARE_MARGO_RPC_HANDLER(rkv_get_ult)
 void rkv_get_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(rkv_length_ult)
 void rkv_length_ult(hg_handle_t h);
-
+DECLARE_MARGO_RPC_HANDLER(rkv_exists_ult)
+void rkv_exists_ult(hg_handle_t h);
 
 static inline rkv_database_t find_database(rkv_provider_t provider,
                                            rkv_database_id_t* db_id)
