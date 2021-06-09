@@ -134,6 +134,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+    virtual Status existsPacked(const UserMem& keys,
+                                const BasicUserMem<size_t>& ksizes,
+                                BasicUserMem<bool>& b) const override {
+        if(ksizes.size != b.size)
+            return Status::InvalidArg;
+        size_t offset = 0;
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const UserMem key{ keys.data + offset, ksizes[i] };
+            if(offset + ksizes[i] > keys.size)
+                return Status::InvalidArg;
+            b.data[i] = m_db.count(key) > 0;
+            offset += ksizes[i];
+        }
+        return Status::OK;
+    }
+
     virtual Status length(const UserMem& key, size_t& size) const override {
         ScopedReadLock lock(m_lock);
         auto it = m_db.find(key);
@@ -156,17 +173,36 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+    virtual Status lengthPacked(const UserMem& keys,
+                                const BasicUserMem<size_t>& ksizes,
+                                BasicUserMem<size_t>& vsizes) const override {
+        if(ksizes.size != vsizes.size)
+            return Status::InvalidArg;
+        size_t offset = 0;
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const UserMem key{ keys.data + offset, ksizes[i] };
+            if(offset + ksizes[i] > keys.size)
+                return Status::InvalidArg;
+            auto it = m_db.find(key);
+            if(it == m_db.end()) vsizes[i] = KeyNotFound;
+            else vsizes[i] = it->second.size();
+            offset += ksizes[i];
+        }
+        return Status::OK;
+    }
+
     virtual Status put(const UserMem& key, const UserMem& value) override {
         ScopedWriteLock lock(m_lock);
         auto p = m_db.emplace(std::piecewise_construct,
                               std::forward_as_tuple(
-                                  static_cast<const char*>(key.data),
+                                  key.data,
                                   key.size),
                               std::forward_as_tuple(
-                                  static_cast<const char*>(value.data),
+                                  value.data,
                                   value.size));
         if(!p.second) {
-            p.first->second.assign(static_cast<const char*>(value.data),
+            p.first->second.assign(value.data,
                                    value.size);
         }
         return Status::OK;
@@ -174,23 +210,65 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status putMulti(const std::vector<UserMem>& keys,
                             const std::vector<UserMem>& vals) override {
-        ScopedWriteLock lock(m_lock);
         if(keys.size() != vals.size())
             return Status::InvalidArg;
 
+        ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < keys.size(); i++) {
             auto p = m_db.emplace(std::piecewise_construct,
                     std::forward_as_tuple(
-                        static_cast<const char*>(keys[i].data),
+                        keys[i].data,
                         keys[i].size),
                     std::forward_as_tuple(
-                        static_cast<const char*>(vals[i].data),
+                        vals[i].data,
                         vals[i].size));
             if(!p.second) {
                 p.first->second.assign(
-                        static_cast<const char*>(vals[i].data),
+                        vals[i].data,
                         vals[i].size);
             }
+        }
+        return Status::OK;
+    }
+
+    virtual Status putPacked(const UserMem& keys,
+                             const BasicUserMem<size_t>& ksizes,
+                             const UserMem& vals,
+                             const BasicUserMem<size_t>& vsizes) override {
+        if(ksizes.size != vsizes.size)
+            return Status::InvalidArg;
+
+        size_t key_offset = 0;
+        size_t val_offset = 0;
+
+        size_t total_ksizes = std::accumulate(ksizes.data,
+                                              ksizes.data + ksizes.size,
+                                              0);
+        if(total_ksizes > keys.size)
+            return Status::InvalidArg;
+
+        size_t total_vsizes = std::accumulate(vsizes.data,
+                                              vsizes.data + vsizes.size,
+                                              0);
+        if(total_vsizes > vals.size)
+            return Status::InvalidArg;
+
+        ScopedWriteLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            auto p = m_db.emplace(std::piecewise_construct,
+                    std::forward_as_tuple(
+                        keys.data + key_offset,
+                        ksizes[i]),
+                    std::forward_as_tuple(
+                        vals.data + val_offset,
+                        vsizes[i]));
+            if(!p.second) {
+                p.first->second.assign(
+                        vals.data + val_offset,
+                        vsizes[i]);
+            }
+            key_offset += ksizes[i];
+            val_offset += vsizes[i];
         }
         return Status::OK;
     }
@@ -213,10 +291,10 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status getMulti(const std::vector<UserMem>& keys,
                             std::vector<UserMem>& values) const override {
-        ScopedReadLock lock(m_lock);
         if(keys.size() != values.size())
             return Status::InvalidArg;
 
+        ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < keys.size(); i++) {
             auto& key = keys[i];
             auto& value = values[i];
@@ -236,6 +314,40 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+    Status getPacked(const UserMem& keys,
+                     const BasicUserMem<size_t>& ksizes,
+                     UserMem& vals,
+                     BasicUserMem<size_t>& vsizes) const override {
+        if(ksizes.size != vsizes.size)
+            return Status::InvalidArg;
+
+        size_t key_offset = 0;
+        size_t val_offset = 0;
+        size_t val_remaining_size = vals.size;
+
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            auto key = UserMem{ keys.data + key_offset, ksizes[i] };
+            auto it = m_db.find(key);
+            if(it == m_db.end()) {
+                vsizes[i] = KeyNotFound;
+            } else if(it->second.size() > val_remaining_size) {
+                for(; i < ksizes.size; i++) {
+                    vsizes[i] = BufTooSmall;
+                }
+            } else {
+                auto& v = it->second;
+                std::memcpy(vals.data + val_offset, v.data(), v.size());
+                vsizes[i] = v.size();
+                val_remaining_size -= vsizes[i];
+                val_offset += vsizes[i];
+            }
+            key_offset += ksizes[i];
+        }
+        vals.size = vals.size - val_remaining_size;
+        return Status::OK;
+    }
+
     virtual Status get(const UserMem& key, std::string& value) const override {
         ScopedReadLock lock(m_lock);
         auto it = m_db.find(key);
@@ -249,9 +361,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status getMulti(const std::vector<UserMem>& keys,
                             std::vector<std::string>& values,
                             const std::string& defaultValue = "") const override {
-        if(keys.size() != values.size())
-            return Status::InvalidArg;
-
+        values.resize(keys.size());
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < keys.size(); i++) {
             auto& key = keys[i];
@@ -262,6 +372,29 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             } else {
                 value = it->second;
             }
+        }
+        return Status::OK;
+    }
+
+    virtual Status getPacked(const UserMem& keys,
+                             const BasicUserMem<size_t>& ksizes,
+                             std::vector<std::string>& values,
+                             const std::string& defaultValue = "") const override {
+        values.resize(ksizes.size);
+        size_t offset = 0;
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            auto key = UserMem{ keys.data + offset, ksizes[i] };
+            if(offset + ksizes[i] > keys.size)
+                return Status::InvalidArg;
+            auto& value = values[i];
+            auto it = m_db.find(key);
+            if(it == m_db.end()) {
+                value = defaultValue;
+            } else {
+                value = it->second;
+            }
+            offset += ksizes[i];
         }
         return Status::OK;
     }
@@ -283,6 +416,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             auto it = m_db.find(key);
             if(it == m_db.end()) continue;
             m_db.erase(it);
+        }
+        return Status::OK;
+    }
+
+    virtual Status erasePacked(const UserMem& keys,
+                               const BasicUserMem<size_t>& ksizes) override {
+        size_t offset = 0;
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            auto key = UserMem{ keys.data + offset, ksizes[i] };
+            if(offset + ksizes[i] > keys.size)
+                return Status::InvalidArg;
+            auto it = m_db.find(key);
+            if(it != m_db.end()) {
+                m_db.erase(it);
+            }
+            offset += ksizes[i];
         }
         return Status::OK;
     }
