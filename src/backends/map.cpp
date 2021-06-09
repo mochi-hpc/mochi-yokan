@@ -314,10 +314,42 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    Status getPacked(const UserMem& keys,
-                     const BasicUserMem<size_t>& ksizes,
-                     UserMem& vals,
-                     BasicUserMem<size_t>& vsizes) const override {
+    virtual Status getMulti(const UserMem& keys,
+                            const BasicUserMem<size_t>& ksizes,
+                            UserMem& vals,
+                            BasicUserMem<size_t>& vsizes) const override {
+        if(ksizes.size != vsizes.size)
+            return Status::InvalidArg;
+
+        size_t key_offset = 0;
+        size_t val_offset = 0;
+
+        ScopedReadLock lock(m_lock);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const UserMem key{ keys.data + key_offset, ksizes[i] };
+            auto it = m_db.find(key);
+            const auto original_vsize = vsizes[i];
+            if(it == m_db.end()) {
+                vsizes[i] = KeyNotFound;
+            } else {
+                auto& v = it->second;
+                if(v.size() > vsizes[i]) {
+                    vsizes[i] = BufTooSmall;
+                } else {
+                    std::memcpy(vals.data + val_offset, v.data(), v.size());
+                    vsizes[i] = v.size();
+                }
+            }
+            key_offset += ksizes[i];
+            val_offset += original_vsize;
+        }
+        return Status::OK;
+    }
+
+    virtual Status getPacked(const UserMem& keys,
+                             const BasicUserMem<size_t>& ksizes,
+                             UserMem& vals,
+                             BasicUserMem<size_t>& vsizes) const override {
         if(ksizes.size != vsizes.size)
             return Status::InvalidArg;
 

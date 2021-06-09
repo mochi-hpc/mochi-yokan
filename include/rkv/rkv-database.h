@@ -123,6 +123,14 @@ rkv_return_t rkv_get(rkv_database_handle_t dbh,
                      void* value,
                      size_t* vsize);
 
+rkv_return_t rkv_get_bulk(rkv_database_handle_t dbh,
+                          size_t count,
+                          const char* origin,
+                          hg_bulk_t data,
+                          size_t offset,
+                          size_t size,
+                          bool packed);
+
 rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
                            size_t count,
                            const void* const* keys,
@@ -134,6 +142,7 @@ rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
                             size_t count,
                             const void* keys,
                             const size_t* ksizes,
+                            size_t vbufsize,
                             void* values,
                             size_t* vsizes);
 

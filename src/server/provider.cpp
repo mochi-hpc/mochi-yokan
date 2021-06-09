@@ -88,6 +88,18 @@ rkv_return_t rkv_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->put_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_erase",
+            erase_in_t, erase_out_t,
+            rkv_erase_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->erase_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_get",
+            get_in_t, get_out_t,
+            rkv_get_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->get_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &rkv_finalize_provider, p);
 
     if(provider)
@@ -115,12 +127,8 @@ static void rkv_finalize_provider(void* p)
     //margo_deregister(mid, provider->length_multi_id);
     //margo_deregister(mid, provider->length_packed_id);
     margo_deregister(mid, provider->put_id);
-    //margo_deregister(mid, provider->get_id);
-    //margo_deregister(mid, provider->get_multi_id);
-    //margo_deregister(mid, provider->get_packed_id);
-    //margo_deregister(mid, provider->erase_id);
-    //margo_deregister(mid, provider->erase_multi_id);
-    //margo_deregister(mid, provider->erase_packed_id);
+    margo_deregister(mid, provider->get_id);
+    margo_deregister(mid, provider->erase_id);
     //margo_deregister(mid, provider->list_keys_id);
     //margo_deregister(mid, provider->list_keys_packed_id);
     //margo_deregister(mid, provider->list_keyvals_id);

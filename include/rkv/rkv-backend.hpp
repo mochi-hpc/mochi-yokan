@@ -265,6 +265,29 @@ class KeyValueStoreInterface {
                             std::vector<UserMem>& values) const = 0;
 
     /**
+     * @brief This verion of getMulti uses the user-provided memory.
+     * vsizes is used both as input (to know where to place data in vals
+     * and how much is available to each value) and as output (to store
+     * the actual size of each value).
+     *
+     * This function expects (and will not check) that
+     * - ksizes.size == vsizes.size
+     * - the sum of ksizes <= keys.size
+     * - the sum of vsizes <= vals.size
+     *
+     * @param keys Keys to get.
+     * @param ksizes Size of the keys.
+     * @param vals Values to get.
+     * @param vsizes Size of the values.
+     *
+     * @return Status.
+     */
+    virtual Status getMulti(const UserMem& keys,
+                            const BasicUserMem<size_t>& ksizes,
+                            UserMem& vals,
+                            BasicUserMem<size_t>& vsizes) const = 0;
+
+    /**
      * @brief Get the values associated with multiple keys. The keys,
      * key sizes, values, and value sizes are packed contiguously into
      * their own buffer. ksizes.size and vsizes.size must be equal.

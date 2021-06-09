@@ -49,32 +49,13 @@ typedef struct rkv_provider {
     hg_id_t destroy_database_id;
     hg_id_t list_databases_id;
     /* RPC identifiers for clients */
-    /* exists */
     hg_id_t exists_id;
-    hg_id_t exists_multi_id;
-    hg_id_t exists_packed_id;
-    /* length */
     hg_id_t length_id;
-    hg_id_t length_multi_id;
-    hg_id_t length_packed_id;
-    /* put */
     hg_id_t put_id;
-    hg_id_t put_multi_id;
-    hg_id_t put_packed_id;
-    /* get */
     hg_id_t get_id;
-    hg_id_t get_multi_id;
-    hg_id_t get_packed_id;
-    /* erase */
     hg_id_t erase_id;
-    hg_id_t erase_multi_id;
-    hg_id_t erase_packed_id;
-    /* list keys */
     hg_id_t list_keys_id;
-    hg_id_t list_keys_packed_id;
-    /* list key/vals */
     hg_id_t list_keyvals_id;
-    hg_id_t list_keyvals_packed_id;
 } rkv_provider;
 
 /* Admin RPCs */
@@ -92,6 +73,11 @@ void rkv_list_databases_ult(hg_handle_t h);
 /* Client RPCs */
 DECLARE_MARGO_RPC_HANDLER(rkv_put_ult)
 void rkv_put_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_erase_ult)
+void rkv_erase_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(rkv_get_ult)
+void rkv_get_ult(hg_handle_t h);
+
 
 static inline rkv_database_t find_database(rkv_provider_t provider,
                                            rkv_database_id_t* db_id)
