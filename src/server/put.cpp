@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include <numeric>
 
 void rkv_put_ult(hg_handle_t h)
 {
@@ -59,30 +60,42 @@ void rkv_put_ult(hg_handle_t h)
                                in.bulk, in.offset, local_bulk, 0, in.size);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    size_t* sizes = reinterpret_cast<size_t*>(buffer.data());
-    std::vector<rkv::UserMem> keys(in.count);
-    size_t current_offset = in.count*sizeof(size_t);
-    for(size_t i = 0; i < in.count; i++) {
-        keys[i].data = buffer.data() + current_offset;
-        keys[i].size = sizes[i];
-        current_offset += sizes[i];
-        if(sizes[i] == 0) {
-            out.ret = RKV_ERR_INVALID_ARGS;
-            return;
-        }
-    }
-    std::vector<rkv::UserMem> values(in.count);
-    size_t j = in.count;
-    for(size_t i = 0; i < in.count; i++, j++) {
-        values[i].data = buffer.data() + current_offset;
-        values[i].size = sizes[j];
-        current_offset += sizes[j];
+    auto ptr = buffer.data();
+    auto ksizes = rkv::BasicUserMem<size_t>{
+        reinterpret_cast<size_t*>(ptr),
+        in.count
+    };
+    ptr += in.count*sizeof(size_t);
+
+    auto vsizes = rkv::BasicUserMem<size_t>{
+        reinterpret_cast<size_t*>(ptr),
+        in.count
+    };
+    ptr += in.count*sizeof(size_t);
+
+    auto total_ksize = std::accumulate(ksizes.data, ksizes.data + in.count, (size_t)0);
+    auto total_vsize = std::accumulate(vsizes.data, vsizes.data + in.count, (size_t)0);
+    auto min_key_size = std::accumulate(ksizes.data, ksizes.data + in.count,
+                                        std::numeric_limits<size_t>::max(),
+                                        [](const size_t& lhs, const size_t& rhs) {
+                                            return std::min(lhs, rhs);
+                                        });
+    if(min_key_size == 0) {
+        out.ret = RKV_ERR_INVALID_ARGS;
+        return;
     }
 
-    if(in.count == 1) {
-        database->put(keys[0], values[0]);
-    } else if(in.count > 1) {
-        database->putMulti(keys, values);
+    if(in.size < 2*in.count*sizeof(size_t) + total_ksize + total_vsize) {
+        out.ret = RKV_ERR_INVALID_ARGS;
+        return;
     }
+
+    auto keys = rkv::UserMem{ ptr, total_ksize };
+    ptr += total_ksize;
+
+    auto vals = rkv::UserMem{ ptr, total_vsize };
+
+    out.ret = static_cast<rkv_return_t>(
+            database->putPacked(keys, ksizes, vals, vsizes));
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_put_ult)
