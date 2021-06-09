@@ -112,10 +112,6 @@ MERCURY_GEN_PROC(exists_out_t,
         ((int32_t)(ret))\
         ((int32_t)(exists)))
 
-/* exists_multi */
-
-/* exists_packed */
-
 /* length */
 MERCURY_GEN_PROC(length_in_t,
         ((rkv_database_id_t)(db_id))\
@@ -123,10 +119,6 @@ MERCURY_GEN_PROC(length_in_t,
 MERCURY_GEN_PROC(length_out_t,
         ((int32_t)(ret))\
         ((uint64_t)(length)))
-
-/* length_multi */
-
-/* length_packed */
 
 /* put */
 MERCURY_GEN_PROC(put_in_t,
@@ -155,7 +147,11 @@ MERCURY_GEN_PROC(get_out_t,
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
         ((rkv_database_id_t)(db_id))\
-        ((rkv_data_t)(key)))
+        ((uint64_t)(count))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(erase_out_t,
         ((int32_t)(ret)))
 

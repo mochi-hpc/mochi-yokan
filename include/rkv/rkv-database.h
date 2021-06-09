@@ -137,15 +137,24 @@ rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
                             void* values,
                             size_t* vsizes);
 
+rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
+                            size_t count,
+                            const char* origin,
+                            hg_bulk_t data,
+                            size_t offset,
+                            size_t size);
+
 rkv_return_t rkv_erase(rkv_database_handle_t dbh,
                        const void* key,
                        size_t ksize);
 
 rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
+                             size_t count,
                              const void* const* keys,
                              const size_t* ksizes);
 
 rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
+                              size_t count,
                               const void* keys,
                               const size_t* ksizes);
 

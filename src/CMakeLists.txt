@@ -1,7 +1,8 @@
 # set source files
 set (server-src-files
      server/provider.cpp
-     server/put.cpp)
+     server/put.cpp
+     server/erase.cpp)
 
 set (backend-src-files
      backends/backends.cpp
@@ -9,7 +10,8 @@ set (backend-src-files
 
 set (client-src-files
      client/client.c
-     client/put.cpp)
+     client/put.cpp
+     client/erase.cpp)
 
 set (admin-src-files
      admin/admin.c)
