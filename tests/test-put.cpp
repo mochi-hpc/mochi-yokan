@@ -27,6 +27,19 @@ static MunitResult test_put(const MunitParameter params[], void* data)
         munit_assert_int(ret, ==, RKV_SUCCESS);
     }
 
+    // check that the key/values were correctly stored
+
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        std::vector<char> val(g_max_val_size);
+        size_t vsize = g_max_val_size;
+        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(vsize, ==, p.second.size());
+        munit_assert_memory_equal(vsize, val.data(), p.second.data());
+    }
+
     return MUNIT_OK;
 }
 
@@ -92,6 +105,21 @@ static MunitResult test_put_multi(const MunitParameter params[], void* data)
                                     vptrs.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
+    // check that the key/values were correctly stored
+
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        std::vector<char> val(g_max_val_size);
+        size_t vsize = g_max_val_size;
+        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(vsize, ==, p.second.size());
+        munit_assert_memory_equal(vsize, val.data(), p.second.data());
+    }
+
+    // check with all NULL
+
     ret = rkv_put_multi(dbh, 0, NULL, NULL, NULL, NULL);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
@@ -134,6 +162,19 @@ static MunitResult test_put_multi_all_empty_values(const MunitParameter params[]
     ret = rkv_put_multi(dbh, count, kptrs.data(), ksizes.data(),
                                     vptrs.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // check that the key/values were correctly stored
+
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        std::vector<char> val(g_max_val_size);
+        size_t vsize = g_max_val_size;
+        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(vsize, ==, 0);
+    }
+
 
     return MUNIT_OK;
 }
@@ -217,9 +258,26 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
                                      pvals.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
+    // check that the key/values were correctly stored
+
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        std::vector<char> val(g_max_val_size);
+        size_t vsize = g_max_val_size;
+        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(vsize, ==, p.second.size());
+        munit_assert_memory_equal(vsize, val.data(), p.second.data());
+    }
+
+    // check with 0 keys
+
     ret = rkv_put_packed(dbh, 0, pkeys.data(), ksizes.data(),
                                  pvals.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // check with all NULL
 
     ret = rkv_put_packed(dbh, 0, NULL, NULL, NULL, NULL);
     munit_assert_int(ret, ==, RKV_SUCCESS);
@@ -259,6 +317,18 @@ static MunitResult test_put_packed_all_empty_values(const MunitParameter params[
     ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
                                      pvals.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // check that the key/values were correctly stored
+
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        std::vector<char> val(g_max_val_size);
+        size_t vsize = g_max_val_size;
+        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(vsize, ==, 0);
+    }
 
     return MUNIT_OK;
 }
@@ -544,29 +614,39 @@ static MunitResult test_put_bulk_empty_key(const MunitParameter params[], void* 
     return MUNIT_OK;
 }
 
+static MunitParameterEnum test_params[] = {
+  { (char*)"min-key-size", NULL },
+  { (char*)"max-key-size", NULL },
+  { (char*)"min-val-size", NULL },
+  { (char*)"max-val-size", NULL },
+  { (char*)"num-keyvals", NULL },
+  { NULL, NULL }
+};
+
+
 static MunitTest test_suite_tests[] = {
     { (char*) "/put", test_put,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put/empty-keys", test_put_empty_keys,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_multi", test_put_multi,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_multi/all-empty-values", test_put_multi_all_empty_values,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_multi/empty-key", test_put_multi_empty_key,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_packed", test_put_packed,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_packed/all-empty-values", test_put_packed_all_empty_values,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_packed/empty-key", test_put_packed_empty_key,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_bulk", test_put_bulk,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_bulk/all-empty-values", test_put_bulk_all_empty_values,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put_bulk/empty-key", test_put_bulk_empty_key,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

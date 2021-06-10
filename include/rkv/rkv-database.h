@@ -56,19 +56,37 @@ rkv_return_t rkv_database_handle_ref_incr(
  */
 rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
 
+/**
+ * @brief Put a single key/value pair into the database.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] key Key.
+ * @param[in] ksize Size of the key.
+ * @param[in] value Value.
+ * @param[in] vsize Size of the value.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_put(rkv_database_handle_t dbh,
                      const void* key,
                      size_t ksize,
                      const void* value,
                      size_t vsize);
 
-rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
-                          size_t count,
-                          const char* origin,
-                          hg_bulk_t data,
-                          size_t offset,
-                          size_t size);
-
+/**
+ * @brief Put multiple key/value pairs into the database.
+ * The keys and values are provided by arrays of points,
+ * and may not be contiguous in memory.
+ *
+ * @param dbh Database handle.
+ * @param count Number of key/value pairs.
+ * @param keys Array of pointers to keys.
+ * @param ksizes Array of key sizes.
+ * @param values Array of pointers to values.
+ * @param vsizes Array of value sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
                            size_t count,
                            const void* const* keys,
@@ -76,6 +94,20 @@ rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
                            const void* const* values,
                            const size_t* vsizes);
 
+/**
+ * @brief Put multiple key/value pairs into the database.
+ * The keys and values are provided via contiguous memory
+ * segments.
+ *
+ * @param dbh Database handle.
+ * @param count Number of key/value pairs.
+ * @param keys Buffer containing keys.
+ * @param ksizes Array of key sizes.
+ * @param values Buffer containing values.
+ * @param vsizes Array of value sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                             size_t count,
                             const void* keys,
@@ -83,12 +115,39 @@ rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                             const void* values,
                             const size_t* vsizes);
 
-rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
-                             size_t count,
-                             const char* origin,
-                             hg_bulk_t data,
-                             size_t offset,
-                             size_t size);
+/**
+ * @brief Low-level put operation based on a bulk handle.
+ * This function will take the data in [offset, offset+size[
+ * from the bulk handle and interpret it as follows:
+ * - The first count * sizeof(size_t) bytes store the key sizes.
+ * - The next count * sizeof(size_t) bytes store the value sizes.
+ * - The next N bytes store keys back to back, where
+ *   N = sum of key sizes
+ * - The last M bytes store values back to bake, where
+ *   M = sum of value sizes
+ * Origin represents the address of the process that created
+ * the bulk handle. If NULL, the bulk handle is considered to
+ * have been created by the calling process.
+ *
+ * This function is useful in situation where a process received
+ * a bulk handle from another process and wants to forward it to
+ * an RKV provider.
+ *
+ * @param dbh Database handle.
+ * @param count Number of key/values in the bulk data.
+ * @param origin Address of the process that created the bulk handle.
+ * @param data Bulk handle containing the data.
+ * @param offset Offset at which the payload starts in the bulk handle.
+ * @param size Size of the payload in the bulk handle.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
+rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
+                          size_t count,
+                          const char* origin,
+                          hg_bulk_t data,
+                          size_t offset,
+                          size_t size);
 
 rkv_return_t rkv_exists(rkv_database_handle_t dbh,
                         const void* key,
@@ -106,6 +165,19 @@ rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
                                const void* keys,
                                const size_t* ksizes,
                                uint8_t* flags);
+
+rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
+                             size_t count,
+                             const char* origin,
+                             hg_bulk_t data,
+                             size_t offset,
+                             size_t size);
+
+static inline bool rkv_unpack_exists_flag(const uint8_t* flags, size_t i)
+{
+    uint8_t mask = 1 << (i%8);
+    return flags[i/8] & mask;
+}
 
 rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
                              size_t count,
