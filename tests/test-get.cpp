@@ -380,11 +380,11 @@ static MunitResult test_get_multi_key_not_found(const MunitParameter params[], v
 
     return MUNIT_OK;
 }
-#if 0
+
 /**
- * @brief Check that we can use get_packed to store the key/value
- * pairs from the reference map, and that a count of 0 is also
- * valid.
+ * @brief Check that we can get the key/value pairs from the
+ * reference map using get_packed, and that put_multi also accepts
+ * a count of 0.
  */
 static MunitResult test_get_packed(const MunitParameter params[], void* data)
 {
@@ -395,107 +395,45 @@ static MunitResult test_get_packed(const MunitParameter params[], void* data)
     rkv_return_t ret;
 
     auto count = context->reference.size();
-    std::string         pkeys;
-    std::vector<size_t> ksizes;
-    std::string         pvals;
-    std::vector<size_t> vsizes;
+    std::string         packed_keys;
+    std::vector<size_t> packed_ksizes(count);
+    std::vector<char>   packed_values(count*g_max_val_size);
+    std::vector<size_t> packed_vsizes(count);
 
-    ksizes.reserve(count);
-    vsizes.reserve(count);
-
+    unsigned i = 0;
     for(auto& p : context->reference) {
-        auto& key  = p.first;
-        auto ksize = p.first.size();
-        auto& val  = p.second;
-        auto vsize = p.second.size();
-        pkeys += key;
-        ksizes.push_back(ksize);
-        pvals += val;
-        vsizes.push_back(vsize);
+        packed_keys += p.first;
+        packed_ksizes[i] = p.first.size();
+        i += 1;
     }
 
-    ret = rkv_get_packed(dbh, count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = rkv_get_packed(dbh, count,
+                         packed_keys.data(), packed_ksizes.data(),
+                         g_max_val_size*count,
+                         packed_values.data(), packed_vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
-    // check that the key/values were correctly stored
-
+    i = 0;
+    size_t offset = 0;
     for(auto& p : context->reference) {
-        auto key = p.first.data();
-        auto ksize = p.first.size();
-        std::vector<char> val(g_max_val_size);
-        size_t vsize = g_max_val_size;
-        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
-        munit_assert_int(vsize, ==, p.second.size());
-        munit_assert_memory_equal(vsize, val.data(), p.second.data());
+        auto val   = packed_values.data() + offset;;
+        auto vsize = packed_vsizes[i];
+        munit_assert_long(vsize, ==, p.second.size());
+        munit_assert_memory_equal(vsize, val, p.second.data());
+        i += 1;
+        offset += vsize;
     }
-
-    // check with 0 keys
-
-    ret = rkv_get_packed(dbh, 0, pkeys.data(), ksizes.data(),
-                                 pvals.data(), vsizes.data());
-    munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // check with all NULL
 
-    ret = rkv_get_packed(dbh, 0, NULL, NULL, NULL, NULL);
+    ret = rkv_get_packed(dbh, 0, NULL, NULL, 0, NULL, NULL);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     return MUNIT_OK;
 }
 
 /**
- * @brief Check that we can use get_packed to store the key/value
- * pairs from the reference map, with all values of size 0.
- */
-static MunitResult test_get_packed_all_empty_values(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_database_handle_t dbh = context->dbh;
-    rkv_return_t ret;
-
-    auto count = context->reference.size();
-    std::string         pkeys;
-    std::vector<size_t> ksizes;
-    std::string         pvals;
-    std::vector<size_t> vsizes;
-
-    ksizes.reserve(count);
-    vsizes.reserve(count);
-
-    for(auto& p : context->reference) {
-        auto& key  = p.first;
-        auto ksize = p.first.size();
-        pkeys += key;
-        ksizes.push_back(ksize);
-        vsizes.push_back(0);
-    }
-
-    ret = rkv_get_packed(dbh, count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
-    // check that the key/values were correctly stored
-
-    for(auto& p : context->reference) {
-        auto key = p.first.data();
-        auto ksize = p.first.size();
-        std::vector<char> val(g_max_val_size);
-        size_t vsize = g_max_val_size;
-        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
-        munit_assert_int(vsize, ==, 0);
-    }
-
-    return MUNIT_OK;
-}
-
-/**
- * @brief Check that get_packed correctly detects that a key is empty
- * and returns an error.
+ * @brief Check that if a key has a size of 0, we get an error.
  */
 static MunitResult test_get_packed_empty_key(const MunitParameter params[], void* data)
 {
@@ -506,39 +444,135 @@ static MunitResult test_get_packed_empty_key(const MunitParameter params[], void
     rkv_return_t ret;
 
     auto count = context->reference.size();
-    std::string         pkeys;
-    std::vector<size_t> ksizes;
-    std::string         pvals;
-    std::vector<size_t> vsizes;
-
-    ksizes.reserve(count);
-    vsizes.reserve(count);
+    std::string         packed_keys;
+    std::vector<size_t> packed_ksizes(count);
+    std::vector<char>   packed_values(count*g_max_val_size);
+    std::vector<size_t> packed_vsizes(count);
 
     unsigned i = 0;
-
     for(auto& p : context->reference) {
-        auto& key  = p.first;
-        auto ksize = p.first.size();
-        auto& val  = p.second;
-        auto vsize = p.second.size();
-        if(i == count/2) {
-            ksizes.push_back(0);
+        if(i == context->reference.size()/2) {
+            packed_ksizes[i] = 0;
         } else {
-            pkeys += key;
-            ksizes.push_back(ksize);
+            packed_keys += p.first;
+            packed_ksizes[i] = p.first.size();
         }
-        pvals += val;
-        vsizes.push_back(vsize);
         i += 1;
     }
 
-    ret = rkv_get_packed(dbh, count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = rkv_get_packed(dbh, count,
+                         packed_keys.data(), packed_ksizes.data(),
+                         g_max_val_size*count,
+                         packed_values.data(), packed_vsizes.data());
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     return MUNIT_OK;
 }
 
+static MunitResult test_get_packed_too_small(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_database_handle_t dbh = context->dbh;
+    rkv_return_t ret;
+
+    size_t buffer_size = 0;
+    for(auto& p : context->reference)
+        buffer_size += p.second.size();
+    buffer_size /= 2;
+
+    auto count = context->reference.size();
+    std::string         packed_keys;
+    std::vector<size_t> packed_ksizes(count);
+    std::vector<char>   packed_values(buffer_size);
+    std::vector<size_t> packed_vsizes(count);
+
+    unsigned i = 0;
+    for(auto& p : context->reference) {
+        packed_keys += p.first;
+        packed_ksizes[i] = p.first.size();
+        i += 1;
+    }
+
+    ret = rkv_get_packed(dbh, count,
+                         packed_keys.data(), packed_ksizes.data(),
+                         buffer_size,
+                         packed_values.data(), packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    i = 0;
+    size_t offset = 0;
+    for(auto& p : context->reference) {
+        auto val   = packed_values.data() + offset;
+        auto vsize_read = packed_vsizes[i];
+        auto actual_vsize = p.second.size();
+
+        if(offset + actual_vsize > buffer_size) {
+            munit_assert_long(vsize_read, ==, RKV_SIZE_TOO_SMALL);
+            offset = buffer_size+1;
+        } else {
+            munit_assert_long(vsize_read, ==, actual_vsize);
+            munit_assert_memory_equal(vsize_read, val, p.second.data());
+            offset += vsize_read;
+        }
+        i += 1;
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_get_packed_key_not_found(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_database_handle_t dbh = context->dbh;
+    rkv_return_t ret;
+
+    auto count = context->reference.size();
+    std::string         packed_keys;
+    std::vector<size_t> packed_ksizes(count);
+    std::vector<char>   packed_values(count*g_max_val_size);
+    std::vector<size_t> packed_vsizes(count);
+
+    unsigned i = 0;
+    for(auto& p : context->reference) {
+        if(i % 3 == 0) {
+            packed_keys += "XXXXXXXXXXXX";
+            packed_ksizes[i] = 12;
+        } else {
+            packed_keys += p.first;
+            packed_ksizes[i] = p.first.size();
+        }
+        packed_vsizes[i] = g_max_val_size;
+        i += 1;
+    }
+
+    ret = rkv_get_packed(dbh, count,
+                         packed_keys.data(), packed_ksizes.data(),
+                         g_max_val_size*count,
+                         packed_values.data(), packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    i = 0;
+    size_t offset = 0;
+    for(auto& p : context->reference) {
+        auto val   = packed_values.data() + offset;;
+        auto vsize = packed_vsizes[i];
+        if(i % 3 == 0) {
+            munit_assert_long(vsize, ==, RKV_KEY_NOT_FOUND);
+        } else {
+            munit_assert_long(vsize, ==, p.second.size());
+            munit_assert_memory_equal(vsize, val, p.second.data());
+            offset += vsize;
+        }
+        i += 1;
+    }
+
+    return MUNIT_OK;
+}
+#if 0
 /**
  * @brief Check that we can use get_bulk to store the key/value
  * pairs from the reference map. We use either null as the origin
@@ -802,11 +836,15 @@ static MunitTest test_suite_tests[] = {
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi/key-not-found", test_get_multi_key_not_found,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/get_packed", test_get_packed,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/empty-key", test_get_packed_empty_key,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/get_packed/too-small", test_get_packed_too_small,
+        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/get_packed/key-not-found", test_get_packed_key_not_found,
+        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+#if 0
     { (char*) "/get_bulk", test_get_bulk,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_bulk/all-empty-values", test_get_bulk_all_empty_values,
