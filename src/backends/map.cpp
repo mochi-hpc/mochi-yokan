@@ -293,7 +293,6 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                             std::vector<UserMem>& values) const override {
         if(keys.size() != values.size())
             return Status::InvalidArg;
-
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < keys.size(); i++) {
             auto& key = keys[i];

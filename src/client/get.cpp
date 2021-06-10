@@ -78,9 +78,9 @@ extern "C" rkv_return_t rkv_get(rkv_database_handle_t dbh,
     rkv_return_t ret = rkv_get_packed(dbh, 1, key, &ksize, *vsize, value, vsize);
     if(ret != RKV_SUCCESS)
         return ret;
-    else if(*vsize == ULLONG_MAX-1)
+    else if(*vsize == RKV_SIZE_TOO_SMALL)
         return RKV_ERR_BUFFER_SIZE;
-    else if(*vsize == ULLONG_MAX)
+    else if(*vsize == RKV_KEY_NOT_FOUND)
         return RKV_ERR_KEY_NOT_FOUND;
     return RKV_SUCCESS;
 }
