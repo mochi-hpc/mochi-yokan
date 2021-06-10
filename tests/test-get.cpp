@@ -317,6 +317,69 @@ static MunitResult test_get_multi_too_small(const MunitParameter params[], void*
     return MUNIT_OK;
 }
 
+/**
+ * @brief Check that we can get the key/value pairs from the
+ * reference map using get_multi, and that if a key is not found
+ * the value size is properly set to RKV_SIZE_TOO_SMALL.
+ */
+static MunitResult test_get_multi_key_not_found(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_database_handle_t dbh = context->dbh;
+    rkv_return_t ret;
+
+    auto count = context->reference.size();
+    std::vector<std::vector<char>> values(count);
+    std::vector<std::string> keys(count);
+    for(auto& v : values) v.resize(g_max_val_size);
+    std::vector<const void*> kptrs;
+    std::vector<size_t>      ksizes;
+    std::vector<void*>       vptrs;
+    std::vector<size_t>      vsizes;
+
+    kptrs.reserve(count);
+    ksizes.reserve(count);
+    vptrs.reserve(count);
+    vsizes.reserve(count);
+
+    unsigned i = 0;
+    for(auto& p : context->reference) {
+        if(i % 3 == 0)
+            keys[i] = "XXXXXXXXXXXX";
+        else
+            keys[i]    = p.first;
+        auto key   = keys[i].data();
+        auto ksize = keys[i].size();
+        auto val   = values[i].data();
+        auto vsize = values[i].size();
+        kptrs.push_back(key);
+        ksizes.push_back(ksize);
+        vptrs.push_back(val);
+        vsizes.push_back(vsize);
+        i += 1;
+    }
+
+    ret = rkv_get_multi(dbh, count, kptrs.data(), ksizes.data(),
+                                    vptrs.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    i = 0;
+    for(auto& p : context->reference) {
+        auto val   = vptrs[i];
+        auto vsize = vsizes[i];
+        if(i % 3 == 0) {
+            munit_assert_long(vsize, ==, RKV_KEY_NOT_FOUND);
+        } else {
+            munit_assert_long(vsize, ==, p.second.size());
+            munit_assert_memory_equal(vsize, val, p.second.data());
+        }
+        i += 1;
+    }
+
+    return MUNIT_OK;
+}
 #if 0
 /**
  * @brief Check that we can use get_packed to store the key/value
@@ -737,9 +800,9 @@ static MunitTest test_suite_tests[] = {
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi/too-small", test_get_multi_too_small,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/get_multi/key-not-found", test_get_multi_key_not_found,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+#if 0
     { (char*) "/get_packed", test_get_packed,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/empty-key", test_get_packed_empty_key,
