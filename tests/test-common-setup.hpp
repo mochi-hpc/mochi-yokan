@@ -10,7 +10,7 @@
 #include <rkv/rkv-client.h>
 #include <rkv/rkv-database.h>
 #include "munit/munit.h"
-#include <map>
+#include <unordered_map>
 #include <string>
 
 static size_t g_min_key_size = 8;
@@ -20,13 +20,13 @@ static size_t g_max_val_size = 1024;
 static size_t g_num_keyvals  = 64;
 
 struct test_context {
-    margo_instance_id                 mid;
-    hg_addr_t                         addr;
-    rkv_admin_t                       admin;
-    rkv_client_t                      client;
-    rkv_database_id_t                 id;
-    rkv_database_handle_t             dbh;
-    std::map<std::string,std::string> reference;
+    margo_instance_id                           mid;
+    hg_addr_t                                   addr;
+    rkv_admin_t                                 admin;
+    rkv_client_t                                client;
+    rkv_database_id_t                           id;
+    rkv_database_handle_t                       dbh;
+    std::unordered_map<std::string,std::string> reference;
 };
 
 static const uint16_t provider_id = 42;

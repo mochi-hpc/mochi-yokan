@@ -42,6 +42,16 @@ typedef enum rkv_return_t {
 #undef X
 
 /**
+ * @brief These two constants are used in returned value sizes
+ * to indicate respectively that the buffer was too small to hold
+ * the value, and that the key was not found.
+ */
+#define RKV_SIZE_TOO_SMALL (ULLONG_MAX-1)
+#define RKV_KEY_NOT_FOUND  (ULLONG_MAX)
+
+typedef uint64_t rkv_size_t;
+
+/**
  * @brief Identifier for a database.
  */
 typedef struct rkv_database_id_t {

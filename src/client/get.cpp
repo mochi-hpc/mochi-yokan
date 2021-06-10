@@ -75,7 +75,14 @@ extern "C" rkv_return_t rkv_get(rkv_database_handle_t dbh,
 {
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
-    return rkv_get_packed(dbh, 1, key, &ksize, *vsize, value, vsize);
+    rkv_return_t ret = rkv_get_packed(dbh, 1, key, &ksize, *vsize, value, vsize);
+    if(ret != RKV_SUCCESS)
+        return ret;
+    else if(*vsize == ULLONG_MAX-1)
+        return RKV_ERR_BUFFER_SIZE;
+    else if(*vsize == ULLONG_MAX)
+        return RKV_ERR_KEY_NOT_FOUND;
+    return RKV_SUCCESS;
 }
 
 extern "C" rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,

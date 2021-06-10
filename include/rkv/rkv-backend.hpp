@@ -92,13 +92,13 @@ enum class Status : uint8_t {
 /**
  * @brief Size used for a UserMem value when the key was not found.
  */
-constexpr auto KeyNotFound = std::numeric_limits<size_t>::max();
+constexpr auto KeyNotFound = RKV_KEY_NOT_FOUND;
 
 /**
  * @brief Size used for a UserMem value when the provided buffer
  * was too small to hold the value.
  */
-constexpr auto BufTooSmall = std::numeric_limits<size_t>::max()-1;
+constexpr auto BufTooSmall = RKV_SIZE_TOO_SMALL;
 
 /**
  * @brief Abstract embedded key/value storage object.
