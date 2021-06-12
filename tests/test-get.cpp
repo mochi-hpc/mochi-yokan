@@ -572,7 +572,7 @@ static MunitResult test_get_packed_key_not_found(const MunitParameter params[], 
 
     return MUNIT_OK;
 }
-#if 0
+
 /**
  * @brief Check that we can use get_bulk to store the key/value
  * pairs from the reference map. We use either null as the origin
@@ -591,21 +591,16 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
     auto count = context->reference.size();
     std::string         pkeys;
     std::vector<size_t> ksizes;
-    std::string         pvals;
-    std::vector<size_t> vsizes;
+    std::string         pvals(count*g_max_val_size, '\0');
+    std::vector<size_t> vsizes(count, g_max_val_size);
 
     ksizes.reserve(count);
-    vsizes.reserve(count);
 
     for(auto& p : context->reference) {
         auto& key  = p.first;
         auto ksize = p.first.size();
-        auto& val  = p.second;
-        auto vsize = p.second.size();
         pkeys += key;
         ksizes.push_back(ksize);
-        pvals += val;
-        vsizes.push_back(vsize);
     }
 
     size_t garbage_size = 42;
@@ -630,7 +625,7 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
 
     hret = margo_bulk_create(context->mid,
             5, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READ_ONLY, &bulk);
+            HG_BULK_READWRITE, &bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
 
     char addr_str[256];
@@ -639,167 +634,29 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
             addr_str, &addr_str_size, context->addr);
 
     ret = rkv_get_bulk(dbh, count, addr_str, bulk,
-                       garbage_size, useful_size);
+                       garbage_size, useful_size, true);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, useful_size);
+                       garbage_size, useful_size, true);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
-    hret = margo_bulk_free(bulk);
-    munit_assert_int(hret, ==, HG_SUCCESS);
+    ret = rkv_get_bulk(dbh, count, "invalid-address", bulk,
+                       garbage_size, useful_size, true);
+    munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
 
-    return MUNIT_OK;
-}
-
-/**
- * Same as above but with empty values.
- */
-static MunitResult test_get_bulk_all_empty_values(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_database_handle_t dbh = context->dbh;
-    rkv_return_t ret;
-    hg_return_t hret;
-    hg_bulk_t bulk;
-
-    auto count = context->reference.size();
-    std::string         pkeys;
-    std::vector<size_t> ksizes;
-    std::vector<size_t> vsizes;
-
-    ksizes.reserve(count);
-    vsizes.reserve(count);
-
-    for(auto& p : context->reference) {
-        auto& key  = p.first;
-        auto ksize = p.first.size();
-        pkeys += key;
-        ksizes.push_back(ksize);
-        vsizes.push_back(0);
-    }
-
-    size_t garbage_size = 42;
-    std::string garbage('x', garbage_size);
-
-    std::array<void*, 4> seg_ptrs = {
-        const_cast<char*>(garbage.data()),
-        static_cast<void*>(ksizes.data()),
-        static_cast<void*>(vsizes.data()),
-        const_cast<char*>(pkeys.data())
-    };
-    std::array<hg_size_t, 4> seg_sizes = {
-        garbage_size,
-        ksizes.size()*sizeof(size_t),
-        vsizes.size()*sizeof(size_t),
-        pkeys.size()
-    };
-    auto useful_size = std::accumulate(
-            seg_sizes.begin()+1, seg_sizes.end(), 0);
-
-    hret = margo_bulk_create(context->mid,
-            4, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READ_ONLY, &bulk);
-    munit_assert_int(hret, ==, HG_SUCCESS);
-
-    char addr_str[256];
-    hg_size_t addr_str_size = 256;
-    hret = margo_addr_to_string(context->mid,
-            addr_str, &addr_str_size, context->addr);
-
-    ret = rkv_get_bulk(dbh, count, addr_str, bulk,
-                       garbage_size, useful_size);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
+    /* first invalid size (covers key sizes but not all
+     * of value sizes) */
+    auto invalid_size = seg_sizes[1] + 1;
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, useful_size);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
-
-    hret = margo_bulk_free(bulk);
-    munit_assert_int(hret, ==, HG_SUCCESS);
-
-    return MUNIT_OK;
-}
-
-/**
- * @brief Same as test_get_bulk but introduces an empty key and checks
- * for correct error reporting.
- */
-static MunitResult test_get_bulk_empty_key(const MunitParameter params[], void* data)
-{
-    (void)params;
-    (void)data;
-    struct test_context* context = (struct test_context*)data;
-    rkv_database_handle_t dbh = context->dbh;
-    rkv_return_t ret;
-    hg_return_t hret;
-    hg_bulk_t bulk;
-
-    auto count = context->reference.size();
-    std::string         pkeys;
-    std::vector<size_t> ksizes;
-    std::string         pvals;
-    std::vector<size_t> vsizes;
-
-    ksizes.reserve(count);
-    vsizes.reserve(count);
-
-    unsigned i = 0;
-
-    for(auto& p : context->reference) {
-        auto& key  = p.first;
-        auto ksize = p.first.size();
-        auto& val  = p.second;
-        auto vsize = p.second.size();
-        if(i == count/2) {
-            ksizes.push_back(0);
-        } else {
-            pkeys += key;
-            ksizes.push_back(ksize);
-        }
-        pvals += val;
-        vsizes.push_back(vsize);
-        i += 1;
-    }
-
-    size_t garbage_size = 42;
-    std::string garbage('x', garbage_size);
-
-    std::array<void*, 5> seg_ptrs = {
-        const_cast<char*>(garbage.data()),
-        static_cast<void*>(ksizes.data()),
-        static_cast<void*>(vsizes.data()),
-        const_cast<char*>(pkeys.data()),
-        const_cast<char*>(pvals.data())
-    };
-    std::array<hg_size_t, 5> seg_sizes = {
-        garbage_size,
-        ksizes.size()*sizeof(size_t),
-        vsizes.size()*sizeof(size_t),
-        pkeys.size(),
-        pvals.size()
-    };
-    auto useful_size = std::accumulate(
-            seg_sizes.begin()+1, seg_sizes.end(), 0);
-
-    hret = margo_bulk_create(context->mid,
-            5, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READ_ONLY, &bulk);
-    munit_assert_int(hret, ==, HG_SUCCESS);
-
-    char addr_str[256];
-    hg_size_t addr_str_size = 256;
-    hret = margo_addr_to_string(context->mid,
-            addr_str, &addr_str_size, context->addr);
-
-    ret = rkv_get_bulk(dbh, count, addr_str, bulk,
-                       garbage_size, useful_size);
+                       garbage_size, invalid_size, true);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
+    /* second invalid size (covers key sizes, value sizes,
+     * but keys only partially) */
+    invalid_size = seg_sizes[1] + seg_sizes[2] + 1;
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, useful_size);
+                       garbage_size, invalid_size, true);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     hret = margo_bulk_free(bulk);
@@ -807,7 +664,6 @@ static MunitResult test_get_bulk_empty_key(const MunitParameter params[], void* 
 
     return MUNIT_OK;
 }
-#endif
 
 static MunitParameterEnum test_params[] = {
   { (char*)"min-key-size", NULL },
@@ -817,7 +673,6 @@ static MunitParameterEnum test_params[] = {
   { (char*)"num-keyvals", NULL },
   { NULL, NULL }
 };
-
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/get", test_get,
@@ -844,14 +699,8 @@ static MunitTest test_suite_tests[] = {
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/key-not-found", test_get_packed_key_not_found,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/get_bulk", test_get_bulk,
         test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-    { (char*) "/get_bulk/all-empty-values", test_get_bulk_all_empty_values,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-    { (char*) "/get_bulk/empty-key", test_get_bulk_empty_key,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#endif
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

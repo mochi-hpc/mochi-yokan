@@ -523,6 +523,16 @@ static MunitResult test_put_bulk_all_empty_values(const MunitParameter params[],
                        garbage_size, useful_size);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
+    /* invalid address */
+    ret = rkv_put_bulk(dbh, count, "invalid-address", bulk,
+                       garbage_size, useful_size);
+    munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
+
+    /* incorrect bulk size */
+    ret = rkv_put_bulk(dbh, count, nullptr, bulk,
+                       garbage_size, useful_size/2);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     hret = margo_bulk_free(bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
 
