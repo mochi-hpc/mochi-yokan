@@ -112,13 +112,12 @@ void rkv_exists_ult(hg_handle_t h)
     out.ret = static_cast<rkv_return_t>(
             database->existsPacked(keys, ksizes, flags));
 
-    if(out.ret != RKV_SUCCESS)
-        return;
-
-    // transfer the bit field back the client
-    hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
-            in.bulk, in.offset + flags_offset,
-            local_bulk, flags_offset, flags_size);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    if(out.ret == RKV_SUCCESS) {
+        // transfer the bit field back the client
+        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+                in.bulk, in.offset + flags_offset,
+                local_bulk, flags_offset, flags_size);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    }
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_exists_ult)
