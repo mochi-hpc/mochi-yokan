@@ -645,18 +645,19 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
                        garbage_size, useful_size, true);
     munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
 
-    /* first invalid size (covers key sizes but not all
-     * of value sizes) */
+    /* first invalid size (covers key sizes, value sizes,
+     * but not all of the keys) */
     auto invalid_size = seg_sizes[1] + 1;
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
                        garbage_size, invalid_size, true);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     /* second invalid size (covers key sizes, value sizes,
-     * but keys only partially) */
-    invalid_size = seg_sizes[1] + seg_sizes[2] + 1;
+     * keys, but not enough space for values). Note that
+     * this applies only if packed is false. */
+    invalid_size = seg_sizes[1] + seg_sizes[2] + seg_sizes[3] + 1;
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, invalid_size, true);
+                       garbage_size, invalid_size, false);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     hret = margo_bulk_free(bulk);

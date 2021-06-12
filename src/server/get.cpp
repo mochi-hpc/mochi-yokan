@@ -130,24 +130,22 @@ void rkv_get_ult(hg_handle_t h)
             database->getMulti(keys, ksizes, vals, vsizes));
     }
 
-    if(out.ret != RKV_SUCCESS)
-        return;
+    if(out.ret == RKV_SUCCESS) {
+        // transfer the vsizes and values back the client
+        // this is done using two concurrent bulk transfers
+        margo_request req = MARGO_REQUEST_NULL;
+        hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
+                in.bulk, in.offset + vals_offset,
+                local_bulk, vals_offset, remaining_vsize, &req);
+        CHECK_HRET_OUT(hret, margo_bulk_itransfer);
 
-    // transfer the vsizes and values back the client
-    // this is done using two concurrent bulk transfers
-    margo_request req = MARGO_REQUEST_NULL;
-    hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
-            in.bulk, in.offset + vals_offset,
-            local_bulk, vals_offset, remaining_vsize, &req);
-    CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+                in.bulk, in.offset + vsizes_offset,
+                local_bulk, vsizes_offset, in.count*sizeof(size_t));
+        CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
-            in.bulk, in.offset + vsizes_offset,
-            local_bulk, vsizes_offset, in.count*sizeof(size_t));
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
-
-    hret = margo_wait(req);
-    CHECK_HRET_OUT(hret, margo_wait);
-
+        hret = margo_wait(req);
+        CHECK_HRET_OUT(hret, margo_wait);
+    }
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_get_ult)
