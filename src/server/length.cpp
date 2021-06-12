@@ -104,19 +104,18 @@ void rkv_length_ult(hg_handle_t h)
     // create memory wrapper for value sizes
     auto vsizes = rkv::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + vsizes_offset),
-        in.count*sizeof(size_t)
+        in.count
     };
 
     out.ret = static_cast<rkv_return_t>(
             database->lengthPacked(keys, ksizes, vsizes));
 
-    if(out.ret != RKV_SUCCESS)
-        return;
-
-    // transfer the vsizes back the client
-    hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
-            in.bulk, in.offset + vsizes_offset,
-            local_bulk, vsizes_offset, in.count*sizeof(size_t));
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    if(out.ret == RKV_SUCCESS) {
+        // transfer the vsizes back the client
+        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+                in.bulk, in.offset + vsizes_offset,
+                local_bulk, vsizes_offset, in.count*sizeof(size_t));
+        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    }
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_length_ult)

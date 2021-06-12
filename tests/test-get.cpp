@@ -150,7 +150,7 @@ static MunitResult test_get_empty_keys(const MunitParameter params[], void* data
 
 /**
  * @brief Check that we can get the key/value pairs from the
- * reference map using get_multi, and that put_multi also accepts
+ * reference map using get_multi, and that get_multi also accepts
  * a count of 0.
  */
 static MunitResult test_get_multi(const MunitParameter params[], void* data)
@@ -320,7 +320,7 @@ static MunitResult test_get_multi_too_small(const MunitParameter params[], void*
 /**
  * @brief Check that we can get the key/value pairs from the
  * reference map using get_multi, and that if a key is not found
- * the value size is properly set to RKV_SIZE_TOO_SMALL.
+ * the value size is properly set to RKV_KEY_NOT_FOUND.
  */
 static MunitResult test_get_multi_key_not_found(const MunitParameter params[], void* data)
 {

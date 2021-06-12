@@ -70,7 +70,11 @@ extern "C" rkv_return_t rkv_length(rkv_database_handle_t dbh,
 {
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
-    return rkv_length_packed(dbh, 1, key, &ksize, vsize);
+    rkv_return_t ret = rkv_length_packed(dbh, 1, key, &ksize, vsize);
+    if(ret == RKV_SUCCESS) {
+        if(*vsize == RKV_KEY_NOT_FOUND) ret = RKV_ERR_KEY_NOT_FOUND;
+    }
+    return ret;
 }
 
 extern "C" rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
