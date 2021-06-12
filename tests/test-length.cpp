@@ -459,15 +459,15 @@ static MunitResult test_length_bulk(const MunitParameter params[], void* data)
     /* first invalid size (covers key sizes,
      * but not all of the keys) */
     auto invalid_size = seg_sizes[1] + 1;
-    ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, invalid_size, true);
+    ret = rkv_length_bulk(dbh, count, nullptr, bulk,
+                          garbage_size, invalid_size);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     /* second invalid size (covers key sizes, keys,
      * but not enough space for value sizes). */
     invalid_size = seg_sizes[1] + seg_sizes[2] + 1;
-    ret = rkv_get_bulk(dbh, count, nullptr, bulk,
-                       garbage_size, invalid_size, false);
+    ret = rkv_length_bulk(dbh, count, nullptr, bulk,
+                          garbage_size, invalid_size);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     hret = margo_bulk_free(bulk);
