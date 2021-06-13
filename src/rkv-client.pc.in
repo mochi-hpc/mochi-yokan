@@ -8,5 +8,5 @@ Description: <insert description here>
 Version: @RKV_VERSION@
 
 Requires: margo
-Libs: -L${libdir} @CLIENT_PRIVATE_LIBS@
+Libs: -L${libdir} @CLIENT_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}

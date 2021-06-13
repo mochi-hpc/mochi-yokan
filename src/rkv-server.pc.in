@@ -7,6 +7,6 @@ Name: rkv-server
 Description: <insert description here>
 Version: @RKV_VERSION@
 
-Requires: margo abt-io
-Libs: -L${libdir} @SERVER_PRIVATE_LIBS@
+Requires: margo
+Libs: -L${libdir} @SERVER_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}

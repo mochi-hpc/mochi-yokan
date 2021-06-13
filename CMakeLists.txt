@@ -1,4 +1,4 @@
-# (C) 2020 The University of Chicago
+# (C) 2021 The University of Chicago
 # See COPYRIGHT in top-level directory.
 cmake_minimum_required (VERSION 3.13)
 project (rkv C CXX)
@@ -14,7 +14,6 @@ add_library(coverage_config INTERFACE)
 
 option (ENABLE_COVERAGE "Enable coverage reporting" OFF)
 option (ENABLE_TESTS    "Build tests" OFF)
-option (ENABLE_EXAMPLES "Build examples" OFF)
 option (ENABLE_BEDROCK  "Build bedrock module" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -73,6 +72,3 @@ add_subdirectory (src)
 if(${ENABLE_TESTS})
   add_subdirectory (tests)
 endif(${ENABLE_TESTS})
-if(${ENABLE_EXAMPLES})
-  add_subdirectory (examples)
-endif(${ENABLE_EXAMPLES})

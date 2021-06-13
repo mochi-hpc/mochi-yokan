@@ -1,5 +1,5 @@
 /*
- * (C) 2020 The University of Chicago
+ * (C) 2021 The University of Chicago
  *
  * See COPYRIGHT in top-level directory.
  */
@@ -49,8 +49,6 @@ typedef enum rkv_return_t {
  */
 #define RKV_SIZE_TOO_SMALL (ULLONG_MAX-1)
 #define RKV_KEY_NOT_FOUND  (ULLONG_MAX)
-
-typedef uint64_t rkv_size_t;
 
 /**
  * @brief Identifier for a database.
