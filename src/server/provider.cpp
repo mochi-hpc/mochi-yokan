@@ -46,8 +46,10 @@ rkv_return_t rkv_provider_register(
 
     p = new rkv_provider;
     if(p == NULL) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(mid, "could not allocate memory for provider");
         return RKV_ERR_ALLOCATION;
+        // LCOV_EXCL_STOP
     }
 
     p->mid = mid;
@@ -291,10 +293,6 @@ void rkv_destroy_database_ult(hg_handle_t h)
     provider->dbs.erase(in.id);
 
     out.ret = RKV_SUCCESS;
-
-    if(out.ret != RKV_SUCCESS) {
-        RKV_LOG_ERROR(mid, "could not destroy database, database may be left in an invalid state");
-    }
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
 
