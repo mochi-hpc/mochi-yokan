@@ -17,12 +17,8 @@ typedef struct rkv_client {
    hg_id_t           put_id;
    hg_id_t           get_id;
    hg_id_t           erase_id;
-   /* list keys */
    hg_id_t           list_keys_id;
-   hg_id_t           list_keys_packed_id;
-   /* list key/vals */
    hg_id_t           list_keyvals_id;
-   hg_id_t           list_keyvals_packed_id;
 
    uint64_t          num_database_handles;
 } rkv_client;

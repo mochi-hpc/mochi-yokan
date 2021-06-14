@@ -17,7 +17,9 @@ set (client-src-files
      client/erase.cpp
      client/get.cpp
      client/length.cpp
-     client/exists.cpp)
+     client/exists.cpp
+     client/list_keys.cpp
+     client/list_keyvals.cpp)
 
 set (admin-src-files
      admin/admin.c)

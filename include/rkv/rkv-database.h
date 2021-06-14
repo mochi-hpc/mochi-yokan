@@ -548,49 +548,222 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
                             size_t size);
 
 
+/**
+ * @brief Lists up to count keys from from_key (included if
+ * inclusive is set to true), filtering by prefix if the prefix
+ * is provided.
+ *
+ * If a key size is too small to hold the key, the size will be
+ * set to RKV_SIZE_TOO_SMALL.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix Key prefix.
+ * @param[in] prefix_size Prefix size.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[out] keys Array of buffers to hold keys.
+ * @param[inout] ksizes Array of key sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
-                           size_t max,
                            bool inclusive,
                            const void* from_key,
                            size_t from_ksize,
                            const void* prefix,
                            size_t prefix_size,
+                           size_t* count,
                            void* const* keys,
                            size_t* ksizes);
 
+/**
+ * @brief Same as rkv_list_keys but using a contiguous buffer to hold keys.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix Key prefix.
+ * @param[in] prefix_size Prefix size.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[out] keys Buffer to hold keys.
+ * @param[in] keys_buf_size Size of the buffer to hold keys.
+ * @param[out] ksizes Array of key sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
-                                  size_t max,
                                   bool inclusive,
                                   const void* from_key,
                                   size_t from_ksize,
                                   const void* prefix,
                                   size_t prefix_size,
+                                  size_t* count,
                                   void* keys,
+                                  size_t keys_buf_size,
                                   size_t* ksizes);
 
+/**
+ * @brief Low-level list_keys operation using a bulk handle.
+ * This function will take the data in [offset, offset+size[
+ * from the bulk handle and interpret it as follows:
+ * - The first from_ksize bytes represent the start key.
+ * - The next prefix_size byres represent the prefix.
+ * - The next count * sizeof(size_t) bytes represent the key sizes.
+ * - The next N bytes store keys back to back, where
+ *   N = sum of key sizes
+ * Origin represents the address of the process that created
+ * the bulk handle. If NULL, the bulk handle is considered to
+ * have been created by the calling process.
+ *
+ * This function is useful in situation where a process received
+ * a bulk handle from another process and wants to forward it to
+ * an RKV provider.
+ *
+ * Note: the bulk handle must have been created with HG_BULK_READWRITE.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix_size Prefix size.
+ * @param[in] origin Origin address.
+ * @param[in] data Bulk handle containing the data.
+ * @param[in] offset Offset at which the payload starts in the bulk handle.
+ * @param[in] keys_buf_size Total size allocated for keys.
+ * @param[in] packed Whether keys are packed on the client.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
+rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
+                                bool inclusive,
+                                size_t from_ksize,
+                                size_t prefix_size,
+                                const char* origin,
+                                hg_bulk_t data,
+                                size_t offset,
+                                size_t keys_buf_size,
+                                bool packed,
+                                size_t* count);
+
+
+/**
+ * @brief Lists up to count key/value pairs from from_key (included if
+ * inclusive is set to true), filtering keys by prefix if the prefix
+ * is provided.
+ *
+ * If a key size is too small to hold the key, the size will be
+ * set to RKV_SIZE_TOO_SMALL.
+ * If a value size is too small to hold the value, the size will be
+ * set to RKV_SIZE_TOO_SMALL.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix Key prefix.
+ * @param[in] prefix_size Prefix size.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[out] keys Array of buffers to hold keys.
+ * @param[inout] ksizes Array of key sizes.
+ * @param[out] values Array of buffers to hold values.
+ * @param[inout] vsizes Array of value sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
-                              size_t max,
                               bool inclusive,
                               const void* from_key,
                               size_t from_ksize,
                               const void* prefix,
                               size_t prefix_size,
+                              size_t* count,
                               void* const* keys,
                               size_t* ksizes,
                               void* const* values,
                               size_t* vsizes);
 
+/**
+ * @brief Same as rkv_list_keyvals but using contiguous buffers
+ * to hold keys and values.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix Key prefix.
+ * @param[in] prefix_size Prefix size.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[out] keys Buffer to hold keys.
+ * @param[in] keys_buf_size Size of the buffer to hold keys.
+ * @param[out] ksizes Array of key sizes.
+ * @param[out] values Buffer to hold values.
+ * @param[in] vals_buf_size Size of the buffer to hold values.
+ * @param[out] vsizes Array of value sizes.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
 rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
-                                     size_t max,
                                      bool inclusive,
                                      const void* from_key,
                                      size_t from_ksize,
                                      const void* prefix,
                                      size_t prefix_size,
+                                     size_t* count,
                                      void* keys,
+                                     size_t keys_buf_size,
                                      size_t* ksizes,
                                      void* values,
+                                     size_t vals_buf_size,
                                      size_t* vsizes);
+
+/**
+ * @brief Low-level list_keyvals operation using a bulk handle.
+ * This function will take the data in [offset, offset+size[
+ * from the bulk handle and interpret it as follows:
+ * - The first from_ksize bytes represent the start key.
+ * - The next prefix_size byres represent the prefix.
+ * - The next count * sizeof(size_t) bytes represent the key sizes.
+ * - The next count * sizeof(size_t) bytes represent the value sizes.
+ * - The next key_buf_size bytes will store keys back to back
+ * - The next val_buf_size bytes will store values back to back
+ * Origin represents the address of the process that created
+ * the bulk handle. If NULL, the bulk handle is considered to
+ * have been created by the calling process.
+ *
+ * This function is useful in situation where a process received
+ * a bulk handle from another process and wants to forward it to
+ * an RKV provider.
+ *
+ * Note: the bulk handle must have been created with HG_BULK_READWRITE.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] prefix_size Prefix size.
+ * @param[in] origin Origin address.
+ * @param[in] data Bulk handle containing the data.
+ * @param[in] offset Offset at which the payload starts in the bulk handle.
+ * @param[in] key_buf_size Size of the buffer allocated for keys.
+ * @param[in] val_buf_size Size of the buffer allocated for values.
+ * @param[in] packed Whether the data is packed on the client side.
+ * @param[inout] count Max keys to read (in) / number actually read (out).
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
+rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
+                                   bool inclusive,
+                                   size_t from_ksize,
+                                   size_t prefix_size,
+                                   const char* origin,
+                                   hg_bulk_t data,
+                                   size_t offset,
+                                   size_t key_buf_size,
+                                   size_t val_buf_size,
+                                   bool packed,
+                                   size_t* count);
 
 #ifdef __cplusplus
 }

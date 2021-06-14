@@ -150,10 +150,6 @@ MERCURY_GEN_PROC(get_in_t,
 MERCURY_GEN_PROC(get_out_t,
         ((int32_t)(ret)))
 
-/* get_multi */
-
-/* get_packed */
-
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
         ((rkv_database_id_t)(db_id))\
@@ -165,17 +161,39 @@ MERCURY_GEN_PROC(erase_in_t,
 MERCURY_GEN_PROC(erase_out_t,
         ((int32_t)(ret)))
 
-/* erase_multi */
-
-/* erase_packed */
-
 /* list_keys */
-
-/* list_keys_packed */
+MERCURY_GEN_PROC(list_keys_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((hg_bool_t)(inclusive))\
+        ((hg_bool_t)(packed))\
+        ((uint64_t)(count))\
+        ((uint64_t)(from_ksize))\
+        ((uint64_t)(prefix_size))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(keys_buf_size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(list_keys_out_t,
+        ((uint64_t)(count))\
+        ((int32_t)(ret)))
 
 /* list_keyvals */
+MERCURY_GEN_PROC(list_keyvals_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((hg_bool_t)(inclusive))\
+        ((hg_bool_t)(packed))\
+        ((uint64_t)(count))\
+        ((uint64_t)(from_ksize))\
+        ((uint64_t)(prefix_size))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(keys_buf_size))\
+        ((uint64_t)(vals_buf_size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(list_keyvals_out_t,
+        ((uint64_t)(count))\
+        ((int32_t)(ret)))
 
-/* list_keyvals_packed */
 
 /* Extra hand-coded serialization functions */
 

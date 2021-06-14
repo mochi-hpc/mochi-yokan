@@ -47,8 +47,9 @@ typedef enum rkv_return_t {
  * to indicate respectively that the buffer was too small to hold
  * the value, and that the key was not found.
  */
-#define RKV_SIZE_TOO_SMALL (ULLONG_MAX-1)
 #define RKV_KEY_NOT_FOUND  (ULLONG_MAX)
+#define RKV_SIZE_TOO_SMALL (ULLONG_MAX-1)
+#define RKV_NO_MORE_KEYS   (ULLONG_MAX-2)
 
 /**
  * @brief Identifier for a database.

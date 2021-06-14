@@ -20,31 +20,37 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 
     if(flag == HG_TRUE) {
 
-        margo_registered_name(mid, "rkv_exists",        &c->exists_id,        &flag);
-        margo_registered_name(mid, "rkv_length",        &c->length_id,        &flag);
-        margo_registered_name(mid, "rkv_put",        &c->put_id,        &flag);
-        margo_registered_name(mid, "rkv_get",        &c->get_id,        &flag);
+        margo_registered_name(mid, "rkv_exists",       &c->exists_id,       &flag);
+        margo_registered_name(mid, "rkv_length",       &c->length_id,       &flag);
+        margo_registered_name(mid, "rkv_put",          &c->put_id,          &flag);
+        margo_registered_name(mid, "rkv_get",          &c->get_id,          &flag);
         margo_registered_name(mid, "rkv_erase",        &c->erase_id,        &flag);
-
-        margo_registered_name(mid, "rkv_list_keys",        &c->list_keys_id,        &flag);
-        margo_registered_name(mid, "rkv_list_keys_packed", &c->list_keys_packed_id, &flag);
-
-        margo_registered_name(mid, "rkv_list_keyvals",        &c->list_keyvals_id,        &flag);
-        margo_registered_name(mid, "rkv_list_keyvals_packed", &c->list_keyvals_packed_id, &flag);
+        margo_registered_name(mid, "rkv_list_keys",    &c->list_keys_id,    &flag);
+        margo_registered_name(mid, "rkv_list_keyvals", &c->list_keyvals_id, &flag);
 
     } else {
 
-        c->exists_id = MARGO_REGISTER(mid, "rkv_exists", exists_in_t, exists_out_t, NULL);
-        c->length_id = MARGO_REGISTER(mid, "rkv_length", length_in_t, length_out_t, NULL);
-        c->put_id = MARGO_REGISTER(mid, "rkv_put", put_in_t, put_out_t, NULL);
-        c->get_id = MARGO_REGISTER(mid, "rkv_get", get_in_t, get_out_t, NULL);
-        c->erase_id = MARGO_REGISTER(mid, "rkv_erase", erase_in_t, erase_out_t, NULL);
-
-//        c->list_keys_id = MARGO_REGISTER(mid, "rkv_list_keys", list_keys_in_t, list_keys_out_t, NULL);
-//        c->list_keys_packed_id = MARGO_REGISTER(mid, "rkv_list_keys_packed", list_keys_packed_in_t, list_keys_packed_out_t, NULL);
-
-//        c->list_keyvals_id = MARGO_REGISTER(mid, "rkv_list_keyvals", list_keyvals_in_t, list_keyvals_out_t, NULL);
-//        c->list_keyvals_packed_id = MARGO_REGISTER(mid, "rkv_list_keyvals_packed", list_keyvals_packed_in_t, list_keyvals_packed_out_t, NULL);
+        c->exists_id =
+            MARGO_REGISTER(mid, "rkv_exists",
+                           exists_in_t, exists_out_t, NULL);
+        c->length_id =
+            MARGO_REGISTER(mid, "rkv_length",
+                           length_in_t, length_out_t, NULL);
+        c->put_id =
+            MARGO_REGISTER(mid, "rkv_put",
+                           put_in_t, put_out_t, NULL);
+        c->get_id =
+            MARGO_REGISTER(mid, "rkv_get",
+                           get_in_t, get_out_t, NULL);
+        c->erase_id =
+            MARGO_REGISTER(mid, "rkv_erase",
+                           erase_in_t, erase_out_t, NULL);
+        c->list_keys_id =
+            MARGO_REGISTER(mid, "rkv_list_keys",
+                           list_keys_in_t, list_keys_out_t, NULL);
+        c->list_keyvals_id =
+            MARGO_REGISTER(mid, "rkv_list_keyvals",
+                           list_keyvals_in_t, list_keyvals_out_t, NULL);
 
     }
 
