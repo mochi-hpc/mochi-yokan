@@ -35,9 +35,9 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
                                               size_t keys_buf_size,
                                               size_t vals_buf_size,
                                               bool packed,
-                                              size_t* count)
+                                              size_t count)
 {
-    if(*count == 0)
+    if(count == 0)
         return RKV_SUCCESS;
 
     margo_instance_id mid = dbh->client->mid;
@@ -48,7 +48,7 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id         = dbh->database_id;
-    in.count         = *count;
+    in.count         = count;
     in.bulk          = data;
     in.offset        = offset;
     in.keys_buf_size = keys_buf_size;
@@ -70,9 +70,6 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_get_output);
 
     ret = static_cast<rkv_return_t>(out.ret);
-    if(ret == RKV_SUCCESS) {
-        *count = out.count;
-    }
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
@@ -85,13 +82,13 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
                                          size_t from_ksize,
                                          const void* prefix,
                                          size_t prefix_size,
-                                         size_t* count,
+                                         size_t count,
                                          void* const* keys,
                                          size_t* ksizes,
                                          void* const* values,
                                          size_t* vsizes)
 {
-    if(*count == 0)
+    if(count == 0)
         return RKV_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
         return RKV_ERR_INVALID_ARGS;
@@ -115,13 +112,13 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     }
     // ksizes
     ptrs.push_back(ksizes);
-    sizes.push_back((*count)*sizeof(*ksizes));
+    sizes.push_back(count*sizeof(*ksizes));
 
-    ptrs.reserve(ptrs.size() + (*count)*2);
-    sizes.reserve(sizes.size() + (*count*2));
+    ptrs.reserve(ptrs.size() + count*2);
+    sizes.reserve(sizes.size() + count*2);
     // keys
     size_t keys_buf_size = 0;
-    for(unsigned i = 0; i < *count; i++) {
+    for(unsigned i = 0; i < count; i++) {
         if(ksizes[i] == 0)
             return RKV_ERR_INVALID_ARGS;
         ptrs.push_back(const_cast<void*>(keys[i]));
@@ -130,7 +127,7 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     }
     // values
     size_t vals_buf_size = 0;
-    for(unsigned i = 0; i < *count; i++) {
+    for(unsigned i = 0; i < count; i++) {
         if(vsizes[i] == 0)
             continue;
         ptrs.push_back(const_cast<void*>(values[i]));
@@ -154,7 +151,7 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                                 size_t from_ksize,
                                                 const void* prefix,
                                                 size_t prefix_size,
-                                                size_t* count,
+                                                size_t count,
                                                 void* keys,
                                                 size_t keys_buf_size,
                                                 size_t* ksizes,
@@ -162,7 +159,7 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                                 size_t vals_buf_size,
                                                 size_t* vsizes)
 {
-    if(*count == 0)
+    if(count == 0)
         return RKV_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
         return RKV_ERR_INVALID_ARGS;
@@ -186,10 +183,10 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
         i += 1;
     }
     ptrs[i]  = ksizes;
-    sizes[i] = *count * sizeof(*ksizes);
+    sizes[i] = count * sizeof(*ksizes);
     i += 1;
     ptrs[i]  = vsizes;
-    sizes[i] = *count * sizeof(*ksizes);
+    sizes[i] = count * sizeof(*ksizes);
     i += 1;
     ptrs[i]  = keys;
     sizes[i] = keys_buf_size;

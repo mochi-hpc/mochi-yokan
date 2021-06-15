@@ -118,6 +118,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         m_db.clear();
     }
 
+#if 0
     virtual Status exists(const UserMem& key, bool& b) const override {
         ScopedReadLock lock(m_lock);
         b = m_db.count(key) > 0;
@@ -133,6 +134,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         return Status::OK;
     }
+#endif
 
     virtual Status existsPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
@@ -151,6 +153,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+#if 0
     virtual Status length(const UserMem& key, size_t& size) const override {
         ScopedReadLock lock(m_lock);
         auto it = m_db.find(key);
@@ -172,6 +175,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         return Status::OK;
     }
+#endif
 
     virtual Status lengthPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
@@ -192,6 +196,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+#if 0
     virtual Status put(const UserMem& key, const UserMem& value) override {
         ScopedWriteLock lock(m_lock);
         auto p = m_db.emplace(std::piecewise_construct,
@@ -230,6 +235,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         return Status::OK;
     }
+#endif
 
     virtual Status putPacked(const UserMem& keys,
                              const BasicUserMem<size_t>& ksizes,
@@ -273,6 +279,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+#if 0
     virtual Status get(const UserMem& key, UserMem& value) const override {
         ScopedReadLock lock(m_lock);
         auto it = m_db.find(key);
@@ -312,6 +319,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         return Status::OK;
     }
+#endif
 
     virtual Status getMulti(const UserMem& keys,
                             const BasicUserMem<size_t>& ksizes,
@@ -379,6 +387,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+#if 0
     virtual Status get(const UserMem& key, std::string& value) const override {
         ScopedReadLock lock(m_lock);
         auto it = m_db.find(key);
@@ -450,6 +459,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         return Status::OK;
     }
+#endif
 
     virtual Status erasePacked(const UserMem& keys,
                                const BasicUserMem<size_t>& ksizes) override {
@@ -468,6 +478,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+#if 0
     virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             size_t max, std::vector<std::string>& keys) const override {
@@ -528,6 +539,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         keys.resize(count);
         return Status::OK;
     }
+#endif
 
     virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
@@ -542,9 +554,52 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         }
         const auto end = m_db.end();
         auto max = keySizes.size;
-        size_t count = 0;
+        size_t i = 0;
         size_t offset = 0;
-        for(auto it = fromKeyIt; it != end && count < max; it++) {
+        for(auto it = fromKeyIt; it != end && i < max; it++) {
+            auto& key = it->first;
+            if(prefix.size != 0) {
+                if(prefix.size > key.size()) continue;
+                if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    continue;
+            }
+            size_t usize = keySizes[i];
+            auto umem = static_cast<char*>(keys.data) + offset;
+            if(usize < key.size()) {
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                i += 1;
+                offset += usize;
+                continue;
+            }
+            std::memcpy(umem, key.data(), key.size());
+            keySizes[i] = key.size();
+            offset += usize;
+            i += 1;
+        }
+        keySizes.size = i;
+        keys.size = offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
+        return Status::OK;
+    }
+
+    virtual Status listKeysPacked(const UserMem& fromKey,
+                                  bool inclusive, const UserMem& prefix,
+                                  UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        ScopedReadLock lock(m_lock);
+        using iterator = decltype(m_db.begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db.begin();
+        } else {
+            fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+        }
+        const auto end = m_db.end();
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t offset = 0;
+        for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = it->first;
             if(prefix.size != 0) {
                 if(prefix.size > key.size()) continue;
@@ -555,15 +610,19 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             if(keys.size - offset < key.size())
                 break;
             std::memcpy(umem, key.data(), key.size());
-            keySizes.data[count] = key.size();
+            keySizes[i] = key.size();
             offset += key.size();
-            count += 1;
+            i += 1;
         }
-        keySizes.size = count;
+        keySizes.size = i;
         keys.size = offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
         return Status::OK;
     }
 
+#if 0
     virtual Status listKeyValues(const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix, size_t max,
                                  std::vector<std::string>& keys,
@@ -640,6 +699,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         vals.resize(count);
         return Status::OK;
     }
+#endif
 
     virtual Status listKeyValues(const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix,
@@ -688,6 +748,58 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         keys.size = key_offset;
         valSizes.size = count;
         vals.size = val_offset;
+        return Status::OK;
+    }
+
+    virtual Status listKeyValuesPacked(const UserMem& fromKey,
+                                       bool inclusive, const UserMem& prefix,
+                                       UserMem& keys, BasicUserMem<size_t>& keySizes,
+                                       UserMem& vals, BasicUserMem<size_t>& valSizes) const override {
+        ScopedReadLock lock(m_lock);
+        using iterator = decltype(m_db.begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db.begin();
+        } else {
+            fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+        }
+        const auto end = m_db.end();
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t keys_offset = 0;
+        size_t vals_offset = 0;
+        bool size_too_small = false;
+
+        for(auto it = fromKeyIt; it != end && i < max; it++) {
+            auto& key = it->first;
+            auto& val = it->second;
+            if(prefix.size != 0) {
+                if(prefix.size > key.size()) continue;
+                if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    continue;
+            }
+            auto key_umem = static_cast<char*>(keys.data) + keys_offset;
+            auto val_umem = static_cast<char*>(vals.data) + vals_offset;
+            if(keys.size < key.size() + keys_offset
+            || vals.size < val.size() + vals_offset) {
+                size_too_small = true;
+                break;
+            }
+            std::memcpy(key_umem, key.data(), key.size());
+            std::memcpy(val_umem, val.data(), val.size());
+            keySizes[i] = key.size();
+            valSizes[i] = val.size();
+            keys_offset += key.size();
+            vals_offset += val.size();
+            i += 1;
+        }
+        keySizes.size = i;
+        keys.size = keys_offset;
+        vals.size = vals_offset;
+        for(; i < max; i++) {
+            keySizes[i] = size_too_small ? RKV_SIZE_TOO_SMALL : RKV_NO_MORE_KEYS;
+            valSizes[i] = size_too_small ? RKV_SIZE_TOO_SMALL : RKV_NO_MORE_KEYS;
+        }
         return Status::OK;
     }
 

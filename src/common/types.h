@@ -174,7 +174,6 @@ MERCURY_GEN_PROC(list_keys_in_t,
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(list_keys_out_t,
-        ((uint64_t)(count))\
         ((int32_t)(ret)))
 
 /* list_keyvals */
@@ -191,7 +190,6 @@ MERCURY_GEN_PROC(list_keyvals_in_t,
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(list_keyvals_out_t,
-        ((uint64_t)(count))\
         ((int32_t)(ret)))
 
 

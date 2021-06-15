@@ -562,7 +562,7 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
  * @param[in] prefix_size Prefix size.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read (in) / number actually read (out).
  * @param[out] keys Array of buffers to hold keys.
  * @param[inout] ksizes Array of key sizes.
  *
@@ -574,7 +574,7 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
                            size_t from_ksize,
                            const void* prefix,
                            size_t prefix_size,
-                           size_t* count,
+                           size_t count,
                            void* const* keys,
                            size_t* ksizes);
 
@@ -587,7 +587,7 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
  * @param[in] prefix_size Prefix size.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read.
  * @param[out] keys Buffer to hold keys.
  * @param[in] keys_buf_size Size of the buffer to hold keys.
  * @param[out] ksizes Array of key sizes.
@@ -600,7 +600,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
                                   size_t from_ksize,
                                   const void* prefix,
                                   size_t prefix_size,
-                                  size_t* count,
+                                  size_t count,
                                   void* keys,
                                   size_t keys_buf_size,
                                   size_t* ksizes);
@@ -633,7 +633,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
  * @param[in] offset Offset at which the payload starts in the bulk handle.
  * @param[in] keys_buf_size Total size allocated for keys.
  * @param[in] packed Whether keys are packed on the client.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read.
  *
  * @return RKV_SUCCESS or corresponding error code.
  */
@@ -646,7 +646,7 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
                                 size_t offset,
                                 size_t keys_buf_size,
                                 bool packed,
-                                size_t* count);
+                                size_t count);
 
 
 /**
@@ -665,7 +665,7 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
  * @param[in] prefix_size Prefix size.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read.
  * @param[out] keys Array of buffers to hold keys.
  * @param[inout] ksizes Array of key sizes.
  * @param[out] values Array of buffers to hold values.
@@ -679,7 +679,7 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
                               size_t from_ksize,
                               const void* prefix,
                               size_t prefix_size,
-                              size_t* count,
+                              size_t count,
                               void* const* keys,
                               size_t* ksizes,
                               void* const* values,
@@ -695,7 +695,7 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
  * @param[in] prefix_size Prefix size.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read.
  * @param[out] keys Buffer to hold keys.
  * @param[in] keys_buf_size Size of the buffer to hold keys.
  * @param[out] ksizes Array of key sizes.
@@ -711,7 +711,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                      size_t from_ksize,
                                      const void* prefix,
                                      size_t prefix_size,
-                                     size_t* count,
+                                     size_t count,
                                      void* keys,
                                      size_t keys_buf_size,
                                      size_t* ksizes,
@@ -749,7 +749,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
  * @param[in] key_buf_size Size of the buffer allocated for keys.
  * @param[in] val_buf_size Size of the buffer allocated for values.
  * @param[in] packed Whether the data is packed on the client side.
- * @param[inout] count Max keys to read (in) / number actually read (out).
+ * @param[in] count Max keys to read.
  *
  * @return RKV_SUCCESS or corresponding error code.
  */
@@ -763,7 +763,7 @@ rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
                                    size_t key_buf_size,
                                    size_t val_buf_size,
                                    bool packed,
-                                   size_t* count);
+                                   size_t count);
 
 #ifdef __cplusplus
 }

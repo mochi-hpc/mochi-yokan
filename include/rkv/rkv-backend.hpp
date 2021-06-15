@@ -137,6 +137,7 @@ class KeyValueStoreInterface {
      */
     virtual void destroy() = 0;
 
+#if 0
     /**
      * @brief Check if the provided key exists.
      *
@@ -159,6 +160,7 @@ class KeyValueStoreInterface {
     virtual Status existsMulti(const std::vector<UserMem>& keys,
                                std::vector<bool>& b) const = 0;
 
+#endif
 
     /**
      * @brief Check if the provided keys exist. The keys are packed
@@ -176,6 +178,7 @@ class KeyValueStoreInterface {
     virtual Status existsPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
                                 BitField& b) const = 0;
+#if 0
     /**
      * @brief Get the length of the value associated with the provided key.
      * If the key does not exist, the size is set to KeyNotFound
@@ -201,6 +204,7 @@ class KeyValueStoreInterface {
      */
     virtual Status lengthMulti(const std::vector<UserMem>& keys,
                                std::vector<size_t>& size) const = 0;
+#endif
 
     /**
      * @brief Get the size of values associated with the keys. The keys are packed
@@ -218,6 +222,7 @@ class KeyValueStoreInterface {
     virtual Status lengthPacked(const UserMem& keys,
                                 const BasicUserMem<size_t>& ksizes,
                                 BasicUserMem<size_t>& vsizes) const = 0;
+#if 0
     /**
      * @brief Put a new key/value pair into the database.
      *
@@ -241,6 +246,7 @@ class KeyValueStoreInterface {
      */
     virtual Status putMulti(const std::vector<UserMem>& keys,
                             const std::vector<UserMem>& vals) = 0;
+#endif
 
     /**
      * @brief Put multiple key/value pairs into the database.
@@ -259,7 +265,7 @@ class KeyValueStoreInterface {
                              const BasicUserMem<size_t>& ksizes,
                              const UserMem& vals,
                              const BasicUserMem<size_t>& vsizes) = 0;
-
+#if 0
     /**
      * @brief Get the value associated with a given key.
      * The user must provide the memory into which to store the value.
@@ -293,6 +299,7 @@ class KeyValueStoreInterface {
      */
     virtual Status getMulti(const std::vector<UserMem>& keys,
                             std::vector<UserMem>& values) const = 0;
+#endif
 
     /**
      * @brief This verion of getMulti uses the user-provided memory.
@@ -337,6 +344,7 @@ class KeyValueStoreInterface {
                              UserMem& vals,
                              BasicUserMem<size_t>& vsizes) const = 0;
 
+#if 0
     /**
      * @brief Get the value associated with a given key.
      * This version uses an std::string instead of a UserMem so the
@@ -403,6 +411,8 @@ class KeyValueStoreInterface {
      */
     virtual Status eraseMulti(const std::vector<UserMem>& keys) = 0;
 
+#endif
+    
     /**
      * @brief Erase a set of key/value pairs. Keys are packed into
      * a single buffer. The number of keys is conveyed by ksizes.size.
@@ -415,6 +425,7 @@ class KeyValueStoreInterface {
     virtual Status erasePacked(const UserMem& keys,
                                const BasicUserMem<size_t>& ksizes) = 0;
 
+#if 0
     /**
      * @brief Lists up to max keys from fromKey (included
      * if inclusive is set to true), returning only the keys with the provided
@@ -456,6 +467,7 @@ class KeyValueStoreInterface {
     virtual Status listKeys(const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             std::vector<UserMem>& keys) const = 0;
+#endif
 
     /**
      * @brief This version of listKeys uses a single contiguous buffer
@@ -463,11 +475,15 @@ class KeyValueStoreInterface {
      * buffer. After a successful call, keySizes.size holds the number of keys read.
      * The function will try to read up to keySizes.size keys.
      *
+     * keySizes is considered an input and an output. As input, it provides the
+     * size that should be used for each keys in the keys buffer. As an output,
+     * it stores the actual size of each key.
+     *
      * @param [in] fromKey Starting key.
      * @param [in] inclusive Whether to include the start key if found.
      * @param [in] prefix Prefix to filter with.
      * @param [out] keys Resulting keys.
-     * @param [out] keySizes Resulting key sizes.
+     * @param [inout] keySizes Resulting key sizes.
      *
      * @return Status.
      */
@@ -475,6 +491,23 @@ class KeyValueStoreInterface {
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
 
+    /**
+     * @brief Same as listKeys but considers the keys to be packed back to back
+     * in the keys buffer. The keySizes buffer is provided as output only.
+     *
+     * @param [in] fromKey
+     * @param [in] inclusive
+     * @param [in] prefix
+     * @param [out] keys
+     * @param [out] keySizes
+     *
+     * @return Status.
+     */
+    virtual Status listKeysPacked(const UserMem& fromKey,
+                                  bool inclusive, const UserMem& prefix,
+                                  UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
+
+#if 0
     /**
      * @brief Same as listKeys but also returns the values.
      */
@@ -489,6 +522,7 @@ class KeyValueStoreInterface {
     virtual Status listKeyValues(const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix,
                                  std::vector<UserMem>& keys, std::vector<UserMem>& vals) const = 0;
+#endif
 
     /**
      * @brief Same as listKeys but also returns the values.
@@ -499,6 +533,16 @@ class KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const = 0;
+
+    /**
+     * @brief Same as listKeysPacked but also returns the values.
+     */
+    virtual Status listKeyValuesPacked(const UserMem& fromKey,
+                                       bool inclusive, const UserMem& prefix,
+                                       UserMem& keys,
+                                       BasicUserMem<size_t>& keySizes,
+                                       UserMem& vals,
+                                       BasicUserMem<size_t>& valSizes) const = 0;
 };
 
 /**
