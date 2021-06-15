@@ -108,7 +108,7 @@ void rkv_length_ult(hg_handle_t h)
     };
 
     out.ret = static_cast<rkv_return_t>(
-            database->lengthPacked(keys, ksizes, vsizes));
+            database->length(keys, ksizes, vsizes));
 
     if(out.ret == RKV_SUCCESS) {
         // transfer the vsizes back the client

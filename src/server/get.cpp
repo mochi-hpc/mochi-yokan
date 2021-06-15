@@ -122,13 +122,8 @@ void rkv_get_ult(hg_handle_t h)
     size_t remaining_vsize = in.size - vals_offset;
     auto vals = rkv::UserMem{ ptr + vals_offset, remaining_vsize };
 
-    if(in.packed) {
-        out.ret = static_cast<rkv_return_t>(
-            database->getPacked(keys, ksizes, vals, vsizes));
-    } else {
-        out.ret = static_cast<rkv_return_t>(
-            database->getMulti(keys, ksizes, vals, vsizes));
-    }
+    out.ret = static_cast<rkv_return_t>(
+            database->get(in.packed, keys, ksizes, vals, vsizes));
 
     if(out.ret == RKV_SUCCESS) {
         // transfer the vsizes and values back the client

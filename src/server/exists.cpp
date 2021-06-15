@@ -110,7 +110,7 @@ void rkv_exists_ult(hg_handle_t h)
     };
 
     out.ret = static_cast<rkv_return_t>(
-            database->existsPacked(keys, ksizes, flags));
+            database->exists(keys, ksizes, flags));
 
     if(out.ret == RKV_SUCCESS) {
         // transfer the bit field back the client

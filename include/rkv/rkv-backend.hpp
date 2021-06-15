@@ -137,31 +137,6 @@ class KeyValueStoreInterface {
      */
     virtual void destroy() = 0;
 
-#if 0
-    /**
-     * @brief Check if the provided key exists.
-     *
-     * @param [in] key Key.
-     * @param [out] b Boolean indicating whether the key exists.
-     *
-     * @return Status.
-     */
-    virtual Status exists(const UserMem& key, bool& b) const = 0;
-
-    /**
-     * @brief Check if the provided keys exist. The provided output vector
-     * will be resized to match keys.size().
-     *
-     * @param [in] keys Keys.
-     * @param [out] b Vector of booleans indicating whether each key exists.
-     *
-     * @return Status.
-     */
-    virtual Status existsMulti(const std::vector<UserMem>& keys,
-                               std::vector<bool>& b) const = 0;
-
-#endif
-
     /**
      * @brief Check if the provided keys exist. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory
@@ -175,37 +150,9 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status existsPacked(const UserMem& keys,
-                                const BasicUserMem<size_t>& ksizes,
-                                BitField& b) const = 0;
-#if 0
-    /**
-     * @brief Get the length of the value associated with the provided key.
-     * If the key does not exist, the size is set to KeyNotFound
-     * and the function returns Status::NotFound.
-     *
-     * @param [in] key Key.
-     * @param [out] size Size of the value.
-     *
-     * @return Status.
-     */
-    virtual Status length(const UserMem& key, size_t& size) const = 0;
-
-    /**
-     * @brief Get the length of the values associated with the provided keys.
-     * If any key does not exists, the corresponding size will be set to
-     * KeyNotFound. Keys that have been found will have valid value sizes.
-     * The size vector will be resized to keys.size().
-     *
-     * @param [in] keys Keys.
-     * @param [out] size  Sizes of values.
-     *
-     * @return Status.
-     */
-    virtual Status lengthMulti(const std::vector<UserMem>& keys,
-                               std::vector<size_t>& size) const = 0;
-#endif
-
+    virtual Status exists(const UserMem& keys,
+                          const BasicUserMem<size_t>& ksizes,
+                          BitField& b) const = 0;
     /**
      * @brief Get the size of values associated with the keys. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory holding the
@@ -219,34 +166,9 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status lengthPacked(const UserMem& keys,
-                                const BasicUserMem<size_t>& ksizes,
-                                BasicUserMem<size_t>& vsizes) const = 0;
-#if 0
-    /**
-     * @brief Put a new key/value pair into the database.
-     *
-     * @param [in] key Key to put.
-     * @param [in] value Value to put.
-     *
-     * @return Status.
-     */
-    virtual Status put(const UserMem& key, const UserMem& value) = 0;
-
-    /**
-     * @brief Put multiple key/value pairs into the database.
-     * The two provided vectors must have the same size, otherwise
-     * none of the key/value pairs is inserted and Status::InvalidArg
-     * is returned instead.
-     *
-     * @param [in] keys Keys to put.
-     * @param [in] vals Values to put.
-     *
-     * @return Status.
-     */
-    virtual Status putMulti(const std::vector<UserMem>& keys,
-                            const std::vector<UserMem>& vals) = 0;
-#endif
+    virtual Status length(const UserMem& keys,
+                          const BasicUserMem<size_t>& ksizes,
+                          BasicUserMem<size_t>& vsizes) const = 0;
 
     /**
      * @brief Put multiple key/value pairs into the database.
@@ -261,45 +183,10 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status putPacked(const UserMem& keys,
-                             const BasicUserMem<size_t>& ksizes,
-                             const UserMem& vals,
-                             const BasicUserMem<size_t>& vsizes) = 0;
-#if 0
-    /**
-     * @brief Get the value associated with a given key.
-     * The user must provide the memory into which to store the value.
-     * Upon successfully copying the value into the user-provided memory,
-     * the value.size is set to the size of the value.
-     * If the value does not supply enough memory, SizeError is returned
-     * and the size of value is set to the required size.
-     *
-     * @param [in] key Key.
-     * @param [out] value Value.
-     *
-     * @return Status.
-     */
-    virtual Status get(const UserMem& key, UserMem& value) const = 0;
-
-    /**
-     * @brief Get values associated with multiple keys. The keys and
-     * values vectors must be the same size, otherwise none of the
-     * values will be read and the function will return Status::InvalidArg.
-     * For each value correctly found, if the provided UserMem has sufficient
-     * space, the value's data will be copied into the UserMem's data field
-     * and the UserMem's size will be changed to the value size. If the
-     * provided memory is insufficient, the value will not be copied
-     * and the size of the UserMem will be set to BufTooSmall. If the key
-     * was not found, the value's UserMem will be set to KeyNotFound.
-     *
-     * @param [in] keys Keys to get.
-     * @param [out] values Values.
-     *
-     * @return Status.
-     */
-    virtual Status getMulti(const std::vector<UserMem>& keys,
-                            std::vector<UserMem>& values) const = 0;
-#endif
+    virtual Status put(const UserMem& keys,
+                       const BasicUserMem<size_t>& ksizes,
+                       const UserMem& vals,
+                       const BasicUserMem<size_t>& vsizes) = 0;
 
     /**
      * @brief This verion of getMulti uses the user-provided memory.
@@ -319,100 +206,11 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status getMulti(const UserMem& keys,
-                            const BasicUserMem<size_t>& ksizes,
-                            UserMem& vals,
-                            BasicUserMem<size_t>& vsizes) const = 0;
+    virtual Status get(bool packed, const UserMem& keys,
+                       const BasicUserMem<size_t>& ksizes,
+                       UserMem& vals,
+                       BasicUserMem<size_t>& vsizes) const = 0;
 
-    /**
-     * @brief Get the values associated with multiple keys. The keys,
-     * key sizes, values, and value sizes are packed contiguously into
-     * their own buffer. ksizes.size and vsizes.size must be equal.
-     * The value size for keys that were not found is set to KeyNotFound.
-     * The value size for values that could not fit into the buffer is
-     * set to BufTooSmall.
-     *
-     * @param keys Keys to get.
-     * @param ksizes Size of the keys.
-     * @param vals Values to get.
-     * @param vsizes Size of the values.
-     *
-     * @return Status.
-     */
-    virtual Status getPacked(const UserMem& keys,
-                             const BasicUserMem<size_t>& ksizes,
-                             UserMem& vals,
-                             BasicUserMem<size_t>& vsizes) const = 0;
-
-#if 0
-    /**
-     * @brief Get the value associated with a given key.
-     * This version uses an std::string instead of a UserMem so the
-     * size of the value does not need to be known in advance.
-     *
-     * @param [in] key Key.
-     * @param [out] value Value.
-     *
-     * @return Status.
-     */
-    virtual Status get(const UserMem& key, std::string& value) const = 0;
-
-    /**
-     * @brief Get values associated with multiple keys.
-     * This version uses an std::string instead of a UserMem so the
-     * size of the values do not need to be known in advance.
-     * The keys and values vectors do not need to have the same size,
-     * the value vector will be resized as needed. Since this version
-     * of getMulti does not enable setting the value size to KeyNotFound
-     * if the key is not found, the defaultValue argument is used for
-     * any value whose key is not found.
-     *
-     * @param [in] keys Array of keys.
-     * @param [out] values Array of values.
-     * @param [in] defaultValue Value for keys not found.
-     *
-     * @return Status.
-     */
-    virtual Status getMulti(const std::vector<UserMem>& keys,
-                            std::vector<std::string>& values,
-                            const std::string& defaultValue = "") const = 0;
-
-    /**
-     * @brief Same as getMulti above but the keys are packed into
-     * a contiguous buffer.
-     *
-     * @param keys Keys.
-     * @param ksizes Key sizes.
-     * @param values Values.
-     * @param defaultValue Default value when key is not found.
-     *
-     * @return Status.
-     */
-    virtual Status getPacked(const UserMem& keys,
-                             const BasicUserMem<size_t>& ksizes,
-                             std::vector<std::string>& values,
-                             const std::string& defaultValue = "") const = 0;
-
-    /**
-     * @brief Erase a key/value pair identified by the specified key.
-     *
-     * @param [in] key Key to erase.
-     *
-     * @return Status.
-     */
-    virtual Status erase(const UserMem& key) = 0;
-
-    /**
-     * @brief Erase a set of key/value pairs.
-     *
-     * @param [in] keys Keys to erase.
-     *
-     * @return Status.
-     */
-    virtual Status eraseMulti(const std::vector<UserMem>& keys) = 0;
-
-#endif
-    
     /**
      * @brief Erase a set of key/value pairs. Keys are packed into
      * a single buffer. The number of keys is conveyed by ksizes.size.
@@ -422,52 +220,8 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status erasePacked(const UserMem& keys,
-                               const BasicUserMem<size_t>& ksizes) = 0;
-
-#if 0
-    /**
-     * @brief Lists up to max keys from fromKey (included
-     * if inclusive is set to true), returning only the keys with the provided
-     * prefix. Using UserMem::Null for fromKey will make the list start from
-     * the beginning.
-     * Using a UserMem of size 0 for the prefix makes the function ignore the prefix.
-     *
-     * Note: fromKey does not need to be a key that exists in the database.
-     * It is used as lower bound.
-     *
-     * @param [in] fromKey Starting key.
-     * @param [in] inclusive Whether to include the start key if found.
-     * @param [in] prefix Prefix to filter with.
-     * @param [in] max Maximum number of keys to return.
-     * @param [out] keys Resulting keys.
-     *
-     * @return Status.
-     */
-    virtual Status listKeys(const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
-                            size_t max, std::vector<std::string>& keys) const = 0;
-
-    /**
-     * @brief This version of listKeys uses a vector of UserMem instead of
-     * a vector of strings to hold the resulting keys. The maximum number
-     * of keys is not specified since the size of the provided vector
-     * gives this information. The vector will be resized down to match
-     * the number of keys found. If the provided UserMem objects in the
-     * keys vector don't provide enough space, this function will set their
-     * size field to BufTooSmall.
-     *
-     * @param [in] fromKey Starting key.
-     * @param [in] inclusive Whether to include the start key if found.
-     * @param [in] prefix Prefix to filter with.
-     * @param [out] keys Resulting keys.
-     *
-     * @return Status.
-     */
-    virtual Status listKeys(const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
-                            std::vector<UserMem>& keys) const = 0;
-#endif
+    virtual Status erase(const UserMem& keys,
+                         const BasicUserMem<size_t>& ksizes) = 0;
 
     /**
      * @brief This version of listKeys uses a single contiguous buffer
@@ -487,62 +241,20 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status listKeys(const UserMem& fromKey,
+    virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
 
     /**
-     * @brief Same as listKeys but considers the keys to be packed back to back
-     * in the keys buffer. The keySizes buffer is provided as output only.
-     *
-     * @param [in] fromKey
-     * @param [in] inclusive
-     * @param [in] prefix
-     * @param [out] keys
-     * @param [out] keySizes
-     *
-     * @return Status.
-     */
-    virtual Status listKeysPacked(const UserMem& fromKey,
-                                  bool inclusive, const UserMem& prefix,
-                                  UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
-
-#if 0
-    /**
      * @brief Same as listKeys but also returns the values.
      */
-    virtual Status listKeyValues(const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix, size_t max,
-                                 std::vector<std::string>& keys,
-                                 std::vector<std::string>& vals) const = 0;
-
-    /**
-     * @brief Same as listKeys but also returns the values.
-     */
-    virtual Status listKeyValues(const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
-                                 std::vector<UserMem>& keys, std::vector<UserMem>& vals) const = 0;
-#endif
-
-    /**
-     * @brief Same as listKeys but also returns the values.
-     */
-    virtual Status listKeyValues(const UserMem& fromKey,
+    virtual Status listKeyValues(bool packed,
+                                 const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const = 0;
-
-    /**
-     * @brief Same as listKeysPacked but also returns the values.
-     */
-    virtual Status listKeyValuesPacked(const UserMem& fromKey,
-                                       bool inclusive, const UserMem& prefix,
-                                       UserMem& keys,
-                                       BasicUserMem<size_t>& keySizes,
-                                       UserMem& vals,
-                                       BasicUserMem<size_t>& valSizes) const = 0;
 };
 
 /**

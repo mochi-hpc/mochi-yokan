@@ -96,6 +96,6 @@ void rkv_put_ult(hg_handle_t h)
     auto vals = rkv::UserMem{ ptr, total_vsize };
 
     out.ret = static_cast<rkv_return_t>(
-            database->putPacked(keys, ksizes, vals, vsizes));
+            database->put(keys, ksizes, vals, vsizes));
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_put_ult)

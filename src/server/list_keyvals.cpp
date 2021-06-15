@@ -100,17 +100,11 @@ void rkv_list_keyvals_ult(hg_handle_t h)
         return;
     }
 
-    if(in.packed) {
-        out.ret = static_cast<rkv_return_t>(
-            database->listKeyValuesPacked(
-                from_key, in.inclusive, prefix,
-                keys, ksizes, vals, vsizes));
-    } else {
-        out.ret = static_cast<rkv_return_t>(
+    out.ret = static_cast<rkv_return_t>(
             database->listKeyValues(
+                in.packed,
                 from_key, in.inclusive, prefix,
                 keys, ksizes, vals, vsizes));
-    }
 
     if(out.ret == RKV_SUCCESS) {
         size_to_transfer = 2*in.count*sizeof(size_t)
