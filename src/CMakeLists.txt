@@ -5,7 +5,9 @@ set (server-src-files
      server/erase.cpp
      server/get.cpp
      server/length.cpp
-     server/exists.cpp)
+     server/exists.cpp
+     server/list_keys.cpp
+     server/list_keyvals.cpp)
 
 set (backend-src-files
      backends/backends.cpp

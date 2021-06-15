@@ -11,11 +11,11 @@
 #include "../common/checks.h"
 #include <numeric>
 
-void rkv_list_keys_ult(hg_handle_t h)
+void rkv_list_keyvals_ult(hg_handle_t h)
 {
     hg_return_t hret;
-    list_keys_in_t in;
-    list_keys_out_t out;
+    list_keyvals_in_t in;
+    list_keyvals_out_t out;
     hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
@@ -60,7 +60,9 @@ void rkv_list_keys_ult(hg_handle_t h)
     DEFER(margo_bulk_free(local_bulk));
 
     const size_t ksizes_offset = in.from_ksize + in.prefix_size;
-    const size_t keys_offset   = ksizes_offset + in.count*sizeof(size_t);;
+    const size_t vsizes_offset = ksizes_offset + in.count*sizeof(size_t);
+    const size_t keys_offset   = vsizes_offset + in.count*sizeof(size_t);
+    const size_t vals_offset   = keys_offset + in.keys_buf_size;
 
     // transfer ksizes only if in.packed is false
     size_t size_to_transfer = in.from_ksize + in.prefix_size;
@@ -80,7 +82,12 @@ void rkv_list_keys_ult(hg_handle_t h)
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
     };
+    auto vsizes   = rkv::BasicUserMem<size_t>{
+        reinterpret_cast<size_t*>(ptr + vsizes_offset),
+        in.count
+    };
     auto keys = rkv::UserMem{ ptr + keys_offset, in.keys_buf_size };
+    auto vals = rkv::UserMem{ ptr + vals_offset, in.vals_buf_size };
 
     // check that there is no key of size 0
     auto min_key_size = std::accumulate(ksizes.data, ksizes.data + in.count,
@@ -95,19 +102,23 @@ void rkv_list_keys_ult(hg_handle_t h)
 
     if(in.packed) {
         out.ret = static_cast<rkv_return_t>(
-            database->listKeysPacked(from_key, in.inclusive, prefix, keys, ksizes));
+            database->listKeyValuesPacked(
+                from_key, in.inclusive, prefix,
+                keys, ksizes, vals, vsizes));
     } else {
         out.ret = static_cast<rkv_return_t>(
-            database->listKeys(from_key, in.inclusive, prefix, keys, ksizes));
+            database->listKeyValues(
+                from_key, in.inclusive, prefix,
+                keys, ksizes, vals, vsizes));
     }
 
     if(out.ret == RKV_SUCCESS) {
-        size_to_transfer = in.count*sizeof(size_t)
-                         + keys.size;
+        size_to_transfer = 2*in.count*sizeof(size_t)
+                         + in.keys_buf_size + in.vals_buf_size;
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + ksizes_offset,
                 local_bulk, ksizes_offset, size_to_transfer);
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
     }
 }
-DEFINE_MARGO_RPC_HANDLER(rkv_list_keys_ult)
+DEFINE_MARGO_RPC_HANDLER(rkv_list_keyvals_ult)
