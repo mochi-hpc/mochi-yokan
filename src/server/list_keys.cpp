@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include <iostream>
 #include <numeric>
 
 void rkv_list_keys_ult(hg_handle_t h)
@@ -33,6 +34,7 @@ void rkv_list_keys_ult(hg_handle_t h)
 
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
         hret = margo_addr_lookup(mid, in.origin, &origin_addr);

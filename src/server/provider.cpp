@@ -114,13 +114,13 @@ rkv_return_t rkv_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->exists_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "list_keys",
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_list_keys",
             list_keys_in_t, list_keys_out_t,
             rkv_list_keys_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keys_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "list_keyvals",
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_list_keyvals",
             list_keyvals_in_t, list_keyvals_out_t,
             rkv_list_keyvals_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);

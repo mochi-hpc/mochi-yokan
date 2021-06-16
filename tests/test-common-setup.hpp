@@ -56,12 +56,15 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     if(max_val_size) g_max_val_size = std::atol(max_key_size);
     if(num_keyvals)  g_num_keyvals  = std::atol(num_keyvals);
 
+    margo_init_info margo_args = MARGO_INIT_INFO_INITIALIZER;
+    margo_args.json_config = "{ \"handle_cache_size\" : 0 }";
+
     // create margo instance
-    mid = margo_init("ofi+tcp", MARGO_SERVER_MODE, 0, 0);
+    mid = margo_init_ext("ofi+tcp", MARGO_SERVER_MODE, &margo_args);
     munit_assert_not_null(mid);
     // set log level
-    margo_set_global_log_level(MARGO_LOG_CRITICAL);
-    margo_set_log_level(mid, MARGO_LOG_CRITICAL);
+    margo_set_global_log_level(MARGO_LOG_WARNING);
+    margo_set_log_level(mid, MARGO_LOG_WARNING);
     // get address of current process
     hg_return_t hret = margo_addr_self(mid, &addr);
     munit_assert_int(hret, ==, HG_SUCCESS);
