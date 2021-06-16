@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <cstring>
+#include <iostream>
 
 namespace rkv {
 
@@ -278,6 +279,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         ScopedReadLock lock(m_lock);
 
         if(!packed) {
+
             using iterator = decltype(m_db.begin());
             iterator fromKeyIt;
             if(fromKey.size == 0) {
@@ -309,7 +311,6 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 offset += usize;
                 i += 1;
             }
-            keySizes.size = i;
             keys.size = offset;
             for(; i < max; i++) {
                 keySizes[i] = RKV_NO_MORE_KEYS;
@@ -343,7 +344,6 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 offset += key.size();
                 i += 1;
             }
-            keySizes.size = i;
             keys.size = offset;
             for(; i < max; i++) {
                 keySizes[i] = RKV_NO_MORE_KEYS;

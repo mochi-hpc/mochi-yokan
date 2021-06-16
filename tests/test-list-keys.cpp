@@ -7,6 +7,7 @@
 #include <numeric>
 #include <vector>
 #include <cstring>
+#include <iostream>
 #include <map>
 
 inline bool to_bool(const char* v) {
@@ -43,6 +44,7 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     context->base = base_context;
 
     context->prefix = munit_parameters_get(params, "prefix");
+    g_max_key_size += context->prefix.size(); // important!
     context->inclusive = to_bool(munit_parameters_get(params, "inclusive"));
     const char* keys_per_op_str = munit_parameters_get(params, "keys-per-op");
     context->keys_per_op = keys_per_op_str ? atol(keys_per_op_str) : 6;
@@ -51,7 +53,7 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     unsigned i = 0;
     for(auto& p : base_context->reference) {
         if(i % 2 == 0) {
-            context->ordered_ref[p.first + context->prefix] = p.second;
+            context->ordered_ref[context->prefix + p.first] = p.second;
         }
         i += 1;
     }
@@ -105,58 +107,56 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
     rkv_return_t ret;
 
     auto count = context->keys_per_op;
-    auto total = context->ordered_ref.size();
     std::vector<hg_size_t> ksizes(count, g_max_key_size);
     std::vector<std::string> keys(count, std::string(g_max_key_size, '\0'));
     std::vector<void*> kptrs(count, nullptr);
     for(unsigned i = 0; i < count; i++)
         kptrs[i] = const_cast<char*>(keys[i].data());
     std::vector<std::string> expected_keys;
-    expected_keys.reserve(count);
 
-    unsigned i;
-    std::string from_key;
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
         if(starts_with(key, context->prefix)) {
             expected_keys.push_back(key);
         }
-        i += 1;
-        if(i == total || i % count == 0) {
-            // do the actual operation
-            ret = rkv_list_keys(dbh,
-                    context->inclusive,
-                    from_key.data(),
-                    from_key.size(),
-                    context->prefix.data(),
-                    context->prefix.size(),
-                    count,
-                    kptrs.data(),
-                    ksizes.data());
-            // check the results
-            munit_assert_int(ret, ==, RKV_SUCCESS);
-
-            // TODO
-            // reset the arrays
-            expected_keys.clear();
-            ksizes.clear();
-            ksizes.resize(count, g_max_key_size);
-            from_key = key;
-        }
     }
 
-#if 0
-    for(auto& p : context->) {
-        auto key = p.first.data();
-        auto ksize = p.first.size();
-        std::vector<char> val(g_max_val_size);
-        size_t vsize = g_max_val_size;
-        ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
+    bool done_listing = false;
+    unsigned i = 0;
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    while(!done_listing) {
+
+        ret = rkv_list_keys(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                kptrs.data(),
+                ksizes.data());
         munit_assert_int(ret, ==, RKV_SUCCESS);
-        munit_assert_int(vsize, ==, p.second.size());
-        munit_assert_memory_equal(vsize, val.data(), p.second.data());
+
+        for(unsigned j = 0; j < count; j++) {
+            if(i+j < expected_keys.size()) {
+                auto& exp_key = expected_keys[i+j];
+                munit_assert_long(ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
+                from_key = exp_key;
+            } else {
+                munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
+                done_listing = true;
+            }
+        }
+        i += count;
+        if(context->inclusive)
+            i -= 1;
+
+        ksizes.clear();
+        ksizes.resize(count, g_max_key_size);
     }
-#endif
 
     return MUNIT_OK;
 }
