@@ -352,6 +352,109 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     }
     return MUNIT_OK;
 }
+
+static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keys_context*>(data);
+    rkv_database_handle_t dbh = context->base->dbh;
+    rkv_return_t ret;
+    hg_return_t hret;
+
+    auto count = context->keys_per_op;
+    std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<char> packed_keys(count*g_max_key_size);
+
+    std::vector<std::string> expected_keys;
+
+    for(auto& p : context->ordered_ref) {
+        auto& key = p.first;
+        if(starts_with(key, context->prefix)) {
+            expected_keys.push_back(key);
+        }
+    }
+
+    char addr_str[256];
+    hg_size_t addr_str_size = 256;
+    hret = margo_addr_to_string(context->base->mid,
+            addr_str, &addr_str_size, context->base->addr);
+
+    bool done_listing = false;
+    unsigned i = 0;
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    std::vector<char> garbage(42);
+    hg_size_t garbage_size = 42;
+
+    while(!done_listing) {
+
+        hg_bulk_t data = HG_BULK_NULL;
+        {
+            std::vector<void*> ptrs = { garbage.data() };
+            std::vector<hg_size_t> sizes = { garbage_size };
+            if(!from_key.empty()) {
+                ptrs.push_back(const_cast<char*>(from_key.data()));
+                sizes.push_back(from_key.size());
+            }
+            if(!prefix.empty()) {
+                ptrs.push_back(const_cast<char*>(prefix.data()));
+                sizes.push_back(prefix.size());
+            }
+            ptrs.push_back(packed_ksizes.data());
+            sizes.push_back(count*sizeof(size_t));
+            ptrs.push_back(packed_keys.data());
+            sizes.push_back(packed_keys.size());
+
+            hret = margo_bulk_create(
+                    context->base->mid,
+                    ptrs.size(),
+                    ptrs.data(),
+                    sizes.data(),
+                    HG_BULK_READWRITE,
+                    &data);
+            munit_assert_int(hret, ==, HG_SUCCESS);
+        }
+
+        ret = rkv_list_keys_bulk(dbh,
+                context->inclusive,
+                from_key.size(),
+                prefix.size(),
+                addr_str, data,
+                garbage_size,
+                packed_keys.size(),
+                true, count);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+
+        hret = margo_bulk_free(data);
+        munit_assert_int(hret, ==, HG_SUCCESS);
+
+        size_t offset = 0;
+        for(unsigned j = 0; j < count; j++) {
+            if(i+j < expected_keys.size()) {
+                auto& exp_key = expected_keys[i+j];
+                auto recv_key = packed_keys.data()+offset;
+                munit_assert_long(packed_ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
+                offset += exp_key.size();
+                from_key = exp_key;
+            } else {
+                munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                done_listing = true;
+            }
+        }
+        i += count;
+        if(context->inclusive)
+            i -= 1;
+
+        packed_ksizes.clear();
+        packed_ksizes.resize(count, g_max_key_size);
+    }
+
+    return MUNIT_OK;
+}
+
 static char* inclusive_params[] = {
     (char*)"true", (char*)"false", NULL
 };
@@ -380,6 +483,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/list_keys_packed", test_list_keys_packed,
         test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keys_packed/too_small", test_list_keys_packed_too_small,
+        test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_keys_bulk", test_list_keys_bulk,
         test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
