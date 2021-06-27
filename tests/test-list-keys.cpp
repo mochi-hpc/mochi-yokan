@@ -333,12 +333,14 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     size_t offset = 0;
+    bool buf_size_reached = false;
     for(unsigned j = 0; j < count; j++) {
         if(j < expected_keys.size()) {
             auto& exp_key = expected_keys[j];
             auto recv_key = packed_keys.data()+offset;
-            if(offset + exp_key.size() > buf_size) {
+            if(offset + exp_key.size() > buf_size || buf_size_reached) {
                 munit_assert_long(packed_ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+                buf_size_reached = true;
             } else {
                 munit_assert_long(packed_ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
