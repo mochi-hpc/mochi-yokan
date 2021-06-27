@@ -107,7 +107,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
     rkv_return_t ret;
 
     auto count = context->keys_per_op;
-    std::vector<hg_size_t> ksizes(count, g_max_key_size);
+    std::vector<size_t> ksizes(count, g_max_key_size);
     std::vector<std::string> keys(count, std::string(g_max_key_size, '\0'));
     std::vector<void*> kptrs(count, nullptr);
     for(unsigned i = 0; i < count; i++)
@@ -161,6 +161,195 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitResult test_list_keys_too_small(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keys_context*>(data);
+    rkv_database_handle_t dbh = context->base->dbh;
+    rkv_return_t ret;
+
+    auto count = context->keys_per_op;
+    std::vector<size_t> ksizes(count, g_max_key_size);
+    std::vector<std::string> keys(count, std::string(g_max_key_size, '\0'));
+    std::vector<void*> kptrs(count, nullptr);
+    for(unsigned i = 0; i < count; i++)
+        kptrs[i] = const_cast<char*>(keys[i].data());
+
+    std::vector<std::string> expected_keys;
+
+    for(auto& p : context->ordered_ref) {
+        auto& key = p.first;
+        if(starts_with(key, context->prefix)) {
+            expected_keys.push_back(key);
+        }
+    }
+
+    // make one key buffer too small for its key
+    unsigned i = 0;
+    for(auto& key : expected_keys) {
+        if(i == count/2) {
+            ksizes[i] = key.size()/2;
+        }
+        i += 1;
+    }
+
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    ret = rkv_list_keys(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                kptrs.data(),
+                ksizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    for(unsigned j = 0; j < count; j++) {
+        if(j < expected_keys.size()) {
+            auto& exp_key = expected_keys[j];
+            if(j != count/2) {
+                munit_assert_long(ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
+            } else {
+                munit_assert_long(ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+            }
+        } else {
+            munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
+        }
+    }
+    return MUNIT_OK;
+}
+
+static MunitResult test_list_keys_packed(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keys_context*>(data);
+    rkv_database_handle_t dbh = context->base->dbh;
+    rkv_return_t ret;
+
+    auto count = context->keys_per_op;
+    std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<std::string> expected_keys;
+
+    for(auto& p : context->ordered_ref) {
+        auto& key = p.first;
+        if(starts_with(key, context->prefix)) {
+            expected_keys.push_back(key);
+        }
+    }
+
+    bool done_listing = false;
+    unsigned i = 0;
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    while(!done_listing) {
+
+        ret = rkv_list_keys_packed(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                packed_keys.data(),
+                count*g_max_key_size,
+                packed_ksizes.data());
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+
+        size_t offset = 0;
+        for(unsigned j = 0; j < count; j++) {
+            if(i+j < expected_keys.size()) {
+                auto& exp_key = expected_keys[i+j];
+                auto recv_key = packed_keys.data()+offset;
+                munit_assert_long(packed_ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
+                offset += exp_key.size();
+                from_key = exp_key;
+            } else {
+                munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                done_listing = true;
+            }
+        }
+        i += count;
+        if(context->inclusive)
+            i -= 1;
+
+        packed_ksizes.clear();
+        packed_ksizes.resize(count, g_max_key_size);
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_list_keys_packed_too_small(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keys_context*>(data);
+    rkv_database_handle_t dbh = context->base->dbh;
+    rkv_return_t ret;
+
+    auto count = context->keys_per_op;
+    std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<std::string> expected_keys;
+
+    size_t size_needed = 0;
+    unsigned i = 0;
+    for(auto& p : context->ordered_ref) {
+        auto& key = p.first;
+        if(starts_with(key, context->prefix)) {
+            expected_keys.push_back(key);
+            if(i < count)
+                size_needed += key.size();
+            else
+                break;
+            i += 1;
+        }
+    }
+
+    size_t buf_size = size_needed/2;
+
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    ret = rkv_list_keys_packed(dbh,
+            context->inclusive,
+            from_key.data(),
+            from_key.size(),
+            prefix.data(),
+            prefix.size(),
+            count,
+            packed_keys.data(),
+            buf_size,
+            packed_ksizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    size_t offset = 0;
+    for(unsigned j = 0; j < count; j++) {
+        if(j < expected_keys.size()) {
+            auto& exp_key = expected_keys[j];
+            auto recv_key = packed_keys.data()+offset;
+            if(offset + exp_key.size() > buf_size) {
+                munit_assert_long(packed_ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+            } else {
+                munit_assert_long(packed_ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
+                offset += exp_key.size();
+            }
+        } else {
+            munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+        }
+    }
+    return MUNIT_OK;
+}
 static char* inclusive_params[] = {
     (char*)"true", (char*)"false", NULL
 };
@@ -183,6 +372,12 @@ static MunitParameterEnum test_params[] = {
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/list_keys", test_list_keys,
+        test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_keys/too_small", test_list_keys_too_small,
+        test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_keys_packed", test_list_keys_packed,
+        test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_keys_packed/too_small", test_list_keys_packed_too_small,
         test_list_keys_context_setup, test_list_keys_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

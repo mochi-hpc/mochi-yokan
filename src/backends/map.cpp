@@ -329,6 +329,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             auto max = keySizes.size;
             size_t i = 0;
             size_t offset = 0;
+            bool buf_too_small = false;
             for(auto it = fromKeyIt; it != end && i < max; it++) {
                 auto& key = it->first;
                 if(prefix.size != 0) {
@@ -337,11 +338,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                         continue;
                 }
                 auto umem = static_cast<char*>(keys.data) + offset;
-                if(keys.size - offset < key.size())
-                    break;
-                std::memcpy(umem, key.data(), key.size());
-                keySizes[i] = key.size();
-                offset += key.size();
+                if(keys.size - offset < key.size() || buf_too_small) {
+                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    buf_too_small = true;
+                } else {
+                    std::memcpy(umem, key.data(), key.size());
+                    keySizes[i] = key.size();
+                    offset += key.size();
+                }
                 i += 1;
             }
             keys.size = offset;

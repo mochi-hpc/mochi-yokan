@@ -90,17 +90,6 @@ void rkv_list_keyvals_ult(hg_handle_t h)
     auto keys = rkv::UserMem{ ptr + keys_offset, in.keys_buf_size };
     auto vals = rkv::UserMem{ ptr + vals_offset, in.vals_buf_size };
 
-    // check that there is no key of size 0
-    auto min_key_size = std::accumulate(ksizes.data, ksizes.data + in.count,
-                                        std::numeric_limits<size_t>::max(),
-                                        [](const size_t& lhs, const size_t& rhs) {
-                                            return std::min(lhs, rhs);
-                                        });
-    if(min_key_size == 0) {
-        out.ret = RKV_ERR_INVALID_ARGS;
-        return;
-    }
-
     out.ret = static_cast<rkv_return_t>(
             database->listKeyValues(
                 in.packed,
