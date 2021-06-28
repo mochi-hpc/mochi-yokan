@@ -10,6 +10,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include <numeric>
+#include <iostream>
 
 void rkv_list_keyvals_ult(hg_handle_t h)
 {
@@ -48,8 +49,9 @@ void rkv_list_keyvals_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
 
     size_t buffer_size = in.from_ksize + in.prefix_size
-                       + in.count*sizeof(size_t)
-                       + in.keys_buf_size;
+                       + 2*in.count*sizeof(size_t)
+                       + in.keys_buf_size
+                       + in.vals_buf_size;
 
     std::vector<char> buffer(buffer_size);
     void* segptrs[1] = { buffer.data() };
@@ -67,7 +69,7 @@ void rkv_list_keyvals_ult(hg_handle_t h)
 
     // transfer ksizes only if in.packed is false
     size_t size_to_transfer = in.from_ksize + in.prefix_size;
-    if(!in.packed) size_to_transfer += in.count*sizeof(size_t);
+    if(!in.packed) size_to_transfer += 2*in.count*sizeof(size_t);
 
     if(size_to_transfer > 0) {
         hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,

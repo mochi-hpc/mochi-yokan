@@ -6,6 +6,7 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <iostream>
 #include "client.h"
 #include "../common/defer.hpp"
 #include "../common/types.h"
@@ -48,16 +49,16 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id         = dbh->database_id;
+    in.inclusive     = inclusive;
+    in.packed        = packed;
     in.count         = count;
-    in.bulk          = data;
+    in.from_ksize    = from_ksize;
+    in.prefix_size   = prefix_size;
     in.offset        = offset;
     in.keys_buf_size = keys_buf_size;
     in.vals_buf_size = vals_buf_size;
     in.origin        = const_cast<char*>(origin);
-    in.packed        = packed;
-    in.from_ksize    = from_ksize;
-    in.prefix_size   = prefix_size;
-    in.inclusive     = inclusive;
+    in.bulk          = data;
 
     hret = margo_create(mid, dbh->addr, dbh->client->list_keyvals_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -113,6 +114,9 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     // ksizes
     ptrs.push_back(ksizes);
     sizes.push_back(count*sizeof(*ksizes));
+    // vsizes
+    ptrs.push_back(vsizes);
+    sizes.push_back(count*sizeof(*vsizes));
 
     ptrs.reserve(ptrs.size() + count*2);
     sizes.reserve(sizes.size() + count*2);
