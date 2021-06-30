@@ -429,7 +429,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             size_t i = 0;
             size_t key_offset = 0;
             size_t val_offset = 0;
-            bool buf_too_small = false;
+            bool key_buf_too_small = false;
+            bool val_buf_too_small = false;
             for(auto it = fromKeyIt; it != end && i < max; it++) {
                 auto& key = it->first;
                 auto& val = it->second;
@@ -440,16 +441,20 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 }
                 auto key_umem = static_cast<char*>(keys.data) + key_offset;
                 auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(buf_too_small
-                || keys.size - key_offset < key.size()
-                || vals.size - val_offset < val.size()) {
+                if(key_buf_too_small
+                || keys.size - key_offset < key.size()) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    buf_too_small = true;
+                    key_buf_too_small = true;
                 } else {
                     std::memcpy(key_umem, key.data(), key.size());
                     keySizes[i] = key.size();
                     key_offset += key.size();
+                }
+                if(val_buf_too_small
+                || vals.size - val_offset < val.size()) {
+                    valSizes[i] = RKV_SIZE_TOO_SMALL;
+                    val_buf_too_small = true;
+                } else {
                     std::memcpy(val_umem, val.data(), val.size());
                     valSizes[i] = val.size();
                     val_offset += val.size();
