@@ -261,7 +261,6 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
     }
     return MUNIT_OK;
 }
-#if 0
 
 static MunitResult test_list_keyvals_packed(const MunitParameter params[], void* data)
 {
@@ -273,13 +272,18 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<size_t> packed_vsizes(count, g_max_val_size);
     std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<char> packed_vals(count*g_max_val_size);
     std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
+        auto& val = p.second;
         if(starts_with(key, context->prefix)) {
             expected_keys.push_back(key);
+            expected_vals.push_back(val);
         }
     }
 
@@ -299,20 +303,30 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
                 count,
                 packed_keys.data(),
                 count*g_max_key_size,
-                packed_ksizes.data());
+                packed_ksizes.data(),
+                packed_vals.data(),
+                count*g_max_val_size,
+                packed_vsizes.data());
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
-        size_t offset = 0;
+        size_t key_offset = 0;
+        size_t val_offset = 0;
         for(unsigned j = 0; j < count; j++) {
             if(i+j < expected_keys.size()) {
                 auto& exp_key = expected_keys[i+j];
-                auto recv_key = packed_keys.data()+offset;
+                auto& exp_val = expected_vals[i+j];
+                auto recv_key = packed_keys.data()+key_offset;
+                auto recv_val = packed_vals.data()+val_offset;
                 munit_assert_long(packed_ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
-                offset += exp_key.size();
+                munit_assert_long(packed_vsizes[j], ==, exp_val.size());
+                munit_assert_memory_equal(packed_vsizes[j], recv_val, exp_val.data());
+                key_offset += exp_key.size();
+                val_offset += exp_val.size();
                 from_key = exp_key;
             } else {
                 munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                munit_assert_long(packed_vsizes[j], ==, RKV_NO_MORE_KEYS);
                 done_listing = true;
             }
         }
@@ -322,11 +336,14 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
 
         packed_ksizes.clear();
         packed_ksizes.resize(count, g_max_key_size);
+        packed_vsizes.clear();
+        packed_vsizes.resize(count, g_max_val_size);
     }
 
     return MUNIT_OK;
 }
 
+#if 0
 static MunitResult test_list_keyvals_packed_too_small(const MunitParameter params[], void* data)
 {
     (void)params;
@@ -520,9 +537,9 @@ static MunitTest test_suite_tests[] = {
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals/too_small", test_list_keyvals_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/list_keyvals_packed", test_list_keyvals_packed,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+#if 0
     { (char*) "/list_keyvals_packed/too_small", test_list_keyvals_packed_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals_bulk", test_list_keyvals_bulk,
