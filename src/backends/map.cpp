@@ -394,14 +394,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 auto val_umem = static_cast<char*>(vals.data) + val_offset;
                 if(key_usize < key.size()) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
                 } else {
                     std::memcpy(key_umem, key.data(), key.size());
                     keySizes[i] = key.size();
                 }
                 if(val_usize < val.size()) {
                     valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    val_offset += val_usize;
                 } else {
                     std::memcpy(val_umem, val.data(), val.size());
                     valSizes[i] = val.size();

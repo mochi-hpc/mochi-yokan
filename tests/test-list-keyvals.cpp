@@ -176,7 +176,6 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
-#if 0
 static MunitResult test_list_keyvals_too_small(const MunitParameter params[], void* data)
 {
     (void)params;
@@ -187,27 +186,38 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
 
     auto count = context->keys_per_op;
     std::vector<size_t> ksizes(count, g_max_key_size);
+    std::vector<size_t> vsizes(count, g_max_val_size);
     std::vector<std::string> keys(count, std::string(g_max_key_size, '\0'));
+    std::vector<std::string> vals(count, std::string(g_max_val_size, '\0'));
     std::vector<void*> kptrs(count, nullptr);
-    for(unsigned i = 0; i < count; i++)
+    std::vector<void*> vptrs(count, nullptr);
+    for(unsigned i = 0; i < count; i++) {
         kptrs[i] = const_cast<char*>(keys[i].data());
+        vptrs[i] = const_cast<char*>(vals[i].data());
+    }
 
     std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
+        auto& val = p.second;
         if(starts_with(key, context->prefix)) {
             expected_keys.push_back(key);
+            expected_vals.push_back(val);
         }
     }
 
     // make one key buffer too small for its key
-    unsigned i = 0;
-    for(auto& key : expected_keys) {
+    for(unsigned i = 0; i < count; i++) {
+        auto& key = expected_keys[i];
+        auto& val = expected_vals[i];
         if(i == count/2) {
             ksizes[i] = key.size()/2;
         }
-        i += 1;
+        if(i == count/3) {
+            vsizes[i] = val.size()/2;
+        }
     }
 
     std::string from_key;
@@ -221,24 +231,37 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
                 prefix.size(),
                 count,
                 kptrs.data(),
-                ksizes.data());
+                ksizes.data(),
+                vptrs.data(),
+                vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     for(unsigned j = 0; j < count; j++) {
         if(j < expected_keys.size()) {
             auto& exp_key = expected_keys[j];
-            if(j != count/2) {
+            auto& exp_val = expected_vals[j];
+            if(j == count/2) {
+                munit_assert_long(ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+                munit_assert_long(vsizes[j], ==, exp_val.size());
+                munit_assert_memory_equal(vsizes[j], vptrs[j], exp_val.data());
+            } else if(j == count/3) {
                 munit_assert_long(ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
+                munit_assert_long(vsizes[j], ==, RKV_SIZE_TOO_SMALL);
             } else {
-                munit_assert_long(ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+                munit_assert_long(ksizes[j], ==, exp_key.size());
+                munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
+                munit_assert_long(vsizes[j], ==, exp_val.size());
+                munit_assert_memory_equal(vsizes[j], vptrs[j], exp_val.data());
             }
         } else {
             munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
+            munit_assert_long(vsizes[j], ==, RKV_NO_MORE_KEYS);
         }
     }
     return MUNIT_OK;
 }
+#if 0
 
 static MunitResult test_list_keyvals_packed(const MunitParameter params[], void* data)
 {
@@ -495,9 +518,9 @@ static MunitParameterEnum test_params[] = {
 static MunitTest test_suite_tests[] = {
     { (char*) "/list_keyvals", test_list_keyvals,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/list_keyvals/too_small", test_list_keyvals_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+#if 0
     { (char*) "/list_keyvals_packed", test_list_keyvals_packed,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals_packed/too_small", test_list_keyvals_packed_too_small,
