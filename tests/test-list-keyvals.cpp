@@ -343,8 +343,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
     return MUNIT_OK;
 }
 
-#if 0
-static MunitResult test_list_keyvals_packed_too_small(const MunitParameter params[], void* data)
+static MunitResult test_list_keyvals_packed_key_too_small(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
@@ -354,24 +353,32 @@ static MunitResult test_list_keyvals_packed_too_small(const MunitParameter param
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<size_t> packed_vsizes(count, g_max_val_size);
     std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<char> packed_vals(count*g_max_val_size);
     std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
 
-    size_t size_needed = 0;
+    size_t size_needed_for_keys = 0;
+    size_t size_needed_for_vals = 0;
     unsigned i = 0;
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
+        auto& val = p.second;
         if(starts_with(key, context->prefix)) {
             expected_keys.push_back(key);
-            if(i < count)
-                size_needed += key.size();
-            else
+            expected_vals.push_back(val);
+            if(i < count) {
+                size_needed_for_keys += key.size();
+                size_needed_for_vals += val.size();
+            } else
                 break;
             i += 1;
         }
     }
 
-    size_t buf_size = size_needed/2;
+    size_t key_buf_size = size_needed_for_keys/2;
+    size_t val_buf_size = size_needed_for_vals;
 
     std::string from_key;
     std::string prefix = context->prefix;
@@ -384,30 +391,125 @@ static MunitResult test_list_keyvals_packed_too_small(const MunitParameter param
             prefix.size(),
             count,
             packed_keys.data(),
-            buf_size,
-            packed_ksizes.data());
+            key_buf_size,
+            packed_ksizes.data(),
+            packed_vals.data(),
+            val_buf_size,
+            packed_vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
-    size_t offset = 0;
-    bool buf_size_reached = false;
+    size_t key_offset = 0;
+    size_t val_offset = 0;
+    bool key_buf_size_reached = false;
     for(unsigned j = 0; j < count; j++) {
         if(j < expected_keys.size()) {
             auto& exp_key = expected_keys[j];
-            auto recv_key = packed_keys.data()+offset;
-            if(offset + exp_key.size() > buf_size || buf_size_reached) {
+            auto& exp_val = expected_vals[j];
+            auto recv_key = packed_keys.data()+key_offset;
+            auto recv_val = packed_vals.data()+val_offset;
+            if(key_offset + exp_key.size() > key_buf_size || key_buf_size_reached) {
                 munit_assert_long(packed_ksizes[j], ==, RKV_SIZE_TOO_SMALL);
-                buf_size_reached = true;
+                key_buf_size_reached = true;
             } else {
                 munit_assert_long(packed_ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
-                offset += exp_key.size();
             }
+            munit_assert_long(packed_vsizes[j], ==, exp_val.size());
+            munit_assert_memory_equal(packed_vsizes[j], recv_val, exp_val.data());
+            key_offset += exp_key.size();
+            val_offset += exp_val.size();
         } else {
             munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+            munit_assert_long(packed_vsizes[j], ==, RKV_NO_MORE_KEYS);
         }
     }
     return MUNIT_OK;
 }
+
+static MunitResult test_list_keyvals_packed_val_too_small(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keyvals_context*>(data);
+    rkv_database_handle_t dbh = context->base->dbh;
+    rkv_return_t ret;
+
+    auto count = context->keys_per_op;
+    std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<size_t> packed_vsizes(count, g_max_val_size);
+    std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<char> packed_vals(count*g_max_val_size);
+    std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
+
+    size_t size_needed_for_keys = 0;
+    size_t size_needed_for_vals = 0;
+    unsigned i = 0;
+    for(auto& p : context->ordered_ref) {
+        auto& key = p.first;
+        auto& val = p.second;
+        if(starts_with(key, context->prefix)) {
+            expected_keys.push_back(key);
+            expected_vals.push_back(val);
+            if(i < count) {
+                size_needed_for_keys += key.size();
+                size_needed_for_vals += val.size();
+            } else
+                break;
+            i += 1;
+        }
+    }
+
+    size_t key_buf_size = size_needed_for_keys;
+    size_t val_buf_size = size_needed_for_vals/2;
+
+    std::string from_key;
+    std::string prefix = context->prefix;
+
+    ret = rkv_list_keyvals_packed(dbh,
+            context->inclusive,
+            from_key.data(),
+            from_key.size(),
+            prefix.data(),
+            prefix.size(),
+            count,
+            packed_keys.data(),
+            key_buf_size,
+            packed_ksizes.data(),
+            packed_vals.data(),
+            val_buf_size,
+            packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    size_t key_offset = 0;
+    size_t val_offset = 0;
+    bool val_buf_size_reached = false;
+    for(unsigned j = 0; j < count; j++) {
+        if(j < expected_keys.size()) {
+            auto& exp_key = expected_keys[j];
+            auto& exp_val = expected_vals[j];
+            auto recv_key = packed_keys.data()+key_offset;
+            auto recv_val = packed_vals.data()+val_offset;
+            munit_assert_long(packed_ksizes[j], ==, exp_key.size());
+            munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
+            if(val_offset + exp_val.size() > val_buf_size || val_buf_size_reached) {
+                munit_assert_long(packed_vsizes[j], ==, RKV_SIZE_TOO_SMALL);
+                val_buf_size_reached = true;
+            } else {
+                munit_assert_long(packed_vsizes[j], ==, exp_val.size());
+                munit_assert_memory_equal(packed_vsizes[j], recv_val, exp_val.data());
+            }
+            key_offset += exp_key.size();
+            val_offset += exp_val.size();
+        } else {
+            munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+            munit_assert_long(packed_vsizes[j], ==, RKV_NO_MORE_KEYS);
+        }
+    }
+    return MUNIT_OK;
+}
+
+#if 0
 
 static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* data)
 {
@@ -539,9 +641,11 @@ static MunitTest test_suite_tests[] = {
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals_packed", test_list_keyvals_packed,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
-    { (char*) "/list_keyvals_packed/too_small", test_list_keyvals_packed_too_small,
+    { (char*) "/list_keyvals_packed/keys_too_small", test_list_keyvals_packed_key_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_keyvals_packed/vals_too_small", test_list_keyvals_packed_val_too_small,
+        test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+#if 0
     { (char*) "/list_keyvals_bulk", test_list_keyvals_bulk,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
 #endif
