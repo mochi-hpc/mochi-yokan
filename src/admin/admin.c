@@ -16,7 +16,7 @@ rkv_return_t rkv_admin_init(margo_instance_id mid, rkv_admin_t* admin)
 
     hg_bool_t flag;
     hg_id_t id;
-    margo_registered_name(mid, "rkv_create_database", &id, &flag);
+    margo_registered_name(mid, "rkv_open_database", &id, &flag);
 
     if(flag == HG_TRUE) {
         margo_registered_name(mid, "rkv_open_database", &a->open_database_id, &flag);
@@ -70,19 +70,26 @@ rkv_return_t rkv_open_database(
     in.token  = (char*)token;
 
     hret = margo_create(admin->mid, address, admin->open_database_id, &h);
-    if(hret != HG_SUCCESS)
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
 
     hret = margo_provider_forward(provider_id, h, &in);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     hret = margo_get_output(h, &out);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     ret = out.ret;
@@ -117,19 +124,26 @@ rkv_return_t rkv_close_database(
     in.token  = (char*)token;
 
     hret = margo_create(admin->mid, address, admin->close_database_id, &h);
-    if(hret != HG_SUCCESS)
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
 
     hret = margo_provider_forward(provider_id, h, &in);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     hret = margo_get_output(h, &out);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     ret = out.ret;
@@ -156,19 +170,26 @@ rkv_return_t rkv_destroy_database(
     in.token  = (char*)token;
 
     hret = margo_create(admin->mid, address, admin->destroy_database_id, &h);
-    if(hret != HG_SUCCESS)
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
 
     hret = margo_provider_forward(provider_id, h, &in);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     hret = margo_get_output(h, &out);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     ret = out.ret;
@@ -196,19 +217,26 @@ rkv_return_t rkv_list_databases(
     in.max_ids = *count;
 
     hret = margo_create(admin->mid, address, admin->list_databases_id, &h);
-    if(hret != HG_SUCCESS)
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
 
     hret = margo_provider_forward(provider_id, h, &in);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     hret = margo_get_output(h, &out);
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         margo_destroy(h);
         return RKV_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
     }
 
     ret = out.ret;
