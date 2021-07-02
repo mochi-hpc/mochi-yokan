@@ -509,8 +509,6 @@ static MunitResult test_list_keyvals_packed_val_too_small(const MunitParameter p
     return MUNIT_OK;
 }
 
-#if 0
-
 static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* data)
 {
     (void)params;
@@ -522,14 +520,19 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
+    std::vector<size_t> packed_vsizes(count, g_max_val_size);
     std::vector<char> packed_keys(count*g_max_key_size);
+    std::vector<char> packed_vals(count*g_max_val_size);
 
     std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
+        auto& val = p.second;
         if(starts_with(key, context->prefix)) {
             expected_keys.push_back(key);
+            expected_vals.push_back(val);
         }
     }
 
@@ -562,8 +565,12 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
             }
             ptrs.push_back(packed_ksizes.data());
             sizes.push_back(count*sizeof(size_t));
+            ptrs.push_back(packed_vsizes.data());
+            sizes.push_back(count*sizeof(size_t));
             ptrs.push_back(packed_keys.data());
             sizes.push_back(packed_keys.size());
+            ptrs.push_back(packed_vals.data());
+            sizes.push_back(packed_vals.size());
 
             hret = margo_bulk_create(
                     context->base->mid,
@@ -582,23 +589,31 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
                 addr_str, data,
                 garbage_size,
                 packed_keys.size(),
+                packed_vals.size(),
                 true, count);
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
         hret = margo_bulk_free(data);
         munit_assert_int(hret, ==, HG_SUCCESS);
 
-        size_t offset = 0;
+        size_t key_offset = 0;
+        size_t val_offset = 0;
         for(unsigned j = 0; j < count; j++) {
             if(i+j < expected_keys.size()) {
                 auto& exp_key = expected_keys[i+j];
-                auto recv_key = packed_keys.data()+offset;
+                auto& exp_val = expected_vals[i+j];
+                auto recv_key = packed_keys.data()+key_offset;
+                auto recv_val = packed_vals.data()+val_offset;
                 munit_assert_long(packed_ksizes[j], ==, exp_key.size());
+                munit_assert_long(packed_vsizes[j], ==, exp_val.size());
                 munit_assert_memory_equal(packed_ksizes[j], recv_key, exp_key.data());
-                offset += exp_key.size();
+                munit_assert_memory_equal(packed_vsizes[j], recv_val, exp_val.data());
+                key_offset += exp_key.size();
+                val_offset += exp_val.size();
                 from_key = exp_key;
             } else {
                 munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                munit_assert_long(packed_vsizes[j], ==, RKV_NO_MORE_KEYS);
                 done_listing = true;
             }
         }
@@ -607,12 +622,13 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
             i -= 1;
 
         packed_ksizes.clear();
+        packed_vsizes.clear();
         packed_ksizes.resize(count, g_max_key_size);
+        packed_vsizes.resize(count, g_max_val_size);
     }
 
     return MUNIT_OK;
 }
-#endif
 
 static char* inclusive_params[] = {
     (char*)"true", (char*)"false", NULL
@@ -645,10 +661,8 @@ static MunitTest test_suite_tests[] = {
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals_packed/vals_too_small", test_list_keyvals_packed_val_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#if 0
     { (char*) "/list_keyvals_bulk", test_list_keyvals_bulk,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-#endif
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 
