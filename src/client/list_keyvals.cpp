@@ -123,8 +123,7 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     // keys
     size_t keys_buf_size = 0;
     for(unsigned i = 0; i < count; i++) {
-        if(ksizes[i] == 0)
-            return RKV_ERR_INVALID_ARGS;
+        if(ksizes[i] == 0) continue;
         ptrs.push_back(const_cast<void*>(keys[i]));
         sizes.push_back(ksizes[i]);
         keys_buf_size += ksizes[i];
@@ -132,8 +131,7 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     // values
     size_t vals_buf_size = 0;
     for(unsigned i = 0; i < count; i++) {
-        if(vsizes[i] == 0)
-            continue;
+        if(vsizes[i] == 0) continue;
         ptrs.push_back(const_cast<void*>(values[i]));
         sizes.push_back(vsizes[i]);
         vals_buf_size += vsizes[i];
