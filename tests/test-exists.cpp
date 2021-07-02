@@ -174,6 +174,16 @@ static MunitResult test_exists_multi_empty_key(const MunitParameter params[], vo
 
     ret = rkv_exists_multi(dbh, count, kptrs.data(), ksizes.data(), flags.data());
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // test with other invalid args
+    ret = rkv_exists_multi(dbh, count, nullptr, ksizes.data(), flags.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_exists_multi(dbh, count, kptrs.data(), nullptr, flags.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_exists_multi(dbh, count, kptrs.data(), ksizes.data(), nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+
     return MUNIT_OK;
 }
 
@@ -243,6 +253,32 @@ static MunitResult test_exists_packed_empty_key(const MunitParameter params[], v
         }
         i += 1;
     }
+
+    ret = rkv_exists_packed(dbh, count,
+                            packed_keys.data(),
+                            packed_ksizes.data(),
+                            flags.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // other invalid args tests
+    ret = rkv_exists_packed(dbh, count,
+                            nullptr,
+                            packed_ksizes.data(),
+                            flags.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_exists_packed(dbh, count,
+                            packed_keys.data(),
+                            nullptr,
+                            flags.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_exists_packed(dbh, count,
+                            packed_keys.data(),
+                            packed_ksizes.data(),
+                            nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // test with only 0s in the ksizes
+    for(auto& s : packed_ksizes) s = 0;
 
     ret = rkv_exists_packed(dbh, count,
                             packed_keys.data(),
@@ -330,6 +366,12 @@ static MunitResult test_exists_bulk(const MunitParameter params[], void* data)
     ret = rkv_exists_bulk(dbh, count, nullptr, bulk,
                           garbage_size, invalid_size);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    /* third invalid size (0) */
+    ret = rkv_exists_bulk(dbh, count, nullptr, bulk,
+                          garbage_size, 0);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
 
     hret = margo_bulk_free(bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
