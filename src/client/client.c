@@ -62,9 +62,11 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 rkv_return_t rkv_client_finalize(rkv_client_t client)
 {
     if(client->num_database_handles != 0) {
+        // LCOV_EXCL_START
         margo_warning(client->mid,
             "Warning: %ld database handles not released when rkv_client_finalize was called",
             client->num_database_handles);
+        // LCOV_EXCL_STOP
     }
     free(client);
     return RKV_SUCCESS;

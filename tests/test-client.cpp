@@ -146,6 +146,17 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     // ... and a second time because of the increase ref
     ret = rkv_database_handle_release(rh);
     munit_assert_int(ret, ==, RKV_SUCCESS);
+    // test calls that should fail properly
+    ret = rkv_database_handle_create(RKV_CLIENT_NULL,
+            context->addr, provider_id, context->id, &rh);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_database_handle_create(client,
+            HG_ADDR_NULL, provider_id, context->id, &rh);
+    munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
+    ret = rkv_database_handle_ref_incr(RKV_DATABASE_HANDLE_NULL);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_database_handle_release(RKV_DATABASE_HANDLE_NULL);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
     // test that we can free the client object
     ret = rkv_client_finalize(client);
     munit_assert_int(ret, ==, RKV_SUCCESS);
