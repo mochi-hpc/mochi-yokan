@@ -143,8 +143,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status length(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
-        if(ksizes.size != vsizes.size)
-            return Status::InvalidArg;
+        if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {

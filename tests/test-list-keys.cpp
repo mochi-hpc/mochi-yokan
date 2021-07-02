@@ -130,6 +130,33 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
 
     while(!done_listing) {
 
+        // failing calls
+        if(from_key.size() > 0) {
+            ret = rkv_list_keys(dbh,
+                context->inclusive,
+                nullptr,
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                kptrs.data(),
+                ksizes.data());
+            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+        }
+        if(prefix.size() > 0) {
+            ret = rkv_list_keys(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                nullptr,
+                prefix.size(),
+                count,
+                kptrs.data(),
+                ksizes.data());
+            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+        }
+
+        // successful call
         ret = rkv_list_keys(dbh,
                 context->inclusive,
                 from_key.data(),
@@ -159,6 +186,17 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
         ksizes.clear();
         ksizes.resize(count, g_max_key_size);
     }
+
+    ret = rkv_list_keys(dbh,
+            context->inclusive,
+            from_key.data(),
+            from_key.size(),
+            prefix.data(),
+            prefix.size(),
+            0,
+            nullptr,
+            nullptr);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
 
     return MUNIT_OK;
 }
@@ -223,6 +261,20 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
             munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
         }
     }
+
+    // test with a ksize set to 0
+    ksizes[ksizes.size()/2] = 0;
+    ret = rkv_list_keys(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                kptrs.data(),
+                ksizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     return MUNIT_OK;
 }
 
@@ -253,6 +305,35 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
 
     while(!done_listing) {
 
+        // failing calls
+        if(from_key.size() > 0) {
+            ret = rkv_list_keys_packed(dbh,
+                context->inclusive,
+                nullptr,
+                from_key.size(),
+                prefix.data(),
+                prefix.size(),
+                count,
+                packed_keys.data(),
+                count*g_max_key_size,
+                packed_ksizes.data());
+            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+        }
+        if(prefix.size() > 0) {
+            ret = rkv_list_keys_packed(dbh,
+                context->inclusive,
+                from_key.data(),
+                from_key.size(),
+                nullptr,
+                prefix.size(),
+                count,
+                packed_keys.data(),
+                count*g_max_key_size,
+                packed_ksizes.data());
+            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+        }
+
+        // successful call
         ret = rkv_list_keys_packed(dbh,
                 context->inclusive,
                 from_key.data(),
@@ -419,6 +500,18 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
             munit_assert_int(hret, ==, HG_SUCCESS);
         }
 
+        // test with count = 0
+        ret = rkv_list_keys_bulk(dbh,
+                context->inclusive,
+                from_key.size(),
+                prefix.size(),
+                addr_str, data,
+                garbage_size,
+                packed_keys.size(),
+                true, 0);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+
+        // test with actual count
         ret = rkv_list_keys_bulk(dbh,
                 context->inclusive,
                 from_key.size(),
