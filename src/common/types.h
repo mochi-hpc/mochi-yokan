@@ -12,34 +12,9 @@
 #include <mercury_proc_string.h>
 #include "rkv/rkv-common.h"
 
+// LCOV_EXCL_START
+
 static inline hg_return_t hg_proc_rkv_database_id_t(hg_proc_t proc, rkv_database_id_t *id);
-
-typedef struct rkv_data_t {
-    void*  data;
-    size_t size;
-} rkv_data_t;
-
-static inline hg_return_t hg_proc_rkv_data_t(hg_proc_t proc, void* data) {
-    rkv_data_t* mem = (rkv_data_t*)data;
-    hg_return_t ret;
-
-    ret = hg_proc_hg_size_t(proc, &(mem->size));
-    if(ret != HG_SUCCESS) return ret;
-
-    switch(hg_proc_get_op(proc)) {
-    case HG_DECODE:
-        mem->data = calloc(1, mem->size);
-        /* fall through */
-    case HG_ENCODE:
-        if(mem->data)
-            ret = hg_proc_memcpy(proc, mem->data, mem->size);
-        break;
-    case HG_FREE:
-        free(mem->data);
-        break;
-    }
-    return ret;
-}
 
 /* Admin RPC types */
 
@@ -200,5 +175,7 @@ static inline hg_return_t hg_proc_rkv_database_id_t(
 {
     return hg_proc_memcpy(proc, id, sizeof(*id));
 }
+
+// LCOV_EXCL_STOP
 
 #endif
