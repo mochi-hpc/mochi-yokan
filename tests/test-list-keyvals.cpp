@@ -636,7 +636,7 @@ static char* inclusive_params[] = {
 };
 
 static char* prefix_params[] = {
-    (char*)"matt", (char*)"", NULL
+    (char*)"", (char*)"matt", NULL
 };
 
 static MunitParameterEnum test_params[] = {

@@ -53,6 +53,7 @@ class ScopedReadLock {
 
 struct MapKeyValueStoreCompare {
 
+    // LCOV_EXCL_START
     static bool DefaultMemCmp(const void* lhs, size_t lhsize,
                               const void* rhs, size_t rhsize) {
         auto r = std::memcmp(lhs, rhs, std::min(lhsize, rhsize));
@@ -62,6 +63,7 @@ struct MapKeyValueStoreCompare {
             return true;
         return false;
     }
+    // LCOV_EXCL_STOP
 
     using cmp_type = bool (*)(const void*, size_t, const void*, size_t);
 
@@ -106,13 +108,17 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+    // LCOV_EXCL_START
     virtual std::string name() const override {
         return "map";
     }
+    // LCOV_EXCL_STOP
 
+    // LCOV_EXCL_START
     virtual std::string config() const override {
         return "{}";
     }
+    // LCOV_EXCL_STOP
 
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
@@ -180,16 +186,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             auto p = m_db.emplace(std::piecewise_construct,
-                    std::forward_as_tuple(
-                        keys.data + key_offset,
-                        ksizes[i]),
-                    std::forward_as_tuple(
-                        vals.data + val_offset,
-                        vsizes[i]));
+                std::forward_as_tuple(keys.data + key_offset,
+                                      ksizes[i]),
+                std::forward_as_tuple(vals.data + val_offset,
+                                      vsizes[i]));
             if(!p.second) {
-                p.first->second.assign(
-                        vals.data + val_offset,
-                        vsizes[i]);
+                p.first->second.assign(vals.data + val_offset,
+                                       vsizes[i]);
             }
             key_offset += ksizes[i];
             val_offset += vsizes[i];
