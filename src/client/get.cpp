@@ -76,8 +76,7 @@ extern "C" rkv_return_t rkv_get(rkv_database_handle_t dbh,
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
     rkv_return_t ret = rkv_get_packed(dbh, 1, key, &ksize, *vsize, value, vsize);
-    if(ret != RKV_SUCCESS)
-        return ret;
+    if(ret != RKV_SUCCESS) return ret;
     else if(*vsize == RKV_SIZE_TOO_SMALL)
         return RKV_ERR_BUFFER_SIZE;
     else if(*vsize == RKV_KEY_NOT_FOUND)
@@ -164,12 +163,9 @@ extern "C" rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
     if(sizes[2] == 0)
         return RKV_ERR_INVALID_ARGS;
 
-    if(sizes[3] != 0)
-        hret = margo_bulk_create(mid, 4, ptrs.data(), sizes.data(),
-                                 HG_BULK_READWRITE, &bulk);
-    else
-        hret = margo_bulk_create(mid, 3, ptrs.data(), sizes.data(),
-                                 HG_BULK_READWRITE, &bulk);
+    int seg_count = sizes[3] != 0 ? 4 : 3;
+    hret = margo_bulk_create(mid, seg_count, ptrs.data(), sizes.data(),
+                             HG_BULK_READWRITE, &bulk);
 
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
