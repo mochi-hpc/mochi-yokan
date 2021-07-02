@@ -24,6 +24,7 @@ struct test_context {
     hg_addr_t                                   addr;
     rkv_admin_t                                 admin;
     rkv_client_t                                client;
+    rkv_provider_t                              provider;
     rkv_database_id_t                           id;
     rkv_database_handle_t                       dbh;
     std::unordered_map<std::string,std::string> reference;
@@ -41,6 +42,7 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     hg_addr_t         addr;
     rkv_admin_t       admin;
     rkv_client_t      client;
+    rkv_provider_t    provider;
     rkv_database_id_t id;
     rkv_database_handle_t dbh;
 
@@ -73,7 +75,7 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     args.token = NULL;
     ret = rkv_provider_register(
             mid, provider_id, &args,
-            RKV_PROVIDER_IGNORE);
+            &provider);
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // create an admin
     ret = rkv_admin_init(mid, &admin);
@@ -91,12 +93,13 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     // create test context
     struct test_context* context = new test_context;
     munit_assert_not_null(context);
-    context->mid    = mid;
-    context->addr   = addr;
-    context->admin  = admin;
-    context->client = client;
-    context->id     = id;
-    context->dbh    = dbh;
+    context->mid      = mid;
+    context->addr     = addr;
+    context->admin    = admin;
+    context->client   = client;
+    context->provider = provider;
+    context->id       = id;
+    context->dbh      = dbh;
     // create random key/value pairs with an empty value every 8 values
     for(unsigned i = 0; i < g_num_keyvals; i++) {
         std::string key;
@@ -140,6 +143,10 @@ static void test_common_context_tear_down(void* fixture)
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // free address
     margo_addr_free(context->mid, context->addr);
+    // destroy provider (we could let margo finalize it but
+    // by calling this function we increase code coverage
+    ret = rkv_provider_destroy(context->provider);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
     // we are not checking the return value of the above function with
     // munit because we need margo_finalize to be called no matter what.
     margo_finalize(context->mid);

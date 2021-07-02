@@ -126,12 +126,34 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     munit_assert_ulong(count, ==, 1);
     munit_assert_memory_equal(sizeof(id), ids, &id);
 
+    // test that we can close the database we just created
+    ret = rkv_close_database(admin, context->addr,
+            provider_id, valid_token, id);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // check that the database does not appear anymore
+    count = 4;
+    ret = rkv_list_databases(admin, context->addr,
+            provider_id, valid_token, ids, &count);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_ulong(count, ==, 0);
+
+    // reopen a database
+    ret = rkv_open_database(admin, context->addr,
+            provider_id, valid_token, "map", backend_config, &id);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+
     // test that we can destroy the database we just created
     ret = rkv_destroy_database(admin, context->addr,
             provider_id, valid_token, id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
-    // note: open and close are essentially the same as create and
-    // destroy in this code so we won't be testing them.
+
+    // check that the database does not appear anymore
+    count = 4;
+    ret = rkv_list_databases(admin, context->addr,
+            provider_id, valid_token, ids, &count);
+    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_ulong(count, ==, 0);
 
     // test that we can free the admin object
     ret = rkv_admin_finalize(admin);
@@ -140,7 +162,7 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
-static MunitResult test_invalid(const MunitParameter params[], void* data)
+static MunitResult test_invalid_open(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
@@ -201,7 +223,7 @@ static MunitTest test_suite_tests[] = {
         test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { (char*) "/database", test_database,
         test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
-    { (char*) "/invalid", test_invalid,
+    { (char*) "/invalid/open", test_invalid_open,
         test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

@@ -146,19 +146,13 @@ static void rkv_finalize_provider(void* p)
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
-    //margo_deregister(mid, provider->exists_id);
-    //margo_deregister(mid, provider->exists_multi_id);
-    //margo_deregister(mid, provider->exists_packed_id);
-    //margo_deregister(mid, provider->length_id);
-    //margo_deregister(mid, provider->length_multi_id);
-    //margo_deregister(mid, provider->length_packed_id);
+    margo_deregister(mid, provider->exists_id);
+    margo_deregister(mid, provider->length_id);
     margo_deregister(mid, provider->put_id);
     margo_deregister(mid, provider->get_id);
     margo_deregister(mid, provider->erase_id);
-    //margo_deregister(mid, provider->list_keys_id);
-    //margo_deregister(mid, provider->list_keys_packed_id);
-    //margo_deregister(mid, provider->list_keyvals_id);
-    //margo_deregister(mid, provider->list_keyvals_packed_id);
+    margo_deregister(mid, provider->list_keys_id);
+    margo_deregister(mid, provider->list_keyvals_id);
     delete provider;
     margo_info(mid, "RKV provider successfuly finalized");
 }
