@@ -286,8 +286,7 @@ class KeyValueStoreFactory {
             const std::string& backendType,
             const std::string& jsonConfig,
             KeyValueStoreInterface** kvs) {
-        if(!hasBackendType(backendType))
-            return Status::InvalidType;
+        if(!hasBackendType(backendType)) return Status::InvalidType;
         return make_fn[backendType](jsonConfig, kvs);
     }
 

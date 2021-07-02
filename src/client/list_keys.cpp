@@ -142,8 +142,7 @@ extern "C" rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
                                              size_t keys_buf_size,
                                              size_t* ksizes)
 {
-    if(count == 0)
-        return RKV_SUCCESS;
+    if(count == 0) return RKV_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
         return RKV_ERR_INVALID_ARGS;
     if(prefix == nullptr && prefix_size > 0)
