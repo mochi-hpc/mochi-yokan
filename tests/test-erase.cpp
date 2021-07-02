@@ -270,6 +270,15 @@ static MunitResult test_erase_packed_empty_key(const MunitParameter params[], vo
                            nullptr);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
+    // erase packed with all the keys of size 0
+    for(auto& s : packed_ksizes) s = 0;
+    ret = rkv_erase_packed(dbh, packed_ksizes.size(),
+                           packed_keys.data(),
+                           packed_ksizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+
+
     return MUNIT_OK;
 }
 
