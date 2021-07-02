@@ -34,14 +34,18 @@ rkv_return_t rkv_provider_register(
 
     flag = margo_is_listening(mid);
     if(flag == HG_FALSE) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(mid, "margo instance is not a server");
         return RKV_ERR_INVALID_ARGS;
+        // LCOV_EXCL_STOP
     }
 
-    margo_provider_registered_name(mid, "rkv_sum", provider_id, &id, &flag);
+    margo_provider_registered_name(mid, "rkv_open_database", provider_id, &id, &flag);
     if(flag == HG_TRUE) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(mid, "a provider with id %u is already registered", provider_id);
         return RKV_ERR_INVALID_PROVIDER;
+        // LCOV_EXCL_STOP
     }
 
     p = new rkv_provider;
@@ -139,7 +143,9 @@ static void rkv_finalize_provider(void* p)
     rkv_provider_t provider = (rkv_provider_t)p;
     margo_instance_id mid = provider->mid;
     for(auto pair : provider->dbs) {
+        // LCOV_EXCL_START
         delete pair.second;
+        // LCOV_EXCL_STOP
     }
     margo_info(mid, "Finalizing RKV provider");
     margo_deregister(mid, provider->open_database_id);

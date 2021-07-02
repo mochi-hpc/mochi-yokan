@@ -247,7 +247,8 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
             } else if(j == count/3) {
                 munit_assert_long(ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
-                munit_assert_long(vsizes[j], ==, RKV_SIZE_TOO_SMALL);
+                if(exp_val.size() != 0)
+                    munit_assert_long(vsizes[j], ==, RKV_SIZE_TOO_SMALL);
             } else {
                 munit_assert_long(ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
