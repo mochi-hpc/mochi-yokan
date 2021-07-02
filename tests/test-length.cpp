@@ -200,6 +200,15 @@ static MunitResult test_length_multi_empty_key(const MunitParameter params[], vo
 
     ret = rkv_length_multi(dbh, count, kptrs.data(), ksizes.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // other invalid args tests
+    ret = rkv_length_multi(dbh, count, nullptr, ksizes.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_length_multi(dbh, count, kptrs.data(), nullptr, vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_length_multi(dbh, count, kptrs.data(), ksizes.data(), nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     return MUNIT_OK;
 }
 
@@ -339,6 +348,31 @@ static MunitResult test_length_packed_empty_key(const MunitParameter params[], v
                             packed_vsizes.data());
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
+    // other invalid args tests
+    ret = rkv_length_packed(dbh, count,
+                            nullptr,
+                            packed_ksizes.data(),
+                            packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_length_packed(dbh, count,
+                            packed_keys.data(),
+                            nullptr,
+                            packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_length_packed(dbh, count,
+                            packed_keys.data(),
+                            packed_ksizes.data(),
+                            nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    for(auto& s : packed_ksizes) s = 0;
+
+    ret = rkv_length_packed(dbh, count,
+                            packed_keys.data(),
+                            packed_ksizes.data(),
+                            packed_vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     return MUNIT_OK;
 }
 
@@ -468,6 +502,11 @@ static MunitResult test_length_bulk(const MunitParameter params[], void* data)
     invalid_size = seg_sizes[1] + seg_sizes[2] + 1;
     ret = rkv_length_bulk(dbh, count, nullptr, bulk,
                           garbage_size, invalid_size);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    /* third invalid size (0) */
+    ret = rkv_length_bulk(dbh, count, nullptr, bulk,
+                          garbage_size, 0);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     hret = margo_bulk_free(bulk);
