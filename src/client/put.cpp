@@ -142,6 +142,9 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
     if(sizes[2] == 0)
         return RKV_ERR_INVALID_ARGS;
 
+    if(sizes[3] != 0 && values == nullptr)
+        return RKV_ERR_INVALID_ARGS;
+
     if(sizes[3] != 0)
         hret = margo_bulk_create(mid, 4, ptrs.data(), sizes.data(),
                                  HG_BULK_READ_ONLY, &bulk);

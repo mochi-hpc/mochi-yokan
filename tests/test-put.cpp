@@ -118,6 +118,20 @@ static MunitResult test_put_multi(const MunitParameter params[], void* data)
         munit_assert_memory_equal(vsize, val.data(), p.second.data());
     }
 
+    // check with some nullptr
+    ret = rkv_put_multi(dbh, count, nullptr, ksizes.data(),
+                                    vptrs.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_multi(dbh, count, kptrs.data(), nullptr,
+                                    vptrs.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_multi(dbh, count, kptrs.data(), ksizes.data(),
+                                    nullptr, vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_multi(dbh, count, kptrs.data(), ksizes.data(),
+                                    vptrs.data(), nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     // check with all NULL
 
     ret = rkv_put_multi(dbh, 0, NULL, NULL, NULL, NULL);
@@ -276,6 +290,26 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
     ret = rkv_put_packed(dbh, 0, pkeys.data(), ksizes.data(),
                                  pvals.data(), vsizes.data());
     munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // check with some nullptrs
+    ret = rkv_put_packed(dbh, count, nullptr, ksizes.data(),
+                                     pvals.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_packed(dbh, count, pkeys.data(), nullptr,
+                                     pvals.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
+                                     nullptr, vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
+                                     pvals.data(), nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // check with all ksizes[*] = 0
+    for(auto& s : ksizes) s = 0;
+    ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
+                                     pvals.data(), vsizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     // check with all NULL
 
@@ -451,6 +485,11 @@ static MunitResult test_put_bulk(const MunitParameter params[], void* data)
     ret = rkv_put_bulk(dbh, count, nullptr, bulk,
                        garbage_size, useful_size);
     munit_assert_int(ret, ==, RKV_SUCCESS);
+
+    // with useful size = 0
+    ret = rkv_put_bulk(dbh, count, addr_str, bulk,
+                       garbage_size, 0);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     hret = margo_bulk_free(bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);

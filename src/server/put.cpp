@@ -10,6 +10,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include <numeric>
+#include <iostream>
 
 void rkv_put_ult(hg_handle_t h)
 {
