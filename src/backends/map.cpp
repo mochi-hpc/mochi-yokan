@@ -128,14 +128,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status exists(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
-        if(ksizes.size > flags.size)
-            return Status::InvalidArg;
+        if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
-            if(offset + ksizes[i] > keys.size)
-                return Status::InvalidArg;
+            if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             flags[i] = m_db.count(key) > 0;
             offset += ksizes[i];
         }
@@ -151,8 +149,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
-            if(offset + ksizes[i] > keys.size)
-                return Status::InvalidArg;
+            if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto it = m_db.find(key);
             if(it == m_db.end()) vsizes[i] = KeyNotFound;
             else vsizes[i] = it->second.size();
@@ -165,8 +162,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-        if(ksizes.size != vsizes.size)
-            return Status::InvalidArg;
+        if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -174,14 +170,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t total_ksizes = std::accumulate(ksizes.data,
                                               ksizes.data + ksizes.size,
                                               0);
-        if(total_ksizes > keys.size)
-            return Status::InvalidArg;
+        if(total_ksizes > keys.size) return Status::InvalidArg;
 
         size_t total_vsizes = std::accumulate(vsizes.data,
                                               vsizes.data + vsizes.size,
                                               0);
-        if(total_vsizes > vals.size)
-            return Status::InvalidArg;
+        if(total_vsizes > vals.size) return Status::InvalidArg;
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -204,8 +198,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
-        if(ksizes.size != vsizes.size)
-            return Status::InvalidArg;
+        if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -265,8 +258,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
-            if(offset + ksizes[i] > keys.size)
-                return Status::InvalidArg;
+            if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto it = m_db.find(key);
             if(it != m_db.end()) {
                 m_db.erase(it);

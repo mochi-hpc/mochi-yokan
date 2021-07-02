@@ -54,6 +54,8 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
     for(auto& p : base_context->reference) {
         if(i % 2 == 0) {
             context->ordered_ref[context->prefix + p.first] = p.second;
+        } else {
+            context->ordered_ref[p.first] = p.second;
         }
         i += 1;
     }
