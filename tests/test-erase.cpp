@@ -177,6 +177,13 @@ static MunitResult test_erase_multi_empty_key(const MunitParameter params[], voi
 
     ret = rkv_erase_multi(dbh, kptrs.size(), kptrs.data(), ksizes.data());
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // check with invalid keys or ksizes
+    ret = rkv_erase_multi(dbh, kptrs.size(), nullptr, ksizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_erase_multi(dbh, kptrs.size(), kptrs.data(), nullptr);
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
     return MUNIT_OK;
 }
 
@@ -219,7 +226,7 @@ static MunitResult test_erase_packed(const MunitParameter params[], void* data)
 
     // check with all NULL
 
-    ret = rkv_exists_packed(dbh, 0, NULL, NULL, NULL);
+    ret = rkv_erase_packed(dbh, 0, NULL, NULL);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     return MUNIT_OK;
@@ -251,6 +258,16 @@ static MunitResult test_erase_packed_empty_key(const MunitParameter params[], vo
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            packed_keys.data(),
                            packed_ksizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // other invalid args test cases
+    ret = rkv_erase_packed(dbh, packed_ksizes.size(),
+                           nullptr,
+                           packed_ksizes.data());
+    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    ret = rkv_erase_packed(dbh, packed_ksizes.size(),
+                           packed_keys.data(),
+                           nullptr);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     return MUNIT_OK;
@@ -327,6 +344,10 @@ static MunitResult test_erase_bulk(const MunitParameter params[], void* data)
     ret = rkv_erase_bulk(dbh, ksizes.size(), nullptr, bulk,
                          garbage_size, invalid_size);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+
+    // check with a size of 0
+    ret = rkv_erase_bulk(dbh, ksizes.size(), nullptr, bulk,
+                         garbage_size, 0);
 
     hret = margo_bulk_free(bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
