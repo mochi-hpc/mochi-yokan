@@ -17,7 +17,6 @@ void rkv_exists_ult(hg_handle_t h)
     hg_return_t hret;
     exists_in_t in;
     exists_out_t out;
-    hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
     out.ret = RKV_SUCCESS;
@@ -48,14 +47,11 @@ void rkv_exists_ult(hg_handle_t h)
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
 
-    std::vector<char> buffer(in.size);
-    void* segptrs[1] = { buffer.data() };
-    hg_size_t segsizes[1] = { in.size };
-
-    hret = margo_bulk_create(mid, 1, segptrs, segsizes,
-                             HG_BULK_READWRITE, &local_bulk);
-    CHECK_HRET_OUT(hret, margo_bulk_create);
-    DEFER(margo_bulk_free(local_bulk));
+    rkv_buffer_t buffer = provider->bulk_cache.get(
+            provider->bulk_cache_data, in.size, HG_BULK_READWRITE);
+    CHECK_BUFFER(buffer);
+    DEFER(provider->bulk_cache.release(
+            provider->bulk_cache_data, buffer));
 
     const size_t keys_offset = in.count * sizeof(size_t);
     size_t flags_offset      = 0; // computed later
@@ -64,11 +60,11 @@ void rkv_exists_ult(hg_handle_t h)
     size_t sizes_to_transfer = in.count*sizeof(size_t);
 
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, local_bulk, 0, sizes_to_transfer);
+            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     // build buffer wrappers for key sizes
-    auto ptr = buffer.data();
+    auto ptr = buffer->data;
     auto ksizes = rkv::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr),
         in.count
@@ -98,7 +94,7 @@ void rkv_exists_ult(hg_handle_t h)
     // transfer the actual keys from the client
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            local_bulk, keys_offset, total_ksize);
+            buffer->bulk, keys_offset, total_ksize);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     // create memory wrapper for keys
@@ -109,6 +105,7 @@ void rkv_exists_ult(hg_handle_t h)
         (uint8_t*)ptr + flags_offset,
         in.count
     };
+    std::memset(flags.data, 0, flags_size);
 
     out.ret = static_cast<rkv_return_t>(
             database->exists(keys, ksizes, flags));
@@ -117,7 +114,7 @@ void rkv_exists_ult(hg_handle_t h)
         // transfer the bit field back the client
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + flags_offset,
-                local_bulk, flags_offset, flags_size);
+                buffer->bulk, flags_offset, flags_size);
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
     }
 }

@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../buffer/default_bulk_cache.hpp"
 
 static void rkv_finalize_provider(void* p);
 
@@ -60,6 +61,21 @@ rkv_return_t rkv_provider_register(
     p->provider_id = provider_id;
     p->pool = a.pool;
     p->token = (a.token && strlen(a.token)) ? a.token : "";
+
+    /* Bulk cache */
+    // TODO find a cache implementation in the configuration
+    if(a.cache) {
+        p->bulk_cache = *a.cache;
+    } else {
+        p->bulk_cache = rkv_default_bulk_cache;
+    }
+    // TODO pass a configuration field
+    p->bulk_cache_data = p->bulk_cache.init(mid, NULL);
+    if(!p->bulk_cache_data) {
+        RKV_LOG_ERROR(mid, "failed to initialize bulk cache");
+        delete p;
+        return RKV_ERR_ALLOCATION;
+    }
 
     /* Admin RPCs */
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_open_database",
@@ -159,6 +175,7 @@ static void rkv_finalize_provider(void* p)
     margo_deregister(mid, provider->erase_id);
     margo_deregister(mid, provider->list_keys_id);
     margo_deregister(mid, provider->list_keyvals_id);
+    provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
     margo_info(mid, "RKV provider successfuly finalized");
 }

@@ -54,4 +54,13 @@
         } \
     } while(0)
 
+#define CHECK_BUFFER(__buf__) \
+    do { \
+        if(!__buf__) { \
+            RKV_LOG_ERROR(mid, "could not get bulk buffer"); \
+            out.ret = RKV_ERR_ALLOCATION; \
+            return; \
+        } \
+    } while(0)
+
 #endif

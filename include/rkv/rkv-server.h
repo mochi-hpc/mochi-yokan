@@ -7,6 +7,7 @@
 #define __RKV_SERVER_H
 
 #include <rkv/rkv-common.h>
+#include <rkv/rkv-bulk-cache.h>
 #include <margo.h>
 
 #ifdef __cplusplus
@@ -23,10 +24,10 @@ struct rkv_provider_args {
     const char*        token;  // Security token
     const char*        config; // JSON configuration
     ABT_pool           pool;   // Pool used to run RPCs
-    // ...
+    rkv_bulk_cache_t   cache;  // cache implementation for bulk handles
 };
 
-#define RKV_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL }
+#define RKV_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL }
 
 /**
  * @brief Creates a new RKV provider. If RKV_PROVIDER_IGNORE

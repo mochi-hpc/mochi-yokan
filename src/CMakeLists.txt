@@ -7,7 +7,8 @@ set (server-src-files
      server/length.cpp
      server/exists.cpp
      server/list_keys.cpp
-     server/list_keyvals.cpp)
+     server/list_keyvals.cpp
+     buffer/default_bulk_cache.cpp)
 
 set (backend-src-files
      backends/backends.cpp

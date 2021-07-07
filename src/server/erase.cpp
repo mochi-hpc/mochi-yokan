@@ -16,7 +16,6 @@ void rkv_erase_ult(hg_handle_t h)
     hg_return_t hret;
     erase_in_t in;
     erase_out_t out;
-    hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
     out.ret = RKV_SUCCESS;
@@ -47,21 +46,17 @@ void rkv_erase_ult(hg_handle_t h)
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
 
-    std::vector<char> buffer(in.size);
-    void* segptrs[1] = { buffer.data() };
-    hg_size_t segsizes[1] = { in.size };
-
-
-    hret = margo_bulk_create(mid, 1, segptrs, segsizes,
-                             HG_BULK_WRITE_ONLY, &local_bulk);
-    CHECK_HRET_OUT(hret, margo_bulk_create);
-    DEFER(margo_bulk_free(local_bulk));
+    rkv_buffer_t buffer = provider->bulk_cache.get(
+            provider->bulk_cache_data, in.size, HG_BULK_WRITE_ONLY);
+    CHECK_BUFFER(buffer);
+    DEFER(provider->bulk_cache.release(
+            provider->bulk_cache_data, buffer));
 
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-                               in.bulk, in.offset, local_bulk, 0, in.size);
+                               in.bulk, in.offset, buffer->bulk, 0, in.size);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    auto ptr = buffer.data();
+    auto ptr = buffer->data;
     auto ksizes = rkv::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr),
         in.count

@@ -39,6 +39,9 @@ typedef struct rkv_provider {
     uint16_t           provider_id;         // Provider id
     ABT_pool           pool;                // Pool on which to post RPC requests
     std::string        token;               // Security token
+    rkv_bulk_cache     bulk_cache;          // Bulk cache functions
+    void*              bulk_cache_data;     // Bulk cache data
+
     /* Databases */
     std::unordered_map<rkv_database_id_t, rkv_database_t> dbs;  // Databases
     // Note: in the above map, the std::string keys are actually uuids (32 bytes)
