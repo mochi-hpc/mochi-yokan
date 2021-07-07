@@ -72,9 +72,11 @@ rkv_return_t rkv_provider_register(
     // TODO pass a configuration field
     p->bulk_cache_data = p->bulk_cache.init(mid, NULL);
     if(!p->bulk_cache_data) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(mid, "failed to initialize bulk cache");
         delete p;
         return RKV_ERR_ALLOCATION;
+        // LCOV_EXCL_STOP
     }
 
     /* Admin RPCs */

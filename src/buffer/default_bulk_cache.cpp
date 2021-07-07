@@ -26,9 +26,11 @@ void default_bulk_cache_finalize(void* c) {
     auto cache = static_cast<default_bulk_cache*>(c);
     auto num_allocated = cache->num_allocated.load();
     if(num_allocated != 0) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(cache->mid,
             "%ld buffers have not been released to the bulk cache",
             num_allocated);
+        // LCOV_EXCL_STOP
     }
     delete cache;
 }
@@ -36,9 +38,11 @@ void default_bulk_cache_finalize(void* c) {
 rkv_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     auto cache = static_cast<default_bulk_cache*>(c);
     if(size == 0) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(cache->mid,
             "requesting a buffer of size 0");
         return nullptr;
+        // LCOV_EXCL_STOP
     }
 
     auto buffer = new rkv_buffer{size, mode, nullptr, HG_BULK_NULL};
@@ -51,10 +55,12 @@ rkv_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
             1, buf_ptrs, buf_sizes, mode, &(buffer->bulk));
 
     if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
         RKV_LOG_ERROR(cache->mid,
             "margo_bulk_create failed with error code %d", hret);
         delete buffer;
         return nullptr;
+        // LCOV_EXCL_STOP
     }
     return buffer;
 }
