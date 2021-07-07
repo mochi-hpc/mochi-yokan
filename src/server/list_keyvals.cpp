@@ -17,7 +17,6 @@ void rkv_list_keyvals_ult(hg_handle_t h)
     hg_return_t hret;
     list_keyvals_in_t in;
     list_keyvals_out_t out;
-    hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
     out.ret = RKV_SUCCESS;
@@ -53,14 +52,10 @@ void rkv_list_keyvals_ult(hg_handle_t h)
                        + in.keys_buf_size
                        + in.vals_buf_size;
 
-    std::vector<char> buffer(buffer_size);
-    void* segptrs[1] = { buffer.data() };
-    hg_size_t segsizes[1] = { buffer_size };
-
-    hret = margo_bulk_create(mid, 1, segptrs, segsizes,
-                             HG_BULK_READWRITE, &local_bulk);
-    CHECK_HRET_OUT(hret, margo_bulk_create);
-    DEFER(margo_bulk_free(local_bulk));
+    rkv_buffer_t buffer = provider->bulk_cache.get(
+        provider->bulk_cache_data, buffer_size, HG_BULK_READWRITE);
+    CHECK_BUFFER(buffer);
+    DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
     const size_t ksizes_offset = in.from_ksize + in.prefix_size;
     const size_t vsizes_offset = ksizes_offset + in.count*sizeof(size_t);
@@ -73,12 +68,12 @@ void rkv_list_keyvals_ult(hg_handle_t h)
 
     if(size_to_transfer > 0) {
         hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-                in.bulk, in.offset, local_bulk, 0, size_to_transfer);
+                in.bulk, in.offset, buffer->bulk, 0, size_to_transfer);
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
     }
 
     // build buffer wrappers
-    auto ptr      = buffer.data();
+    auto ptr      = buffer->data;
     auto from_key = rkv::UserMem{ ptr, in.from_ksize };
     auto prefix   = rkv::UserMem{ ptr + in.from_ksize, in.prefix_size };
     auto ksizes   = rkv::BasicUserMem<size_t>{
@@ -103,7 +98,7 @@ void rkv_list_keyvals_ult(hg_handle_t h)
                          + in.keys_buf_size + in.vals_buf_size;
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + ksizes_offset,
-                local_bulk, ksizes_offset, size_to_transfer);
+                buffer->bulk, ksizes_offset, size_to_transfer);
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
     }
 }

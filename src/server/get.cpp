@@ -16,7 +16,6 @@ void rkv_get_ult(hg_handle_t h)
     hg_return_t hret;
     get_in_t in;
     get_out_t out;
-    hg_bulk_t local_bulk = HG_BULK_NULL;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
     out.ret = RKV_SUCCESS;
@@ -47,14 +46,10 @@ void rkv_get_ult(hg_handle_t h)
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
 
-    std::vector<char> buffer(in.size);
-    void* segptrs[1] = { buffer.data() };
-    hg_size_t segsizes[1] = { in.size };
-
-    hret = margo_bulk_create(mid, 1, segptrs, segsizes,
-                             HG_BULK_READWRITE, &local_bulk);
-    CHECK_HRET_OUT(hret, margo_bulk_create);
-    DEFER(margo_bulk_free(local_bulk));
+    rkv_buffer_t buffer = provider->bulk_cache.get(
+        provider->bulk_cache_data, in.size, HG_BULK_READWRITE);
+    CHECK_BUFFER(buffer);
+    DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
     const size_t ksizes_offset = 0;
     const size_t vsizes_offset = in.count*sizeof(size_t);
@@ -66,11 +61,11 @@ void rkv_get_ult(hg_handle_t h)
     if(!in.packed) sizes_to_transfer *= 2;
 
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, local_bulk, 0, sizes_to_transfer);
+            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     // build buffer wrappers for key sizes
-    auto ptr = buffer.data();
+    auto ptr = buffer->data;
     auto ksizes = rkv::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
@@ -113,7 +108,7 @@ void rkv_get_ult(hg_handle_t h)
     // transfer the actual keys from the client
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            local_bulk, keys_offset, total_ksize);
+            buffer->bulk, keys_offset, total_ksize);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     // create UserMem wrapper for keys
@@ -132,12 +127,12 @@ void rkv_get_ult(hg_handle_t h)
         margo_request req = MARGO_REQUEST_NULL;
         hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + vals_offset,
-                local_bulk, vals_offset, remaining_vsize, &req);
+                buffer->bulk, vals_offset, remaining_vsize, &req);
         CHECK_HRET_OUT(hret, margo_bulk_itransfer);
 
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + vsizes_offset,
-                local_bulk, vsizes_offset, in.count*sizeof(size_t));
+                buffer->bulk, vsizes_offset, in.count*sizeof(size_t));
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
         hret = margo_wait(req);
