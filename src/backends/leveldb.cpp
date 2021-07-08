@@ -9,6 +9,7 @@
 #include <leveldb/db.h>
 #include <leveldb/comparator.h>
 #include <leveldb/env.h>
+#include <leveldb/write_batch.h>
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -100,6 +101,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         leveldb::Status status;
         leveldb::DB* db = nullptr;
         status = leveldb::DB::Open(options, path, &db);
+        // TODO properly handle status
 
         *kvs = new LevelDBKeyValueStore(db, std::move(cfg));
 
@@ -126,46 +128,48 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status exists(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
-#if 0
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
+        std::string value;
+        // TODO enable more read options in config
+        leveldb::ReadOptions options;
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            flags[i] = m_db.count(key) > 0;
+            const leveldb::Slice key{ keys.data + offset, ksizes[i] };
+            flags[i] = m_db->Get(options, key, &value).ok();
             offset += ksizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status length(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
-#if 0
-        if(ksizes.size != vsizes.size) return Status::InvalidArg;
+        if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
+        std::string value;
+        // TODO enable more read options in config
+        leveldb::ReadOptions options;
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db.find(key);
-            if(it == m_db.end()) vsizes[i] = KeyNotFound;
-            else vsizes[i] = it->second.size();
+            const leveldb::Slice key{ keys.data + offset, ksizes[i] };
+            auto status = m_db->Get(options, key, &value);
+            if(status.ok()) {
+                vsizes[i] = value.size();
+            } else if(status.IsNotFound()) {
+                vsizes[i] = KeyNotFound;
+            } else {
+                // TODO handle other types of status
+            }
             offset += ksizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status put(const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-#if 0
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -181,52 +185,55 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
-        ScopedWriteLock lock(m_lock);
+        // TODO I don't know if using a WriteBatch is more efficient than
+        // looping over the key/value pairs and call Put directly on the
+        // database, so I should add an option in the config to allow this.
+        leveldb::WriteBatch wb;
+
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto p = m_db.emplace(std::piecewise_construct,
-                std::forward_as_tuple(keys.data + key_offset,
-                                      ksizes[i]),
-                std::forward_as_tuple(vals.data + val_offset,
-                                      vsizes[i]));
-            if(!p.second) {
-                p.first->second.assign(vals.data + val_offset,
-                                       vsizes[i]);
-            }
+            wb.Put(leveldb::Slice{ keys.data + key_offset, ksizes[i] },
+                   leveldb::Slice{ vals.data + val_offset, vsizes[i] });
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }
+        // TODO add an option in the config to pass sync=true to WriteOptions
+        auto status = m_db->Write(leveldb::WriteOptions(), &wb);
+        // TODO do something with status
+        (void)status;
+
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status get(bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
-#if 0
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
-        ScopedReadLock lock(m_lock);
+
+        std::string value;
+        // TODO add "verify_checksum and "fill_cache" in configuration
+        leveldb::ReadOptions options;
 
         if(!packed) {
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                const UserMem key{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db.find(key);
+                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                auto status = m_db->Get(options, key, &value);
                 const auto original_vsize = vsizes[i];
-                if(it == m_db.end()) {
+                if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
-                } else {
-                    auto& v = it->second;
-                    if(v.size() > vsizes[i]) {
+                } else if(status.ok()) {
+                    if(value.size() > vsizes[i]) {
                         vsizes[i] = BufTooSmall;
                     } else {
-                        std::memcpy(vals.data + val_offset, v.data(), v.size());
-                        vsizes[i] = v.size();
+                        std::memcpy(vals.data + val_offset, value.data(), value.size());
+                        vsizes[i] = value.size();
                     }
+                } else {
+                    // TODO handle other leveldb status
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -237,47 +244,46 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             size_t val_remaining_size = vals.size;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                auto key = UserMem{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db.find(key);
-                if(it == m_db.end()) {
+                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                auto status = m_db->Get(options, key, &value);
+                if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
-                } else if(it->second.size() > val_remaining_size) {
-                    for(; i < ksizes.size; i++) {
-                        vsizes[i] = BufTooSmall;
+                } else if(status.ok()) {
+                    if(value.size() > val_remaining_size) {
+                        for(; i < ksizes.size; i++) {
+                            vsizes[i] = BufTooSmall;
+                        }
+                    } else {
+                        std::memcpy(vals.data + val_offset, value.data(), value.size());
+                        vsizes[i] = value.size();
+                        val_remaining_size -= vsizes[i];
+                        val_offset += vsizes[i];
                     }
                 } else {
-                    auto& v = it->second;
-                    std::memcpy(vals.data + val_offset, v.data(), v.size());
-                    vsizes[i] = v.size();
-                    val_remaining_size -= vsizes[i];
-                    val_offset += vsizes[i];
+                    // TODO handle other leveldb status
                 }
                 key_offset += ksizes[i];
             }
             vals.size = vals.size - val_remaining_size;
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status erase(const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
-#if 0
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
+        leveldb::WriteBatch wb;
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto key = UserMem{ keys.data + offset, ksizes[i] };
+            const auto key = leveldb::Slice{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db.find(key);
-            if(it != m_db.end()) {
-                m_db.erase(it);
-            }
+            wb.Delete(key);
             offset += ksizes[i];
         }
+        leveldb::WriteOptions options;
+        // TODO add options from the configuration
+        auto status = m_db->Write(options, &wb);
+        // TODO handle status properly
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status listKeys(bool packed, const UserMem& fromKey,
