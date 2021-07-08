@@ -289,69 +289,37 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-#if 0
-        ScopedReadLock lock(m_lock);
 
-        if(!packed) {
+        auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
+        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
-            using iterator = decltype(m_db.begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
-            } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
-            }
-            const auto end = m_db.end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
+        leveldb::ReadOptions options; // TODO add options from config
+        auto iterator = m_db->NewIterator(options);
+        if(fromKey.size == 0) {
+            iterator->SeekToFirst();
+        } else {
+            iterator->Seek(fromKeySlice);
+            if(!inclusive) {
+                if(iterator->key().compare(fromKeySlice) == 0) {
+                    iterator->Next();
                 }
-                size_t usize = keySizes[i];
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    i += 1;
-                    offset += usize;
-                    continue;
-                }
-                std::memcpy(umem, key.data(), key.size());
-                keySizes[i] = key.size();
-                offset += usize;
-                i += 1;
             }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
+        }
 
-        } else { // if packed
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t offset = 0;
+        bool buf_too_small = false;
 
-            using iterator = decltype(m_db.begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
-            } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+        while(iterator->Valid() && i < max) {
+            auto key = iterator->key();
+            if(!key.starts_with(prefixSlice)) {
+                iterator->Next();
+                continue;
             }
-            const auto end = m_db.end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            bool buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto umem = static_cast<char*>(keys.data) + offset;
+            size_t usize = keySizes[i];
+            auto umem = static_cast<char*>(keys.data) + offset;
+            if(packed) {
                 if(keys.size - offset < key.size() || buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                     buf_too_small = true;
@@ -360,16 +328,25 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                     keySizes[i] = key.size();
                     offset += key.size();
                 }
-                i += 1;
+            } else {
+                if(usize < key.size()) {
+                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    offset += usize;
+                } else {
+                    std::memcpy(umem, key.data(), key.size());
+                    keySizes[i] = key.size();
+                    offset += usize;
+                }
             }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
+            i += 1;
+            iterator->Next();
         }
+        keys.size = offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
+        delete iterator;
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status listKeyValues(bool packed,
@@ -379,86 +356,43 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
-#if 0
-        ScopedReadLock lock(m_lock);
 
-        if(!packed) {
+        auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
+        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
-            using iterator = decltype(m_db.begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
-            } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
-            }
-            const auto end = m_db.end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
+        leveldb::ReadOptions options; // TODO add options from config
+        auto iterator = m_db->NewIterator(options);
+        if(fromKey.size == 0) {
+            iterator->SeekToFirst();
+        } else {
+            iterator->Seek(fromKeySlice);
+            if(!inclusive) {
+                if(iterator->key().compare(fromKeySlice) == 0) {
+                    iterator->Next();
                 }
-                size_t key_usize = keySizes[i];
-                size_t val_usize = valSizes[i];
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                }
-                key_offset += key_usize;
-                val_offset += val_usize;
-                i += 1;
             }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
+        }
 
-        } else { // if packed
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t key_offset = 0;
+        size_t val_offset = 0;
+        bool key_buf_too_small = false;
+        bool val_buf_too_small = false;
 
-            using iterator = decltype(m_db.begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
-            } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+        while(iterator->Valid() && i < max) {
+            auto key = iterator->key();
+            if(!key.starts_with(prefixSlice)) {
+                iterator->Next();
+                continue;
             }
-            const auto end = m_db.end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            bool key_buf_too_small = false;
-            bool val_buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_buf_too_small
-                || keys.size - key_offset < key.size()) {
+            auto val = iterator->value();
+            size_t key_usize = keySizes[i];
+            size_t val_usize = valSizes[i];
+            auto key_umem = static_cast<char*>(keys.data) + key_offset;
+            auto val_umem = static_cast<char*>(vals.data) + val_offset;
+            if(packed) {
+                if(keys.size - key_offset < key.size() || key_buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                     key_buf_too_small = true;
                 } else {
@@ -466,8 +400,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                     keySizes[i] = key.size();
                     key_offset += key.size();
                 }
-                if(val_buf_too_small
-                || vals.size - val_offset < val.size()) {
+                if(vals.size - val_offset < val.size() || val_buf_too_small) {
                     valSizes[i] = RKV_SIZE_TOO_SMALL;
                     val_buf_too_small = true;
                 } else {
@@ -475,19 +408,35 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                     valSizes[i] = val.size();
                     val_offset += val.size();
                 }
-                i += 1;
+            } else {
+                if(key_usize < key.size()) {
+                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    key_offset += key_usize;
+                } else {
+                    std::memcpy(key_umem, key.data(), key.size());
+                    keySizes[i] = key.size();
+                    key_offset += key_usize;
+                }
+                if(val_usize < val.size()) {
+                    valSizes[i] = RKV_SIZE_TOO_SMALL;
+                    val_offset += val_usize;
+                } else {
+                    std::memcpy(val_umem, val.data(), val.size());
+                    valSizes[i] = val.size();
+                    val_offset += val_usize;
+                }
             }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
-
+            i += 1;
+            iterator->Next();
         }
+        keys.size = key_offset;
+        vals.size = val_offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+            valSizes[i] = RKV_NO_MORE_KEYS;
+        }
+        delete iterator;
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     ~LevelDBKeyValueStore() {
