@@ -14,6 +14,13 @@ set (backend-src-files
      backends/backends.cpp
      backends/map.cpp)
 
+set(DB_DEPENDENCIES "")
+
+if (ENABLE_LEVELDB)
+    list (APPEND backend-src-files backends/leveldb.cpp)
+    list (APPEND DB_DEPENDENCIES PkgConfig::leveldb stdc++fs)
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp
@@ -45,6 +52,7 @@ target_link_libraries (rkv-server
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE nlohmann_json
+    PRIVATE ${DB_DEPENDENCIES}
     PRIVATE coverage_config)
 target_include_directories (rkv-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (rkv-server BEFORE PUBLIC

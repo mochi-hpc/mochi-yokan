@@ -7,18 +7,19 @@
 #include <margo.h>
 #include <rkv/rkv-server.h>
 #include <rkv/rkv-admin.h>
+#include "available-backends.h"
 #include "munit/munit.h"
 
 struct test_context {
     margo_instance_id mid;
     hg_addr_t         addr;
+    const char*       backend_type;
+    const char*       backend_config;
 };
 
 static const char* valid_token = "ABCDEFGH";
 static const char* wrong_token = "HGFEDCBA";
 static const uint16_t provider_id = 42;
-static const char* backend_config = "{ \"foo\" : \"bar\" }";
-
 
 static void* test_context_setup(const MunitParameter params[], void* user_data)
 {
@@ -47,6 +48,8 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     munit_assert_not_null(context);
     context->mid  = mid;
     context->addr = addr;
+    context->backend_type = munit_parameters_get(params, "backend");
+    context->backend_config = find_backend_config_for(context->backend_type);
     return context;
 }
 
@@ -112,9 +115,10 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     ret = rkv_admin_init(context->mid, &admin);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
-    // test that we can open a database with type "map"
+    // test that we can open a database with correct type
     ret = rkv_open_database(admin, context->addr,
-            provider_id, valid_token, "map", backend_config, &id);
+            provider_id, valid_token, context->backend_type,
+            context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // test that we can list the databases
@@ -140,7 +144,8 @@ static MunitResult test_database(const MunitParameter params[], void* data)
 
     // reopen a database
     ret = rkv_open_database(admin, context->addr,
-            provider_id, valid_token, "map", backend_config, &id);
+            provider_id, valid_token, context->backend_type,
+            context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // test that we can destroy the database we just created
@@ -176,27 +181,31 @@ static MunitResult test_invalid(const MunitParameter params[], void* data)
 
     // test that calling the wrong provider id leads to an error
     ret = rkv_open_database(admin, context->addr,
-            provider_id + 1, valid_token, "map", backend_config, &id);
+            provider_id + 1, valid_token, context->backend_type,
+            context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
 
     // test that calling with the wrong token leads to an error
     ret = rkv_open_database(admin, context->addr,
-            provider_id, wrong_token, "map", backend_config, &id);
+            provider_id, wrong_token, context->backend_type,
+            context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_TOKEN);
 
     // test that calling with the wrong config leads to an error
     ret = rkv_open_database(admin, context->addr,
-            provider_id, valid_token, "map", "{ashqw{", &id);
+            provider_id, valid_token, context->backend_type,
+            "{ashqw{", &id);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_CONFIG);
 
     // test that calling with an unknown backend leads to an error
     ret = rkv_open_database(admin, context->addr,
-            provider_id, valid_token, "blah", backend_config, &id);
+            provider_id, valid_token, "blah", context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_BACKEND);
 
     // this creation should be successful
     ret = rkv_open_database(admin, context->addr,
-            provider_id, valid_token, "map", backend_config, &id);
+            provider_id, valid_token, context->backend_type,
+            context->backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // check that list with invalid token will fail
@@ -235,15 +244,20 @@ static MunitResult test_invalid(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitParameterEnum test_params[] = {
+  { (char*)"backend", (char**)available_backends },
+  { NULL, NULL }
+};
+
 static MunitTest test_suite_tests[] = {
     { (char*) "/admin", test_admin,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/admin/two", test_two_admins,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/database", test_database,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/invalid", test_invalid,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

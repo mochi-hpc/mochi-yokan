@@ -13,8 +13,6 @@ static void* test_erase_context_setup(const MunitParameter params[], void* user_
     auto context = static_cast<test_context*>(
         test_common_context_setup(params, user_data));
 
-    rkv_return_t ret;
-
     auto count = context->reference.size();
     std::vector<const void*> kptrs;
     std::vector<size_t>      ksizes;
@@ -37,9 +35,8 @@ static void* test_erase_context_setup(const MunitParameter params[], void* user_
         vsizes.push_back(vsize);
     }
 
-    ret = rkv_put_multi(context->dbh, kptrs.size(), kptrs.data(), ksizes.data(),
-                                      vptrs.data(), vsizes.data());
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    rkv_put_multi(context->dbh, kptrs.size(), kptrs.data(), ksizes.data(),
+                  vptrs.data(), vsizes.data());
 
     return context;
 }
@@ -59,6 +56,7 @@ static MunitResult test_erase(const MunitParameter params[], void* data)
             auto key = p.first.data();
             auto ksize = p.first.size();
             ret = rkv_erase(dbh, key, ksize);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, RKV_SUCCESS);
         }
         i += 1;
@@ -71,6 +69,7 @@ static MunitResult test_erase(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         uint8_t flag = 0;
         ret = rkv_exists(dbh, key, ksize, &flag);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
         munit_assert_int(flag, ==, (i % 2 != 0));
         i += 1;
@@ -88,9 +87,11 @@ static MunitResult test_erase_empty_keys(const MunitParameter params[], void* da
     rkv_return_t ret;
 
     ret = rkv_erase(dbh, "abc", 0);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     ret = rkv_erase(dbh, nullptr, 0);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     return MUNIT_OK;
@@ -125,6 +126,7 @@ static MunitResult test_erase_multi(const MunitParameter params[], void* data)
     ret = rkv_erase_multi(dbh, ksizes.size(),
                           kptrs.data(),
                           ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // check which keys now exist
@@ -134,6 +136,7 @@ static MunitResult test_erase_multi(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         uint8_t flag = 0;
         ret = rkv_exists(dbh, key, ksize, &flag);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
         munit_assert_int(flag, ==, (i % 2 != 0));
         i += 1;
@@ -142,6 +145,7 @@ static MunitResult test_erase_multi(const MunitParameter params[], void* data)
     // check with all NULL
     ret = rkv_erase_multi(dbh, 0, NULL, NULL);
     munit_assert_int(ret, ==, RKV_SUCCESS);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
 
     return MUNIT_OK;
 }
@@ -176,11 +180,14 @@ static MunitResult test_erase_multi_empty_key(const MunitParameter params[], voi
     }
 
     ret = rkv_erase_multi(dbh, kptrs.size(), kptrs.data(), ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     // check with invalid keys or ksizes
     ret = rkv_erase_multi(dbh, kptrs.size(), nullptr, ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     ret = rkv_erase_multi(dbh, kptrs.size(), kptrs.data(), nullptr);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
@@ -210,6 +217,7 @@ static MunitResult test_erase_packed(const MunitParameter params[], void* data)
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            packed_keys.data(),
                            packed_ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     // check which keys now exist
@@ -219,6 +227,7 @@ static MunitResult test_erase_packed(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         uint8_t flag = 0;
         ret = rkv_exists(dbh, key, ksize, &flag);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
         munit_assert_int(flag, ==, (i % 2 != 0));
         i += 1;
@@ -227,6 +236,7 @@ static MunitResult test_erase_packed(const MunitParameter params[], void* data)
     // check with all NULL
 
     ret = rkv_erase_packed(dbh, 0, NULL, NULL);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     return MUNIT_OK;
@@ -258,16 +268,19 @@ static MunitResult test_erase_packed_empty_key(const MunitParameter params[], vo
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            packed_keys.data(),
                            packed_ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     // other invalid args test cases
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            nullptr,
                            packed_ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            packed_keys.data(),
                            nullptr);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     // erase packed with all the keys of size 0
@@ -275,9 +288,8 @@ static MunitResult test_erase_packed_empty_key(const MunitParameter params[], vo
     ret = rkv_erase_packed(dbh, packed_ksizes.size(),
                            packed_keys.data(),
                            packed_ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
-
-
 
     return MUNIT_OK;
 }
@@ -337,14 +349,17 @@ static MunitResult test_erase_bulk(const MunitParameter params[], void* data)
 
     ret = rkv_erase_bulk(dbh, ksizes.size(), addr_str, bulk,
                          garbage_size, useful_size);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     ret = rkv_erase_bulk(dbh, ksizes.size(), nullptr, bulk,
                          garbage_size, useful_size);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     ret = rkv_erase_bulk(dbh, ksizes.size(), "invalid-address", bulk,
                          garbage_size, useful_size);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_FROM_MERCURY);
 
     /* first invalid size (covers key sizes,
@@ -352,11 +367,13 @@ static MunitResult test_erase_bulk(const MunitParameter params[], void* data)
     auto invalid_size = seg_sizes[1] + 1;
     ret = rkv_erase_bulk(dbh, ksizes.size(), nullptr, bulk,
                          garbage_size, invalid_size);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     // check with a size of 0
     ret = rkv_erase_bulk(dbh, ksizes.size(), nullptr, bulk,
                          garbage_size, 0);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
 
     hret = margo_bulk_free(bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
@@ -365,6 +382,7 @@ static MunitResult test_erase_bulk(const MunitParameter params[], void* data)
 }
 
 static MunitParameterEnum test_params[] = {
+  { (char*)"backend", (char**)available_backends },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },

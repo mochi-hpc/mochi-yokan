@@ -80,13 +80,14 @@ struct BitField {
  * @brief Status returned by all the backend functions.
  */
 enum class Status : uint8_t {
-    OK          = RKV_SUCCESS,
-    InvalidType = RKV_ERR_INVALID_BACKEND,
-    InvalidConf = RKV_ERR_INVALID_CONFIG,
-    InvalidArg  = RKV_ERR_INVALID_ARGS,
-    NotFound    = RKV_ERR_KEY_NOT_FOUND,
-    SizeError   = RKV_ERR_BUFFER_SIZE,
-    KeyExists   = RKV_ERR_KEY_EXISTS
+    OK           = RKV_SUCCESS,
+    InvalidType  = RKV_ERR_INVALID_BACKEND,
+    InvalidConf  = RKV_ERR_INVALID_CONFIG,
+    InvalidArg   = RKV_ERR_INVALID_ARGS,
+    NotFound     = RKV_ERR_KEY_NOT_FOUND,
+    SizeError    = RKV_ERR_BUFFER_SIZE,
+    KeyExists    = RKV_ERR_KEY_EXISTS,
+    NotSupported = RKV_ERR_OP_UNSUPPORTED
 };
 
 /**

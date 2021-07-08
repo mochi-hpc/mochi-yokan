@@ -9,18 +9,18 @@
 #include <rkv/rkv-admin.h>
 #include <rkv/rkv-client.h>
 #include <rkv/rkv-database.h>
+#include "available-backends.h"
 #include "munit/munit.h"
 
 struct test_context {
-    margo_instance_id   mid;
-    hg_addr_t           addr;
+    margo_instance_id mid;
+    hg_addr_t         addr;
     rkv_admin_t       admin;
     rkv_database_id_t id;
 };
 
 static const char* token = "ABCDEFGH";
 static const uint16_t provider_id = 42;
-static const char* backend_config = "{ \"foo\" : \"bar\" }";
 
 static void* test_context_setup(const MunitParameter params[], void* user_data)
 {
@@ -31,6 +31,8 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     hg_addr_t         addr;
     rkv_admin_t       admin;
     rkv_database_id_t id;
+    const char* backend_type = munit_parameters_get(params, "backend");
+    const char* backend_config = find_backend_config_for(backend_type);
     // create margo instance
     mid = margo_init("ofi+tcp", MARGO_SERVER_MODE, 0, 0);
     munit_assert_not_null(mid);
@@ -52,7 +54,8 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // open a database using the admin
     ret = rkv_open_database(admin, addr,
-            provider_id, token, "map", backend_config, &id);
+            provider_id, token, backend_type,
+            backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // create test context
     struct test_context* context = (struct test_context*)calloc(1, sizeof(*context));
@@ -164,13 +167,18 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitParameterEnum test_params[] = {
+  { (char*)"backend", (char**)available_backends },
+  { NULL, NULL }
+};
+
 static MunitTest test_suite_tests[] = {
     { (char*) "/client", test_client,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/client/two", test_two_clients,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/database", test_database,
-        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, NULL },
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

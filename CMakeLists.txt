@@ -15,6 +15,7 @@ add_library(coverage_config INTERFACE)
 option (ENABLE_COVERAGE "Enable coverage reporting" OFF)
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_BEDROCK  "Build bedrock module" OFF)
+option (ENABLE_LEVELDB  "Build with leveldb support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -60,6 +61,11 @@ pkg_check_modules (margo REQUIRED IMPORTED_TARGET margo)
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
 # search for json-c
 pkg_check_modules (json-c REQUIRED IMPORTED_TARGET json-c)
+
+if (ENABLE_LEVELDB)
+    pkg_check_modules (leveldb REQUIRED IMPORTED_TARGET leveldb)
+    set (HAS_LEVELDB ON)
+endif ()
 
 # library version set here (e.g. for shared libs).
 set (RKV_VERSION_MAJOR 0)

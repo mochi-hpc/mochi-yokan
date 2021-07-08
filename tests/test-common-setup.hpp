@@ -9,6 +9,7 @@
 #include <rkv/rkv-admin.h>
 #include <rkv/rkv-client.h>
 #include <rkv/rkv-database.h>
+#include "available-backends.h"
 #include "munit/munit.h"
 #include <unordered_map>
 #include <string>
@@ -31,7 +32,6 @@ struct test_context {
 };
 
 static const uint16_t provider_id = 42;
-static const char* backend_config = "{ \"foo\" : \"bar\" }";
 
 static void* test_common_context_setup(const MunitParameter params[], void* user_data)
 {
@@ -52,6 +52,8 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     const char* min_val_size = munit_parameters_get(params, "min-val-size");
     const char* max_val_size = munit_parameters_get(params, "max-val-size");
     const char* num_keyvals  = munit_parameters_get(params, "num-keyvals");
+    const char* backend_type = munit_parameters_get(params, "backend");
+    const char* backend_config = find_backend_config_for(backend_type);
     if(min_key_size) g_min_key_size = std::atol(min_key_size);
     if(max_key_size) g_max_key_size = std::atol(max_key_size);
     if(min_val_size) g_min_val_size = std::atol(min_key_size);
@@ -82,7 +84,7 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // open a database using the admin
     ret = rkv_open_database(admin, addr,
-            provider_id, NULL, "map", backend_config, &id);
+            provider_id, NULL, backend_type, backend_config, &id);
     munit_assert_int(ret, ==, RKV_SUCCESS);
     // create a client
     ret = rkv_client_init(mid, &client);

@@ -6,4 +6,10 @@ spack:
   - nlohmann-json
   - mochi-margo
   - mercury~boostsys ^libfabric fabrics=tcp,rxm
+  - leveldb@1.22
+#  - berkeley-db +cxx +stl
+#  - lmdb
+#  - rocksdb
+#  - gdbm
+#  - tkrzw
   concretization: together

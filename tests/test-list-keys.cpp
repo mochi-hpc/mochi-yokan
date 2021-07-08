@@ -61,8 +61,6 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     }
     base_context->reference.clear();
 
-    rkv_return_t ret;
-
     auto count = context->ordered_ref.size();
     std::vector<const void*> kptrs;
     std::vector<size_t>      ksizes;
@@ -85,10 +83,9 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
         vsizes.push_back(vsize);
     }
 
-    ret = rkv_put_multi(base_context->dbh, count,
-                        kptrs.data(), ksizes.data(),
-                        vptrs.data(), vsizes.data());
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    rkv_put_multi(base_context->dbh, count,
+                  kptrs.data(), ksizes.data(),
+                  vptrs.data(), vsizes.data());
 
     return context;
 }
@@ -141,6 +138,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 count,
                 kptrs.data(),
                 ksizes.data());
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
         }
         if(prefix.size() > 0) {
@@ -153,6 +151,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 count,
                 kptrs.data(),
                 ksizes.data());
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
         }
 
@@ -166,6 +165,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 count,
                 kptrs.data(),
                 ksizes.data());
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
         for(unsigned j = 0; j < count; j++) {
@@ -196,6 +196,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
             0,
             nullptr,
             nullptr);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     return MUNIT_OK;
@@ -246,6 +247,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
                 count,
                 kptrs.data(),
                 ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     for(unsigned j = 0; j < count; j++) {
@@ -273,6 +275,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
                 count,
                 kptrs.data(),
                 ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     return MUNIT_OK;
@@ -317,6 +320,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 packed_keys.data(),
                 count*g_max_key_size,
                 packed_ksizes.data());
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
         }
         if(prefix.size() > 0) {
@@ -330,6 +334,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 packed_keys.data(),
                 count*g_max_key_size,
                 packed_ksizes.data());
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
         }
 
@@ -344,6 +349,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 packed_keys.data(),
                 count*g_max_key_size,
                 packed_ksizes.data());
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
         size_t offset = 0;
@@ -413,6 +419,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
             packed_keys.data(),
             buf_size,
             packed_ksizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_SUCCESS);
 
     size_t offset = 0;
@@ -497,6 +504,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                     sizes.data(),
                     HG_BULK_READWRITE,
                     &data);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(hret, ==, HG_SUCCESS);
         }
 
@@ -509,6 +517,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                 garbage_size,
                 packed_keys.size(),
                 true, 0);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
         // test with actual count
@@ -520,6 +529,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                 garbage_size,
                 packed_keys.size(),
                 true, count);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, RKV_SUCCESS);
 
         hret = margo_bulk_free(data);
@@ -559,6 +569,7 @@ static char* prefix_params[] = {
 };
 
 static MunitParameterEnum test_params[] = {
+  { (char*)"backend", (char**)available_backends },
   { (char*)"inclusive", inclusive_params },
   { (char*)"prefix", prefix_params },
   { (char*)"min-key-size", NULL },
