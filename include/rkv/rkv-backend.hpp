@@ -87,7 +87,10 @@ enum class Status : uint8_t {
     NotFound     = RKV_ERR_KEY_NOT_FOUND,
     SizeError    = RKV_ERR_BUFFER_SIZE,
     KeyExists    = RKV_ERR_KEY_EXISTS,
-    NotSupported = RKV_ERR_OP_UNSUPPORTED
+    NotSupported = RKV_ERR_OP_UNSUPPORTED,
+    Corruption   = RKV_ERR_CORRUPTION,
+    IOError      = RKV_ERR_IO,
+    Other        = RKV_ERR_OTHER
 };
 
 /**

@@ -19,53 +19,19 @@ namespace rkv {
 
 using json = nlohmann::json;
 
-#if 0
-struct MapKeyValueStoreCompare {
-
-    // LCOV_EXCL_START
-    static bool DefaultMemCmp(const void* lhs, size_t lhsize,
-                              const void* rhs, size_t rhsize) {
-        auto r = std::memcmp(lhs, rhs, std::min(lhsize, rhsize));
-        if(r < 0) return true;
-        if(r > 0) return false;
-        if(lhsize < rhsize)
-            return true;
-        return false;
-    }
-    // LCOV_EXCL_STOP
-
-    using cmp_type = bool (*)(const void*, size_t, const void*, size_t);
-
-    cmp_type cmp = &DefaultMemCmp;
-
-    MapKeyValueStoreCompare() = default;
-
-    MapKeyValueStoreCompare(cmp_type comparator)
-    : cmp(comparator) {}
-
-    bool operator()(const std::string& lhs, const std::string& rhs) const {
-        return cmp(lhs.data(), lhs.size(), rhs.data(), rhs.size());
-    }
-
-    bool operator()(const std::string& lhs, const UserMem& rhs) const {
-        return cmp(lhs.data(), lhs.size(), rhs.data, rhs.size);
-    }
-
-    bool operator()(const UserMem& lhs, const std::string& rhs) const {
-        return cmp(lhs.data, lhs.size, rhs.data(), rhs.size());
-    }
-
-    bool operator()(const UserMem& lhs, const UserMem& rhs) const {
-        return cmp(lhs.data, lhs.size, rhs.data, rhs.size);
-    }
-
-    using is_transparent = int;
-};
-#endif
-
 class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
     public:
+
+    static inline Status convertStatus(const leveldb::Status& s) {
+        if(s.ok()) return Status::OK;
+        if(s.IsNotFound()) return Status::NotFound;
+        if(s.IsCorruption()) return Status::Corruption;
+        if(s.IsIOError()) return Status::IOError;
+        if(s.IsNotSupportedError()) return Status::NotSupported;
+        if(s.IsInvalidArgument()) return Status::InvalidArg;
+        return Status::Other;
+    }
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
@@ -101,7 +67,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         leveldb::Status status;
         leveldb::DB* db = nullptr;
         status = leveldb::DB::Open(options, path, &db);
-        // TODO properly handle status
+        if(!status.ok())
+            return convertStatus(status);
 
         *kvs = new LevelDBKeyValueStore(db, std::move(cfg));
 
@@ -159,7 +126,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             } else if(status.IsNotFound()) {
                 vsizes[i] = KeyNotFound;
             } else {
-                // TODO handle other types of status
+                return convertStatus(status);
             }
             offset += ksizes[i];
         }
@@ -198,10 +165,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         }
         // TODO add an option in the config to pass sync=true to WriteOptions
         auto status = m_db->Write(leveldb::WriteOptions(), &wb);
-        // TODO do something with status
-        (void)status;
-
-        return Status::OK;
+        return convertStatus(status);
     }
 
     virtual Status get(bool packed, const UserMem& keys,
@@ -233,7 +197,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                         vsizes[i] = value.size();
                     }
                 } else {
-                    // TODO handle other leveldb status
+                    return convertStatus(status);
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -260,7 +224,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                         val_offset += vsizes[i];
                     }
                 } else {
-                    // TODO handle other leveldb status
+                    convertStatus(status);
                 }
                 key_offset += ksizes[i];
             }
@@ -282,8 +246,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         leveldb::WriteOptions options;
         // TODO add options from the configuration
         auto status = m_db->Write(options, &wb);
-        // TODO handle status properly
-        return Status::OK;
+        return convertStatus(status);
     }
 
     virtual Status listKeys(bool packed, const UserMem& fromKey,
