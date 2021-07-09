@@ -43,22 +43,43 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         // fill options and complete configuration
         leveldb::Options options;
 
-#define SET_AND_COMPLETE(__field__, __value__) \
-        options.__field__ = cfg.value(#__field__, __value__); \
-        cfg[#__field__] = options.__field__
+#define SET_AND_COMPLETE(__json__, __field__, __value__)               \
+        do { try {                                                     \
+            options.__field__ = __json__.value(#__field__, __value__); \
+            __json__[#__field__] = options.__field__;                  \
+        } catch(...) {                                                 \
+            return Status::InvalidConf;                                \
+        } } while(0)
 
-        SET_AND_COMPLETE(create_if_missing, false);
-        SET_AND_COMPLETE(error_if_exists, false);
-        SET_AND_COMPLETE(paranoid_checks, false);
-        SET_AND_COMPLETE(write_buffer_size, (size_t)(4*1024*1024));
-        SET_AND_COMPLETE(max_open_files, 1000);
-        SET_AND_COMPLETE(block_size, (size_t)(4*1024));
-        SET_AND_COMPLETE(block_restart_interval, 16);
-        SET_AND_COMPLETE(max_file_size, (size_t)(2*1024*1024));
-        SET_AND_COMPLETE(reuse_logs, false);
-        options.compression = cfg.value("compression", true) ?
-            leveldb::kSnappyCompression : leveldb::kNoCompression;
-        cfg["compression"] = options.compression == leveldb::kSnappyCompression;
+#define CHECK_AND_ADD_MISSING(__json__, __field__, __type__, __default__) \
+        do { if(!__json__.contains(__field__)) {                          \
+            __json__[__field__] = __default__;                            \
+        } else if(!__json__[__field__].is_##__type__()) {                 \
+            return Status::InvalidConf;                                   \
+        } } while(0)
+
+        SET_AND_COMPLETE(cfg, create_if_missing, false);
+        SET_AND_COMPLETE(cfg, error_if_exists, false);
+        SET_AND_COMPLETE(cfg, paranoid_checks, false);
+        SET_AND_COMPLETE(cfg, write_buffer_size, (size_t)(4*1024*1024));
+        SET_AND_COMPLETE(cfg, max_open_files, 1000);
+        SET_AND_COMPLETE(cfg, block_size, (size_t)(4*1024));
+        SET_AND_COMPLETE(cfg, block_restart_interval, 16);
+        SET_AND_COMPLETE(cfg, max_file_size, (size_t)(2*1024*1024));
+        SET_AND_COMPLETE(cfg, reuse_logs, false);
+        try {
+            options.compression = cfg.value("compression", true) ?
+                leveldb::kSnappyCompression : leveldb::kNoCompression;
+            cfg["compression"] = options.compression == leveldb::kSnappyCompression;
+        } catch(...) {
+            return Status::InvalidConf;
+        }
+        CHECK_AND_ADD_MISSING(cfg, "read_options", object, json::object());
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "verify_checksums", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "fill_cache", boolean, true);
+        CHECK_AND_ADD_MISSING(cfg, "write_options", object, json::object());
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "sync", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg, "use_write_batch", boolean, false);
         // TODO set logger, env, block_cache, and filter_policy
         std::string path = cfg.value("path", "");
         if(path.empty()) {
@@ -99,11 +120,10 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         size_t offset = 0;
         std::string value;
         // TODO enable more read options in config
-        leveldb::ReadOptions options;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const leveldb::Slice key{ keys.data + offset, ksizes[i] };
-            flags[i] = m_db->Get(options, key, &value).ok();
+            flags[i] = m_db->Get(m_read_options, key, &value).ok();
             offset += ksizes[i];
         }
         return Status::OK;
@@ -116,11 +136,10 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         size_t offset = 0;
         std::string value;
         // TODO enable more read options in config
-        leveldb::ReadOptions options;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const leveldb::Slice key{ keys.data + offset, ksizes[i] };
-            auto status = m_db->Get(options, key, &value);
+            auto status = m_db->Get(m_read_options, key, &value);
             if(status.ok()) {
                 vsizes[i] = value.size();
             } else if(status.IsNotFound()) {
@@ -152,20 +171,30 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
-        // TODO I don't know if using a WriteBatch is more efficient than
-        // looping over the key/value pairs and call Put directly on the
-        // database, so I should add an option in the config to allow this.
-        leveldb::WriteBatch wb;
+        if(m_use_write_batch) {
+            leveldb::WriteBatch wb;
 
-        for(size_t i = 0; i < ksizes.size; i++) {
-            wb.Put(leveldb::Slice{ keys.data + key_offset, ksizes[i] },
-                   leveldb::Slice{ vals.data + val_offset, vsizes[i] });
-            key_offset += ksizes[i];
-            val_offset += vsizes[i];
+            for(size_t i = 0; i < ksizes.size; i++) {
+                wb.Put(leveldb::Slice{ keys.data + key_offset, ksizes[i] },
+                       leveldb::Slice{ vals.data + val_offset, vsizes[i] });
+                key_offset += ksizes[i];
+                val_offset += vsizes[i];
+            }
+            auto status = m_db->Write(m_write_options, &wb);
+            return convertStatus(status);
+
+        } else {
+            for(size_t i = 0; i < ksizes.size; i++) {
+                auto status = m_db->Put(m_write_options,
+                          leveldb::Slice{ keys.data + key_offset, ksizes[i] },
+                          leveldb::Slice{ vals.data + val_offset, vsizes[i] });
+                key_offset += ksizes[i];
+                val_offset += vsizes[i];
+                if(!status.ok())
+                    return convertStatus(status);
+            }
         }
-        // TODO add an option in the config to pass sync=true to WriteOptions
-        auto status = m_db->Write(leveldb::WriteOptions(), &wb);
-        return convertStatus(status);
+        return Status::OK;;
     }
 
     virtual Status get(bool packed, const UserMem& keys,
@@ -178,14 +207,12 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         size_t val_offset = 0;
 
         std::string value;
-        // TODO add "verify_checksum and "fill_cache" in configuration
-        leveldb::ReadOptions options;
 
         if(!packed) {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
-                auto status = m_db->Get(options, key, &value);
+                auto status = m_db->Get(m_read_options, key, &value);
                 const auto original_vsize = vsizes[i];
                 if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
@@ -209,7 +236,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
-                auto status = m_db->Get(options, key, &value);
+                auto status = m_db->Get(m_read_options, key, &value);
                 if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
                 } else if(status.ok()) {
@@ -243,9 +270,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             wb.Delete(key);
             offset += ksizes[i];
         }
-        leveldb::WriteOptions options;
-        // TODO add options from the configuration
-        auto status = m_db->Write(options, &wb);
+        auto status = m_db->Write(m_write_options, &wb);
         return convertStatus(status);
     }
 
@@ -256,8 +281,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
         auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
-        leveldb::ReadOptions options; // TODO add options from config
-        auto iterator = m_db->NewIterator(options);
+        auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
@@ -323,8 +347,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
         auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
-        leveldb::ReadOptions options; // TODO add options from config
-        auto iterator = m_db->NewIterator(options);
+        auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
@@ -410,10 +433,18 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
     LevelDBKeyValueStore(leveldb::DB* db, json&& cfg)
     : m_db(db)
-    , m_config(std::move(cfg)) {}
+    , m_config(std::move(cfg)) {
+        m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
+        m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
+        m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
+        m_use_write_batch = m_config["use_write_batch"].get<bool>();
+    }
 
-    leveldb::DB* m_db;
-    json m_config;
+    leveldb::DB*          m_db;
+    json                  m_config;
+    leveldb::ReadOptions  m_read_options;
+    leveldb::WriteOptions m_write_options;
+    bool                  m_use_write_batch;
 };
 
 }
