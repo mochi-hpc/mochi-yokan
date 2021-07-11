@@ -151,6 +151,7 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         CHECK_AND_ADD_MISSING(cfg["write_options"], "memtable_insert_hint_per_batch", boolean, false);
 
         CHECK_AND_ADD_MISSING(cfg["write_options"], "use_write_batch", boolean, false);
+
         // TODO set logger, env, block_cache, and filter_policy...
         if(cfg.contains("db_paths")) {
             auto& db_paths = cfg["db_paths"];
@@ -209,13 +210,13 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
         if(ksizes.size > flags.size) return Status::InvalidArg;
+        auto count = ksizes.size;
         size_t offset = 0;
-        std::string value;
-        // TODO enable more read options in config
-        for(size_t i = 0; i < ksizes.size; i++) {
+        for(size_t i = 0; i < count; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const rocksdb::Slice key{ keys.data + offset, ksizes[i] };
-            flags[i] = m_db->Get(m_read_options, key, &value).ok();
+            rocksdb::PinnableSlice value;
+            flags[i] = m_db->Get(m_read_options, m_db->DefaultColumnFamily(), key, &value).ok();
             offset += ksizes[i];
         }
         return Status::OK;
@@ -226,12 +227,11 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
                           BasicUserMem<size_t>& vsizes) const override {
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
-        std::string value;
-        // TODO enable more read options in config
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const rocksdb::Slice key{ keys.data + offset, ksizes[i] };
-            auto status = m_db->Get(m_read_options, key, &value);
+            rocksdb::PinnableSlice value;
+            auto status = m_db->Get(m_read_options, m_db->DefaultColumnFamily(), key, &value);
             if(status.ok()) {
                 vsizes[i] = value.size();
             } else if(status.IsNotFound()) {
@@ -298,13 +298,12 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         size_t val_offset = 0;
 
-        std::string value;
-
         if(!packed) {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 const rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
-                auto status = m_db->Get(m_read_options, key, &value);
+                rocksdb::PinnableSlice value;
+                auto status = m_db->Get(m_read_options, m_db->DefaultColumnFamily(), key, &value);
                 const auto original_vsize = vsizes[i];
                 if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
@@ -328,7 +327,8 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 const rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
-                auto status = m_db->Get(m_read_options, key, &value);
+                rocksdb::PinnableSlice value;
+                auto status = m_db->Get(m_read_options, m_db->DefaultColumnFamily(), key, &value);
                 if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
                 } else if(status.ok()) {

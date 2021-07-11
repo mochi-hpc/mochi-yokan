@@ -119,7 +119,6 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         std::string value;
-        // TODO enable more read options in config
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const leveldb::Slice key{ keys.data + offset, ksizes[i] };
@@ -135,7 +134,6 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         std::string value;
-        // TODO enable more read options in config
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const leveldb::Slice key{ keys.data + offset, ksizes[i] };
