@@ -42,7 +42,8 @@ static const char* backend_configs[] = {
     "{}",
 #endif
 #ifdef HAS_ROCKSDB
-    "{}",
+    "{\"path\":\"/tmp/rocksdb-test\","
+    " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_GDBM
     "{}",

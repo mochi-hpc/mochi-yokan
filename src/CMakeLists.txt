@@ -21,6 +21,11 @@ if (ENABLE_LEVELDB)
     list (APPEND DB_DEPENDENCIES PkgConfig::leveldb stdc++fs)
 endif ()
 
+if (ENABLE_ROCKSDB)
+    list (APPEND backend-src-files backends/rocksdb.cpp)
+    list (APPEND DB_DEPENDENCIES PkgConfig::rocksdb stdc++fs)
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

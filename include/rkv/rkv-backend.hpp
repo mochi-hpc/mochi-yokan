@@ -90,6 +90,12 @@ enum class Status : uint8_t {
     NotSupported = RKV_ERR_OP_UNSUPPORTED,
     Corruption   = RKV_ERR_CORRUPTION,
     IOError      = RKV_ERR_IO,
+    Incomplete   = RKV_ERR_INCOMPLETE,
+    TimedOut     = RKV_ERR_TIMEOUT,
+    Aborted      = RKV_ERR_ABORTED,
+    Busy         = RKV_ERR_BUSY,
+    Expired      = RKV_ERR_EXPIRED,
+    TryAgain     = RKV_ERR_TRY_AGAIN,
     Other        = RKV_ERR_OTHER
 };
 

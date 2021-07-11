@@ -6,10 +6,10 @@
 #include "rkv/rkv-backend.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
-#include <leveldb/db.h>
-#include <leveldb/comparator.h>
-#include <leveldb/env.h>
-#include <leveldb/write_batch.h>
+#include <rocksdb/db.h>
+#include <rocksdb/comparator.h>
+#include <rocksdb/env.h>
+#include <rocksdb/write_batch.h>
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -19,18 +19,39 @@ namespace rkv {
 
 using json = nlohmann::json;
 
-class LevelDBKeyValueStore : public KeyValueStoreInterface {
+class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
     public:
 
-    static inline Status convertStatus(const leveldb::Status& s) {
-        if(s.ok()) return Status::OK;
-        if(s.IsNotFound()) return Status::NotFound;
-        if(s.IsCorruption()) return Status::Corruption;
-        if(s.IsIOError()) return Status::IOError;
-        if(s.IsNotSupportedError()) return Status::NotSupported;
-        if(s.IsInvalidArgument()) return Status::InvalidArg;
-        return Status::Other;
+    static inline Status convertStatus(const rocksdb::Status& s) {
+        switch(s.code()) {
+        case rocksdb::Status::kOk:
+            return Status::OK;
+        case rocksdb::Status::kNotFound:
+            return Status::NotFound;
+        case rocksdb::Status::kCorruption:
+            return Status::Corruption;
+        case rocksdb::Status::kNotSupported:
+            return Status::NotSupported;
+        case rocksdb::Status::kInvalidArgument:
+            return Status::InvalidArg;
+        case rocksdb::Status::kIOError:
+            return Status::IOError;
+        case rocksdb::Status::kIncomplete:
+            return Status::Incomplete;
+        case rocksdb::Status::kTimedOut:
+            return Status::TimedOut;
+        case rocksdb::Status::kAborted:
+            return Status::Aborted;
+        case rocksdb::Status::kBusy:
+            return Status::Busy;
+        case rocksdb::Status::kExpired:
+            return Status::Expired;
+        case rocksdb::Status::kTryAgain:
+            return Status::TryAgain;
+        default:
+            return Status::Other;
+        }
     }
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
@@ -41,7 +62,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             return Status::InvalidConf;
         }
         // fill options and complete configuration
-        leveldb::Options options;
+        rocksdb::Options options;
 
 #define SET_AND_COMPLETE(__json__, __field__, __value__)               \
         do { try {                                                     \
@@ -59,46 +80,117 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         } } while(0)
 
         SET_AND_COMPLETE(cfg, create_if_missing, false);
+        SET_AND_COMPLETE(cfg, create_missing_column_families, false);
         SET_AND_COMPLETE(cfg, error_if_exists, false);
         SET_AND_COMPLETE(cfg, paranoid_checks, false);
-        SET_AND_COMPLETE(cfg, write_buffer_size, (size_t)(4*1024*1024));
+        SET_AND_COMPLETE(cfg, track_and_verify_wals_in_manifest, false);
+        SET_AND_COMPLETE(cfg, write_buffer_size, (size_t)(64 << 20));
         SET_AND_COMPLETE(cfg, max_open_files, 1000);
-        SET_AND_COMPLETE(cfg, block_size, (size_t)(4*1024));
-        SET_AND_COMPLETE(cfg, block_restart_interval, 16);
-        SET_AND_COMPLETE(cfg, max_file_size, (size_t)(2*1024*1024));
-        SET_AND_COMPLETE(cfg, reuse_logs, false);
-        try {
-            options.compression = cfg.value("compression", true) ?
-                leveldb::kSnappyCompression : leveldb::kNoCompression;
-            cfg["compression"] = options.compression == leveldb::kSnappyCompression;
-        } catch(...) {
-            return Status::InvalidConf;
-        }
+        SET_AND_COMPLETE(cfg, max_file_opening_threads, 16);
+        SET_AND_COMPLETE(cfg, max_total_wal_size, (uint64_t)0);
+        SET_AND_COMPLETE(cfg, use_fsync, false);
+        SET_AND_COMPLETE(cfg, db_log_dir, std::string());
+        SET_AND_COMPLETE(cfg, wal_dir, std::string());
+        SET_AND_COMPLETE(cfg, delete_obsolete_files_period_micros, 6ULL * 60 * 60 * 1000000);
+        SET_AND_COMPLETE(cfg, max_background_jobs, 2);
+        SET_AND_COMPLETE(cfg, base_background_compactions, -1);
+        SET_AND_COMPLETE(cfg, max_background_compactions, -1);
+        SET_AND_COMPLETE(cfg, max_subcompactions, 1);
+        SET_AND_COMPLETE(cfg, max_background_flushes, -1);
+        SET_AND_COMPLETE(cfg, max_log_file_size, 0);
+        SET_AND_COMPLETE(cfg, log_file_time_to_roll, 0);
+        SET_AND_COMPLETE(cfg, keep_log_file_num, 1000);
+        SET_AND_COMPLETE(cfg, recycle_log_file_num, 0);
+        SET_AND_COMPLETE(cfg, max_manifest_file_size, 1024 * 1024 * 1024);
+        SET_AND_COMPLETE(cfg, WAL_ttl_seconds, 0);
+        SET_AND_COMPLETE(cfg, WAL_size_limit_MB, 0);
+        SET_AND_COMPLETE(cfg, manifest_preallocation_size, 4 * 1024 * 1024);
+        SET_AND_COMPLETE(cfg, allow_mmap_reads, false);
+        SET_AND_COMPLETE(cfg, allow_mmap_writes, false);
+        SET_AND_COMPLETE(cfg, use_direct_reads, false);
+        SET_AND_COMPLETE(cfg, use_direct_io_for_flush_and_compaction, false);
+        SET_AND_COMPLETE(cfg, allow_fallocate, true);
+        SET_AND_COMPLETE(cfg, is_fd_close_on_exec, true);
+        SET_AND_COMPLETE(cfg, stats_dump_period_sec, 600);
+        SET_AND_COMPLETE(cfg, stats_persist_period_sec, 600);
+        SET_AND_COMPLETE(cfg, persist_stats_to_disk, false);
+        SET_AND_COMPLETE(cfg, stats_history_buffer_size, (size_t)1024*1024);
+        SET_AND_COMPLETE(cfg, advise_random_on_open, true);
+        SET_AND_COMPLETE(cfg, db_write_buffer_size, (size_t)0);
+        // TODO access_hint_on_compaction_start enumerator
+        SET_AND_COMPLETE(cfg, new_table_reader_for_compaction_inputs, false);
+        SET_AND_COMPLETE(cfg, compaction_readahead_size, (size_t)0);
+        // TODO many more options
+        SET_AND_COMPLETE(cfg, level0_file_num_compaction_trigger, 4);
+        SET_AND_COMPLETE(cfg, max_bytes_for_level_base, 256 * 1048576);
+        SET_AND_COMPLETE(cfg, snap_refresh_nanos, 0);
+        SET_AND_COMPLETE(cfg, disable_auto_compactions, false);
+
+        // TODO handle compression and compression options
+
         CHECK_AND_ADD_MISSING(cfg, "read_options", object, json::object());
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "readahead_size", number_unsigned, 0);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "max_skippable_internal_keys", number_unsigned, 0);
         CHECK_AND_ADD_MISSING(cfg["read_options"], "verify_checksums", boolean, false);
         CHECK_AND_ADD_MISSING(cfg["read_options"], "fill_cache", boolean, true);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "tailing", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "total_order_seek", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "auto_prefix_mode", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "prefix_same_as_start", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "pin_data", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "background_purge_on_iterator_cleanup", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "ignore_range_deletions", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["read_options"], "value_size_soft_limit", number_unsigned, 0);
+
         CHECK_AND_ADD_MISSING(cfg, "write_options", object, json::object());
         CHECK_AND_ADD_MISSING(cfg["write_options"], "sync", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "disableWAL", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "ignore_missing_column_families", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "no_slowdown", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "low_pri", boolean, false);
+        CHECK_AND_ADD_MISSING(cfg["write_options"], "memtable_insert_hint_per_batch", boolean, false);
+
         CHECK_AND_ADD_MISSING(cfg["write_options"], "use_write_batch", boolean, false);
-        // TODO set logger, env, block_cache, and filter_policy
-        std::string path = cfg.value("path", "");
-        if(path.empty()) {
-            return Status::InvalidConf;
+        // TODO set logger, env, block_cache, and filter_policy...
+        if(cfg.contains("db_paths")) {
+            auto& db_paths = cfg["db_paths"];
+            if(!db_paths.is_array()) {
+                return Status::InvalidConf;
+            }
+            for(auto& p : db_paths) {
+                if(!p.is_object())
+                    return Status::InvalidConf;
+                if(!p.contains("path") || !p.contains("target_size"))
+                    return Status::InvalidConf;
+                if(!p["path"].is_string())
+                    return Status::InvalidConf;
+                if(!p["target_size"].is_number_unsigned())
+                    return Status::InvalidConf;
+                options.db_paths.emplace_back(
+                        p["path"].get<std::string>(),
+                        p["target_size"].get<uint64_t>());
+            }
         }
-        leveldb::Status status;
-        leveldb::DB* db = nullptr;
-        status = leveldb::DB::Open(options, path, &db);
+        if(!cfg.contains("path"))
+            return Status::InvalidConf;
+        if(!cfg["path"].is_string())
+            return Status::InvalidConf;
+        auto path = cfg["path"].get<std::string>();
+
+        rocksdb::Status status;
+        rocksdb::DB* db = nullptr;
+        status = rocksdb::DB::Open(options, path, &db);
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBKeyValueStore(db, std::move(cfg));
+        *kvs = new RocksDBKeyValueStore(db, std::move(cfg));
 
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "leveldb";
+        return "rocksdb";
     }
     // LCOV_EXCL_STOP
 
@@ -122,7 +214,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         // TODO enable more read options in config
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            const leveldb::Slice key{ keys.data + offset, ksizes[i] };
+            const rocksdb::Slice key{ keys.data + offset, ksizes[i] };
             flags[i] = m_db->Get(m_read_options, key, &value).ok();
             offset += ksizes[i];
         }
@@ -138,7 +230,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         // TODO enable more read options in config
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            const leveldb::Slice key{ keys.data + offset, ksizes[i] };
+            const rocksdb::Slice key{ keys.data + offset, ksizes[i] };
             auto status = m_db->Get(m_read_options, key, &value);
             if(status.ok()) {
                 vsizes[i] = value.size();
@@ -172,11 +264,11 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
         if(m_use_write_batch) {
-            leveldb::WriteBatch wb;
+            rocksdb::WriteBatch wb;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                wb.Put(leveldb::Slice{ keys.data + key_offset, ksizes[i] },
-                       leveldb::Slice{ vals.data + val_offset, vsizes[i] });
+                wb.Put(rocksdb::Slice{ keys.data + key_offset, ksizes[i] },
+                       rocksdb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];
             }
@@ -186,8 +278,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         } else {
             for(size_t i = 0; i < ksizes.size; i++) {
                 auto status = m_db->Put(m_write_options,
-                          leveldb::Slice{ keys.data + key_offset, ksizes[i] },
-                          leveldb::Slice{ vals.data + val_offset, vsizes[i] });
+                          rocksdb::Slice{ keys.data + key_offset, ksizes[i] },
+                          rocksdb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];
                 if(!status.ok())
@@ -211,7 +303,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(!packed) {
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                const rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
                 auto status = m_db->Get(m_read_options, key, &value);
                 const auto original_vsize = vsizes[i];
                 if(status.IsNotFound()) {
@@ -235,7 +327,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             size_t val_remaining_size = vals.size;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                const rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
                 auto status = m_db->Get(m_read_options, key, &value);
                 if(status.IsNotFound()) {
                     vsizes[i] = KeyNotFound;
@@ -263,9 +355,9 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status erase(const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         size_t offset = 0;
-        leveldb::WriteBatch wb;
+        rocksdb::WriteBatch wb;
         for(size_t i = 0; i < ksizes.size; i++) {
-            const auto key = leveldb::Slice{ keys.data + offset, ksizes[i] };
+            const auto key = rocksdb::Slice{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             wb.Delete(key);
             offset += ksizes[i];
@@ -278,8 +370,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
-        auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
+        auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
+        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -344,8 +436,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
 
-        auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
+        auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
+        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -425,28 +517,49 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~LevelDBKeyValueStore() {
+    ~RocksDBKeyValueStore() {
         delete m_db;
     }
 
     private:
 
-    LevelDBKeyValueStore(leveldb::DB* db, json&& cfg)
+    RocksDBKeyValueStore(rocksdb::DB* db, json&& cfg)
     : m_db(db)
     , m_config(std::move(cfg)) {
-        m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
-        m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
-        m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
+
+#define GET_OPTION(__opt__, __cfg__, __field__) \
+        __opt__.__field__ = __cfg__[#__field__].get<decltype(__opt__.__field__)>()
+
+        GET_OPTION(m_read_options, m_config["read_options"], readahead_size);
+        GET_OPTION(m_read_options, m_config["read_options"], max_skippable_internal_keys);
+        GET_OPTION(m_read_options, m_config["read_options"], verify_checksums);
+        GET_OPTION(m_read_options, m_config["read_options"], fill_cache);
+        GET_OPTION(m_read_options, m_config["read_options"], tailing);
+        GET_OPTION(m_read_options, m_config["read_options"], total_order_seek);
+        GET_OPTION(m_read_options, m_config["read_options"], auto_prefix_mode);
+        GET_OPTION(m_read_options, m_config["read_options"], prefix_same_as_start);
+        GET_OPTION(m_read_options, m_config["read_options"], pin_data);
+        GET_OPTION(m_read_options, m_config["read_options"], background_purge_on_iterator_cleanup);
+        GET_OPTION(m_read_options, m_config["read_options"], ignore_range_deletions);
+        GET_OPTION(m_read_options, m_config["read_options"], value_size_soft_limit);
+
+        GET_OPTION(m_write_options, m_config["write_options"], sync);
+        GET_OPTION(m_write_options, m_config["write_options"], disableWAL);
+        GET_OPTION(m_write_options, m_config["write_options"], ignore_missing_column_families);
+        GET_OPTION(m_write_options, m_config["write_options"], no_slowdown);
+        GET_OPTION(m_write_options, m_config["write_options"], low_pri);
+        GET_OPTION(m_write_options, m_config["write_options"], memtable_insert_hint_per_batch);
+
         m_use_write_batch = m_config["write_options"]["use_write_batch"].get<bool>();
     }
 
-    leveldb::DB*          m_db;
+    rocksdb::DB*          m_db;
     json                  m_config;
-    leveldb::ReadOptions  m_read_options;
-    leveldb::WriteOptions m_write_options;
+    rocksdb::ReadOptions  m_read_options;
+    rocksdb::WriteOptions m_write_options;
     bool                  m_use_write_batch;
 };
 
 }
 
-RKV_REGISTER_BACKEND(leveldb, rkv::LevelDBKeyValueStore);
+RKV_REGISTER_BACKEND(rocksdb, rkv::RocksDBKeyValueStore);

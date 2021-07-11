@@ -36,6 +36,12 @@ extern "C" {
     X(RKV_ERR_KEY_EXISTS, "Key exists")                \
     X(RKV_ERR_CORRUPTION, "Data corruption")           \
     X(RKV_ERR_IO, "IO error")                          \
+    X(RKV_ERR_INCOMPLETE, "Imcomplete operation")      \
+    X(RKV_ERR_TIMEOUT, "Timeout")                      \
+    X(RKV_ERR_ABORTED, "Operation aborted")            \
+    X(RKV_ERR_BUSY, "Busy")                            \
+    X(RKV_ERR_EXPIRED, "Operation expired")            \
+    X(RKV_ERR_TRY_AGAIN, "Try again")                  \
     X(RKV_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,

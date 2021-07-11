@@ -16,6 +16,7 @@ option (ENABLE_COVERAGE "Enable coverage reporting" OFF)
 option (ENABLE_TESTS    "Build tests" OFF)
 option (ENABLE_BEDROCK  "Build bedrock module" OFF)
 option (ENABLE_LEVELDB  "Build with leveldb support" OFF)
+option (ENABLE_ROCKSDB  "Build with rocksdb support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -65,6 +66,11 @@ pkg_check_modules (json-c REQUIRED IMPORTED_TARGET json-c)
 if (ENABLE_LEVELDB)
     pkg_check_modules (leveldb REQUIRED IMPORTED_TARGET leveldb)
     set (HAS_LEVELDB ON)
+endif ()
+
+if (ENABLE_ROCKSDB)
+    pkg_check_modules (rocksdb REQUIRED IMPORTED_TARGET rocksdb)
+    set (HAS_ROCKSDB ON)
 endif ()
 
 # library version set here (e.g. for shared libs).
