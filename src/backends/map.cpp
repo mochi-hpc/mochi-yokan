@@ -110,12 +110,18 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         json cfg;
         bool use_lock;
         cmp_type cmp = comparator::DefaultMemCmp;
+        rkv_allocator_init_fn key_alloc_init, val_alloc_init;
+        rkv_allocator_t key_alloc, val_alloc;
+        std::string key_alloc_conf, val_alloc_conf;
+
         try {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
+            // check use_lock
             use_lock = cfg.value("use_lock", true);
             cfg["use_lock"] = use_lock;
+            // check comparator field
             if(!cfg.contains("comparator"))
                 cfg["comparator"] = "default";
             auto comparator = cfg.value("comparator", "default");
@@ -123,10 +129,42 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 cmp = Linker::load<cmp_type>(comparator);
             if(cmp == nullptr)
                 return Status::InvalidConf;
+            // check allocators
+            if(!cfg.contains("allocators")) {
+                cfg["allocators"]["key_allocator"] = "default";
+                cfg["allocators"]["value_allocator"] = "default";
+            } else if(!cfg["allocators"].is_object()) {
+                return Status::InvalidConf;
+            }
+            auto& alloc_cfg = cfg["allocators"];
+            // key allocator
+            auto key_allocator_name = alloc_cfg.value("key_allocator", "default");
+            auto key_allocator_config = alloc_cfg.value("key_allocator_config", json::object());
+            alloc_cfg["key_allocator"] = key_allocator_name;
+            alloc_cfg["key_allocator_config"] = key_allocator_config;
+            if(key_allocator_name == "default")
+                key_alloc_init = default_allocator_init;
+            else
+                key_alloc_init = Linker::load<decltype(key_alloc_init)>(key_allocator_name);
+            if(key_alloc_init == nullptr) return Status::InvalidConf;
+            key_alloc_init(&key_alloc, key_allocator_config.dump().c_str());
+
+            // value allocator
+            auto val_allocator_name = alloc_cfg.value("value_allocator", "default");
+            auto val_allocator_config = alloc_cfg.value("value_allocator_config", json::object());
+            alloc_cfg["value_allocator"] = val_allocator_name;
+            alloc_cfg["value_allocator_config"] = val_allocator_config;
+            if(val_allocator_name == "default")
+                val_alloc_init = default_allocator_init;
+            else
+                val_alloc_init = Linker::load<decltype(val_alloc_init)>(val_allocator_name);
+            if(val_alloc_init == nullptr) return Status::InvalidConf;
+            val_alloc_init(&val_alloc, val_allocator_config.dump().c_str());
+
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(use_lock, cmp);
+        *kvs = new MapKeyValueStore(use_lock, cmp, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -204,7 +242,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 std::forward_as_tuple(keys.data + key_offset,
                                       ksizes[i], m_key_allocator),
                 std::forward_as_tuple(vals.data + val_offset,
-                                      vsizes[i]));
+                                      vsizes[i], m_val_allocator));
             if(!p.second) {
                 p.first->second.assign(vals.data + val_offset,
                                        vsizes[i]);
@@ -492,6 +530,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         m_key_allocator.finalize(m_key_allocator.context);
+        m_val_allocator.finalize(m_val_allocator.context);
     }
 
     private:
@@ -499,22 +538,27 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     using key_type = std::basic_string<char, std::char_traits<char>,
                                        Allocator<char>>;
     using value_type = std::basic_string<char, std::char_traits<char>,
-                                         std::allocator<char>>;
+                                         Allocator<char>>;
     using comparator = MapKeyValueStoreCompare<key_type>;
     using cmp_type = comparator::cmp_type;
+    using map_type = std::map<key_type, value_type, comparator>;
 
-    MapKeyValueStore(bool use_lock = true,
-                     cmp_type cmp_fun = comparator::DefaultMemCmp,
-                     rkv_allocator_init_fn key_allocator_ctor = default_allocator_init)
-    : m_db(cmp_fun) {
+    MapKeyValueStore(bool use_lock,
+                     cmp_type cmp_fun,
+                     const rkv_allocator_t& key_allocator,
+                     const rkv_allocator_t& val_allocator)
+    : m_db(cmp_fun)
+    , m_key_allocator(key_allocator)
+    , m_val_allocator(val_allocator)
+    {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
-        key_allocator_ctor(&m_key_allocator);
     }
 
-    std::map<key_type, value_type, comparator> m_db;
-    ABT_rwlock                                 m_lock = ABT_RWLOCK_NULL;
-    rkv_allocator_t                            m_key_allocator;
+    map_type        m_db;
+    ABT_rwlock      m_lock = ABT_RWLOCK_NULL;
+    rkv_allocator_t m_key_allocator;
+    rkv_allocator_t m_val_allocator;
 };
 
 }

@@ -13,7 +13,8 @@
 
 namespace rkv {
 
-inline void default_allocator_init(rkv_allocator_t* allocator) {
+inline void default_allocator_init(rkv_allocator_t* allocator, const char* config) {
+    (void)config;
     allocator->context = new std::allocator<char>();
     allocator->allocate = [](void* ctx, size_t item_size, size_t count) {
         auto a = static_cast<std::allocator<char>*>(ctx);

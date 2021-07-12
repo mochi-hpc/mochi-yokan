@@ -24,7 +24,7 @@ typedef struct rkv_allocator {
 /**
  * @brief Type of functions used to initialize an allocator object.
  */
-typedef void (*rkv_allocator_init_fn)(rkv_allocator_t*);
+typedef void (*rkv_allocator_init_fn)(rkv_allocator_t*, const char*);
 
 #ifdef __cplusplus
 }
