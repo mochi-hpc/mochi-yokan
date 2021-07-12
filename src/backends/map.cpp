@@ -5,6 +5,7 @@
  */
 #include "rkv/rkv-backend.hpp"
 #include "../common/linker.hpp"
+#include "../common/allocator.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
@@ -58,6 +59,7 @@ class ScopedReadLock {
     ABT_rwlock m_lock = ABT_RWLOCK_NULL;
 };
 
+template<typename KeyType>
 struct MapKeyValueStoreCompare {
 
     // LCOV_EXCL_START
@@ -81,15 +83,15 @@ struct MapKeyValueStoreCompare {
     MapKeyValueStoreCompare(cmp_type comparator)
     : cmp(comparator) {}
 
-    bool operator()(const std::string& lhs, const std::string& rhs) const {
+    bool operator()(const KeyType& lhs, const KeyType& rhs) const {
         return cmp(lhs.data(), lhs.size(), rhs.data(), rhs.size());
     }
 
-    bool operator()(const std::string& lhs, const UserMem& rhs) const {
+    bool operator()(const KeyType& lhs, const UserMem& rhs) const {
         return cmp(lhs.data(), lhs.size(), rhs.data, rhs.size);
     }
 
-    bool operator()(const UserMem& lhs, const std::string& rhs) const {
+    bool operator()(const UserMem& lhs, const KeyType& rhs) const {
         return cmp(lhs.data, lhs.size, rhs.data(), rhs.size());
     }
 
@@ -107,7 +109,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
         bool use_lock;
-        MapKeyValueStoreCompare::cmp_type cmp = MapKeyValueStoreCompare::DefaultMemCmp;
+        cmp_type cmp = comparator::DefaultMemCmp;
         try {
             cfg = json::parse(config);
             if(!cfg.is_object())
@@ -118,7 +120,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 cfg["comparator"] = "default";
             auto comparator = cfg.value("comparator", "default");
             if(comparator != "default")
-                cmp = Linker::load<MapKeyValueStoreCompare::cmp_type>(comparator);
+                cmp = Linker::load<cmp_type>(comparator);
             if(cmp == nullptr)
                 return Status::InvalidConf;
         } catch(...) {
@@ -200,7 +202,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         for(size_t i = 0; i < ksizes.size; i++) {
             auto p = m_db.emplace(std::piecewise_construct,
                 std::forward_as_tuple(keys.data + key_offset,
-                                      ksizes[i]),
+                                      ksizes[i], m_key_allocator),
                 std::forward_as_tuple(vals.data + val_offset,
                                       vsizes[i]));
             if(!p.second) {
@@ -487,22 +489,32 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     }
 
     ~MapKeyValueStore() {
-        ABT_rwlock_free(&m_lock);
+        if(m_lock != ABT_RWLOCK_NULL)
+            ABT_rwlock_free(&m_lock);
+        m_key_allocator.finalize(m_key_allocator.context);
     }
 
     private:
 
+    using key_type = std::basic_string<char, std::char_traits<char>,
+                                       Allocator<char>>;
+    using value_type = std::basic_string<char, std::char_traits<char>,
+                                         std::allocator<char>>;
+    using comparator = MapKeyValueStoreCompare<key_type>;
+    using cmp_type = comparator::cmp_type;
+
     MapKeyValueStore(bool use_lock = true,
-                     MapKeyValueStoreCompare::cmp_type cmp_fun =
-                         MapKeyValueStoreCompare::DefaultMemCmp)
+                     cmp_type cmp_fun = comparator::DefaultMemCmp,
+                     rkv_allocator_init_fn key_allocator_ctor = default_allocator_init)
     : m_db(cmp_fun) {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
+        key_allocator_ctor(&m_key_allocator);
     }
 
-    std::map<std::string, std::string, MapKeyValueStoreCompare> m_db;
-    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
-
+    std::map<key_type, value_type, comparator> m_db;
+    ABT_rwlock                                 m_lock = ABT_RWLOCK_NULL;
+    rkv_allocator_t                            m_key_allocator;
 };
 
 }
