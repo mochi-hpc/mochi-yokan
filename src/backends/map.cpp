@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "../common/linker.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
@@ -19,18 +20,22 @@ class ScopedWriteLock {
 
     public:
 
+    ScopedWriteLock() = default;
+
     ScopedWriteLock(ABT_rwlock lock)
     : m_lock(lock) {
-        ABT_rwlock_wrlock(m_lock);
+        if(m_lock != ABT_RWLOCK_NULL)
+            ABT_rwlock_wrlock(m_lock);
     }
 
     ~ScopedWriteLock() {
-        ABT_rwlock_unlock(m_lock);
+        if(m_lock != ABT_RWLOCK_NULL)
+            ABT_rwlock_unlock(m_lock);
     }
 
     private:
 
-    ABT_rwlock m_lock;
+    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
 };
 
 class ScopedReadLock {
@@ -39,16 +44,18 @@ class ScopedReadLock {
 
     ScopedReadLock(ABT_rwlock lock)
     : m_lock(lock) {
-        ABT_rwlock_rdlock(m_lock);
+        if(m_lock != ABT_RWLOCK_NULL)
+            ABT_rwlock_rdlock(m_lock);
     }
 
     ~ScopedReadLock() {
-        ABT_rwlock_unlock(m_lock);
+        if(m_lock != ABT_RWLOCK_NULL)
+            ABT_rwlock_unlock(m_lock);
     }
 
     private:
 
-    ABT_rwlock m_lock;
+    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
 };
 
 struct MapKeyValueStoreCompare {
@@ -99,12 +106,25 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
+        bool use_lock;
+        MapKeyValueStoreCompare::cmp_type cmp = MapKeyValueStoreCompare::DefaultMemCmp;
         try {
             cfg = json::parse(config);
+            if(!cfg.is_object())
+                return Status::InvalidConf;
+            use_lock = cfg.value("use_lock", true);
+            cfg["use_lock"] = use_lock;
+            if(!cfg.contains("comparator"))
+                cfg["comparator"] = "default";
+            auto comparator = cfg.value("comparator", "default");
+            if(comparator != "default")
+                cmp = Linker::load<MapKeyValueStoreCompare::cmp_type>(comparator);
+            if(cmp == nullptr)
+                return Status::InvalidConf;
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore();
+        *kvs = new MapKeyValueStore(use_lock, cmp);
         return Status::OK;
     }
 
@@ -472,17 +492,17 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    MapKeyValueStore() {
-        ABT_rwlock_create(&m_lock);
-    }
-
-    MapKeyValueStore(MapKeyValueStoreCompare::cmp_type cmp_fun)
+    MapKeyValueStore(bool use_lock = true,
+                     MapKeyValueStoreCompare::cmp_type cmp_fun =
+                         MapKeyValueStoreCompare::DefaultMemCmp)
     : m_db(cmp_fun) {
-        ABT_rwlock_create(&m_lock);
+        if(use_lock)
+            ABT_rwlock_create(&m_lock);
     }
 
     std::map<std::string, std::string, MapKeyValueStoreCompare> m_db;
-    ABT_rwlock m_lock;
+    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
+
 };
 
 }
