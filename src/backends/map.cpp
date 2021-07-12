@@ -110,9 +110,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         json cfg;
         bool use_lock;
         cmp_type cmp = comparator::DefaultMemCmp;
-        rkv_allocator_init_fn key_alloc_init, val_alloc_init;
-        rkv_allocator_t key_alloc, val_alloc;
-        std::string key_alloc_conf, val_alloc_conf;
+        rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
+        rkv_allocator_t key_alloc, val_alloc, node_alloc;
+        std::string key_alloc_conf, val_alloc_conf, node_alloc_conf;
 
         try {
             cfg = json::parse(config);
@@ -133,10 +133,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             if(!cfg.contains("allocators")) {
                 cfg["allocators"]["key_allocator"] = "default";
                 cfg["allocators"]["value_allocator"] = "default";
+                cfg["allocators"]["pair_allocator"] = "default";
             } else if(!cfg["allocators"].is_object()) {
                 return Status::InvalidConf;
             }
+
             auto& alloc_cfg = cfg["allocators"];
+
             // key allocator
             auto key_allocator_name = alloc_cfg.value("key_allocator", "default");
             auto key_allocator_config = alloc_cfg.value("key_allocator_config", json::object());
@@ -161,10 +164,22 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             if(val_alloc_init == nullptr) return Status::InvalidConf;
             val_alloc_init(&val_alloc, val_allocator_config.dump().c_str());
 
+            // node allocator
+            auto node_allocator_name = alloc_cfg.value("node_allocator", "default");
+            auto node_allocator_config = alloc_cfg.value("node_allocator_config", json::object());
+            alloc_cfg["node_allocator"] = node_allocator_name;
+            alloc_cfg["node_allocator_config"] = node_allocator_config;
+            if(node_allocator_name == "default")
+                node_alloc_init = default_allocator_init;
+            else
+                node_alloc_init = Linker::load<decltype(node_alloc_init)>(node_allocator_name);
+            if(node_alloc_init == nullptr) return Status::InvalidConf;
+            node_alloc_init(&node_alloc, node_allocator_config.dump().c_str());
+
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(use_lock, cmp, key_alloc, val_alloc);
+        *kvs = new MapKeyValueStore(use_lock, cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -182,7 +197,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
-        m_db.clear();
+        m_db->clear();
     }
 
     virtual Status exists(const UserMem& keys,
@@ -194,7 +209,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            flags[i] = m_db.count(key) > 0;
+            flags[i] = m_db->count(key) > 0;
             offset += ksizes[i];
         }
         return Status::OK;
@@ -209,8 +224,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db.find(key);
-            if(it == m_db.end()) vsizes[i] = KeyNotFound;
+            auto it = m_db->find(key);
+            if(it == m_db->end()) vsizes[i] = KeyNotFound;
             else vsizes[i] = it->second.size();
             offset += ksizes[i];
         }
@@ -238,7 +253,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto p = m_db.emplace(std::piecewise_construct,
+            auto p = m_db->emplace(std::piecewise_construct,
                 std::forward_as_tuple(keys.data + key_offset,
                                       ksizes[i], m_key_allocator),
                 std::forward_as_tuple(vals.data + val_offset,
@@ -267,9 +282,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 const UserMem key{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db.find(key);
+                auto it = m_db->find(key);
                 const auto original_vsize = vsizes[i];
-                if(it == m_db.end()) {
+                if(it == m_db->end()) {
                     vsizes[i] = KeyNotFound;
                 } else {
                     auto& v = it->second;
@@ -290,8 +305,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 auto key = UserMem{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db.find(key);
-                if(it == m_db.end()) {
+                auto it = m_db->find(key);
+                if(it == m_db->end()) {
                     vsizes[i] = KeyNotFound;
                 } else if(it->second.size() > val_remaining_size) {
                     for(; i < ksizes.size; i++) {
@@ -318,9 +333,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db.find(key);
-            if(it != m_db.end()) {
-                m_db.erase(it);
+            auto it = m_db->find(key);
+            if(it != m_db->end()) {
+                m_db->erase(it);
             }
             offset += ksizes[i];
         }
@@ -334,14 +349,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         if(!packed) {
 
-            using iterator = decltype(m_db.begin());
+            using iterator = decltype(m_db->begin());
             iterator fromKeyIt;
             if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
+                fromKeyIt = m_db->begin();
             } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
             }
-            const auto end = m_db.end();
+            const auto end = m_db->end();
             auto max = keySizes.size;
             size_t i = 0;
             size_t offset = 0;
@@ -372,14 +387,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         } else { // if packed
 
-            using iterator = decltype(m_db.begin());
+            using iterator = decltype(m_db->begin());
             iterator fromKeyIt;
             if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
+                fromKeyIt = m_db->begin();
             } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
             }
-            const auto end = m_db.end();
+            const auto end = m_db->end();
             auto max = keySizes.size;
             size_t i = 0;
             size_t offset = 0;
@@ -422,14 +437,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         if(!packed) {
 
-            using iterator = decltype(m_db.begin());
+            using iterator = decltype(m_db->begin());
             iterator fromKeyIt;
             if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
+                fromKeyIt = m_db->begin();
             } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
             }
-            const auto end = m_db.end();
+            const auto end = m_db->end();
             auto max = keySizes.size;
             size_t i = 0;
             size_t key_offset = 0;
@@ -471,14 +486,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         } else { // if packed
 
-            using iterator = decltype(m_db.begin());
+            using iterator = decltype(m_db->begin());
             iterator fromKeyIt;
             if(fromKey.size == 0) {
-                fromKeyIt = m_db.begin();
+                fromKeyIt = m_db->begin();
             } else {
-                fromKeyIt = inclusive ? m_db.lower_bound(fromKey) : m_db.upper_bound(fromKey);
+                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
             }
-            const auto end = m_db.end();
+            const auto end = m_db->end();
             auto max = keySizes.size;
             size_t i = 0;
             size_t key_offset = 0;
@@ -529,6 +544,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     ~MapKeyValueStore() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
+        delete m_db;
         m_key_allocator.finalize(m_key_allocator.context);
         m_val_allocator.finalize(m_val_allocator.context);
     }
@@ -541,22 +557,26 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                          Allocator<char>>;
     using comparator = MapKeyValueStoreCompare<key_type>;
     using cmp_type = comparator::cmp_type;
-    using map_type = std::map<key_type, value_type, comparator>;
+    using allocator = Allocator<std::pair<const key_type, value_type>>;
+    using map_type = std::map<key_type, value_type, comparator, allocator>;
 
     MapKeyValueStore(bool use_lock,
                      cmp_type cmp_fun,
+                     const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator,
                      const rkv_allocator_t& val_allocator)
-    : m_db(cmp_fun)
+    : m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
     {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
+        m_db = new map_type(cmp_fun, allocator(m_node_allocator));
     }
 
-    map_type        m_db;
+    map_type*       m_db;
     ABT_rwlock      m_lock = ABT_RWLOCK_NULL;
+    rkv_allocator_t m_node_allocator;
     rkv_allocator_t m_key_allocator;
     rkv_allocator_t m_val_allocator;
 };

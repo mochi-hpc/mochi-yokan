@@ -40,6 +40,15 @@ struct Allocator {
     inline Allocator(rkv_allocator_t& a)
     : m_internal(a) {}
 
+    template<typename U>
+    Allocator(const Allocator<U>& other)
+    : m_internal(other.m_internal) {}
+
+    template<typename U>
+    struct rebind {
+        typedef Allocator<U> other;
+    };
+
     inline value_type* allocate(size_type n, const void* hint = 0) {
         (void)hint;
         return static_cast<value_type*>(
