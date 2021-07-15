@@ -333,6 +333,7 @@ void rkv_list_databases_ult(hg_handle_t h)
     list_databases_in_t  in;
     list_databases_out_t out;
     out.ids = nullptr;
+    out.count = 0;
     unsigned i;
 
     DEFER(free(out.ids));
@@ -351,7 +352,7 @@ void rkv_list_databases_ult(hg_handle_t h)
     DEFER(margo_free_input(h, &in));
 
     if(!check_token(provider, in.token)) {
-        margo_error(mid, "Invalid token");
+        RKV_LOG_ERROR(mid, "invalid token");
         out.ret = RKV_ERR_INVALID_TOKEN;
         return;
     }
