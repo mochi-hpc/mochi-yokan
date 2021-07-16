@@ -283,109 +283,129 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t key_offset = 0;
+        bool key_buf_too_small = false;
+        uint32_t flag = DB_CURRENT;
+
+        // this buffer is used in dummy_key so we can at least load the prefix
+        std::vector<char> prefix_check_buffer(prefix.size);
+
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
-        fromKeySlice.set_ulen(fromKey.size);
         fromKeySlice.set_flags(DB_DBT_USERMEM);
+        fromKeySlice.set_ulen(fromKey.size);
 
-        auto prefixSlice = Dbt{ prefix.data, (u_int32_t)prefix.size };
-        prefixSlice.set_ulen(prefix.size);
-        prefixSlice.set_flags(DB_DBT_USERMEM);
-
-        auto dummy_key = Dbt{ nullptr, 0 };
-        dummy_key.set_ulen(0);
+        // dummy_key is a 0-sized key from user memory that expects
+        // a partial write hence it is used to move the cursor
+        auto dummy_key = Dbt{ prefix_check_buffer.data(), (u_int32_t)prefix.size };
+        dummy_key.set_ulen(prefix.size);
+        dummy_key.set_dlen(prefix.size);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
+        // same a dummy_key
         auto dummy_val = Dbt{ nullptr, 0 };
         dummy_val.set_ulen(0);
+        dummy_val.set_dlen(0);
         dummy_val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
+        // Dbt key used to retrieve actual keys
         auto key = Dbt{ nullptr, 0 };
         key.set_ulen(0);
         key.set_flags(DB_DBT_USERMEM);
-
-        auto val = Dbt{ nullptr, 0 };
-        val.set_ulen(0);
-        val.set_flags(DB_DBT_USERMEM);
 
         Dbc* cursor = nullptr;
         int status = m_db->cursor(nullptr, &cursor, 0);
 
         if(fromKey.size == 0) {
+            // move the cursor to the beginning of the database
             status = cursor->get(&dummy_key, &dummy_val, DB_FIRST);
         } else {
-            status = cursor->get(&fromKeySlice, &dummy_val,  DB_SET_RANGE);
-            bool start_key_found =
-                   (status == 0 || status == DB_BUFFER_SMALL)
-                && (fromKeySlice.get_size() == fromKey.size)
-                && (std::memcmp(fromKeySlice.get_data(), fromKey.data, fromKey.size) == 0);
-            if(start_key_found && !inclusive) {
-                // not inclusive, make it point to the next key
-                cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+            // move the cursos to fromKeySlice, or right after if not found
+            status = cursor->get(&fromKeySlice, &dummy_val, DB_SET_RANGE);
+            if(status == 0) {
+                // move was correctly done, now check if the key we point to
+                // is fromKeySlice and move to next if not inclusive
+                if(!inclusive) {
+                    bool start_key_found =
+                        (fromKeySlice.get_size() == fromKey.size)
+                        && (std::memcmp(fromKeySlice.get_data(), fromKey.data, fromKey.size) == 0);
+                    if(start_key_found) {
+                        // make it point to the next key
+                        status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                    }
+                }
+            } else if(status == DB_BUFFER_SMALL) {
+                // fromKeySlice buffer too small to hold the next key,
+                // retry with DB_DBT_PARTIAL to make the move succeed
+                fromKeySlice.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+                status = cursor->get(&fromKeySlice, &dummy_val, DB_SET_RANGE);
             }
         }
 
-        auto max = keySizes.size;
-        size_t i = 0;
-        size_t key_offset = 0;
-        bool buf_too_small = false;
+        if(status == DB_NOTFOUND) { // empty database
+            goto complete;
+        }
 
-        while(i < max) {
+        for(i = 0; i < max; i++) {
 
-            if(packed && buf_too_small) {
-                keySizes[i] = RKV_SIZE_TOO_SMALL;
-                i += 1;
-                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
-                if(status == DB_NOTFOUND) break;
-                else continue;
+            // find the next key that matches the prefix
+            while(true) {
+                status = cursor->get(&dummy_key, &dummy_val, flag);
+                flag = DB_NEXT;
+                if(status == DB_NOTFOUND) {
+                    goto complete;
+                }
+                if(status != 0) {
+                    // TODO handle status
+                    goto complete;
+                }
+                if(prefix.size == 0)
+                    break;
+                else if((dummy_key.get_size() >= prefix.size) &&
+                  (std::memcmp(dummy_key.get_data(), prefix.data, prefix.size) == 0))
+                    break;
             }
 
+            if(packed && key_buf_too_small) {
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                continue;
+            }
+
+            // compute available size in current key buffer
             auto key_ulen = packed ? (keys.size - key_offset) : keySizes[i];
             key.set_data(keys.data + key_offset);
             key.set_ulen(key_ulen);
 
-            status = cursor->get(&key, &dummy_val, DB_CURRENT);
-            if(status != 0 && status != DB_BUFFER_SMALL) {
-                // We got an unexpected error
-                // ...
-                // TODO handle status properly
-                break;
+            // here we know the cursor points to the right element,
+            // se we can get it in key, this time
+
+            if(key_ulen < dummy_key.get_size()) { // early easy check
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                key_buf_too_small = true;
+                continue;
             }
 
-            // check if we had enough space for the key
-            if(key.get_size() > key.get_ulen()) {
-                // we did not
-                // XXX here, if the current key doesn't start with the prefix, then it doesn't matter!
-                // (1) if get_size() < prefix.size we are good
-                // then we set DB_DBT_PARTIAL to get at least the beginning of the key
-                buf_too_small = true;
+            status = cursor->get(&key, &dummy_val, DB_CURRENT);
+            if(status == 0) {
+
+                if(packed) key_offset += key.get_size();
+                else       key_offset += keySizes[i];
+                keySizes[i] = key.get_size();
+
+            } else if(status == DB_BUFFER_SMALL) {
+
                 if(!packed) key_offset += keySizes[i];
                 keySizes[i] = RKV_SIZE_TOO_SMALL;
-                i += 1;
-                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
-                if(status == DB_NOTFOUND) break;
-                else continue;
-            }
+                key_buf_too_small = true;
 
-            // check if the key starts with the prefix
-            if((key.get_size() < prefix.size)
-            || (std::memcmp(key.get_data(), prefix.data, prefix.size) != 0)) {
-                // key doesn't start with the prefix
-                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
-                if(status == DB_NOTFOUND) break;
-                else continue;
-            }
-
-            // here we know that the key was retrieved correctly
-            if(packed) {
-                key_offset += key.get_size();
             } else {
-                key_offset += keySizes[i];
+                // TODO handle status properly
+                goto complete;
             }
-            keySizes[i] = key.get_size();
-            i += 1;
-            status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
-            if(status == DB_NOTFOUND) break;
         }
+
+    complete:
         keys.size = key_offset;
         for(; i < max; i++) {
             keySizes[i] = RKV_NO_MORE_KEYS;
