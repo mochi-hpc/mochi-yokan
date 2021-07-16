@@ -296,8 +296,8 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
         ret = rkv_get(dbh, key, ksize, val.data(), &vsize);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
         SKIP_IF_NOT_IMPLEMENTED(ret);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
         munit_assert_int(vsize, ==, p.second.size());
         munit_assert_memory_equal(vsize, val.data(), p.second.data());
     }

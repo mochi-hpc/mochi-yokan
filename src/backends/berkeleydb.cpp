@@ -119,46 +119,50 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status exists(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
-#if 0
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            flags[i] = m_db->count(key) > 0;
+            Dbt key{ keys.data + offset, (u_int32_t)ksizes[i] };
+            key.set_flags(DB_DBT_USERMEM);
+            key.set_ulen(ksizes[i]);
+            int status = m_db->exists(nullptr, &key, 0);
+            flags[i] = (status != DB_NOTFOUND);
             offset += ksizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status length(const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
-#if 0
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db->find(key);
-            if(it == m_db->end()) vsizes[i] = KeyNotFound;
-            else vsizes[i] = it->second.size();
+            Dbt key{ keys.data + offset, (u_int32_t)ksizes[i] };
+            key.set_flags(DB_DBT_USERMEM);
+            key.set_ulen(ksizes[i]);
+            Dbt val{ nullptr, 0 };
+            val.set_flags(DB_DBT_USERMEM);
+            val.set_ulen(0);
+            int status = m_db->get(nullptr, &key, &val, 0);
+            if(status == DB_BUFFER_SMALL || status == 0) {
+                vsizes[i] = val.get_size();
+            } else if(status == DB_NOTFOUND) {
+                vsizes[i] = KeyNotFound;
+            } else {
+                return Status::Other; // TODO add proper status conversion
+            }
             offset += ksizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status put(const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-#if 0
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -174,52 +178,52 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
-        ScopedWriteLock lock(m_lock);
+        // TODO enable the use of transactions
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto p = m_db->emplace(std::piecewise_construct,
-                std::forward_as_tuple(keys.data + key_offset,
-                                      ksizes[i], m_key_allocator),
-                std::forward_as_tuple(vals.data + val_offset,
-                                      vsizes[i], m_val_allocator));
-            if(!p.second) {
-                p.first->second.assign(vals.data + val_offset,
-                                       vsizes[i]);
-            }
+            Dbt key(keys.data + key_offset, ksizes[i]);
+            Dbt val(vals.data + val_offset, vsizes[i]);
+            key.set_flags(DB_DBT_USERMEM);
+            key.set_ulen(ksizes[i]);
+            val.set_flags(DB_DBT_USERMEM);
+            val.set_ulen(vsizes[i]);
+            // TODO enable DB_NOOVERWRITE is requested
+            int flag = 0;
+            int status = m_db->put(nullptr, &key, &val, flag);
+            // TODO handle status conversion
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status get(bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
-#if 0
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
-        ScopedReadLock lock(m_lock);
 
         if(!packed) {
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                const UserMem key{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db->find(key);
+                Dbt key{ keys.data + key_offset, (u_int32_t)ksizes[i] };
+                Dbt val{ vals.data + val_offset, (u_int32_t)vsizes[i] };
+                key.set_flags(DB_DBT_USERMEM);
+                key.set_ulen(ksizes[i]);
+                val.set_flags(DB_DBT_USERMEM);
+                val.set_ulen(vsizes[i]);
+                int status = m_db->get(nullptr, &key, &val, 0);
                 const auto original_vsize = vsizes[i];
-                if(it == m_db->end()) {
+                if(status == 0) {
+                    vsizes[i] = val.get_size();
+                } else if(status == DB_NOTFOUND) {
                     vsizes[i] = KeyNotFound;
+                } else if(status == DB_BUFFER_SMALL) {
+                    vsizes[i] = BufTooSmall;
                 } else {
-                    auto& v = it->second;
-                    if(v.size() > vsizes[i]) {
-                        vsizes[i] = BufTooSmall;
-                    } else {
-                        std::memcpy(vals.data + val_offset, v.data(), v.size());
-                        vsizes[i] = v.size();
-                    }
+                    // TODO handle other status
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -230,28 +234,32 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             size_t val_remaining_size = vals.size;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                auto key = UserMem{ keys.data + key_offset, ksizes[i] };
-                auto it = m_db->find(key);
-                if(it == m_db->end()) {
+                Dbt key{ keys.data + key_offset, (u_int32_t)ksizes[i] };
+                Dbt val{ vals.data + val_offset, (u_int32_t)val_remaining_size };
+                key.set_flags(DB_DBT_USERMEM);
+                key.set_ulen(ksizes[i]);
+                val.set_flags(DB_DBT_USERMEM);
+                val.set_ulen(val_remaining_size);
+                int status = m_db->get(nullptr, &key, &val, 0);
+                if(status == 0) {
+                    vsizes[i] = val.get_size();
+                    val_remaining_size -= vsizes[i];
+                    val_offset += vsizes[i];
+                } else if(status == DB_NOTFOUND) {
                     vsizes[i] = KeyNotFound;
-                } else if(it->second.size() > val_remaining_size) {
+                } else if(status == DB_BUFFER_SMALL) {
                     for(; i < ksizes.size; i++) {
                         vsizes[i] = BufTooSmall;
                     }
+                    break;
                 } else {
-                    auto& v = it->second;
-                    std::memcpy(vals.data + val_offset, v.data(), v.size());
-                    vsizes[i] = v.size();
-                    val_remaining_size -= vsizes[i];
-                    val_offset += vsizes[i];
+                    // TODO handle other status conversion
                 }
                 key_offset += ksizes[i];
             }
             vals.size = vals.size - val_remaining_size;
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status erase(const UserMem& keys,
