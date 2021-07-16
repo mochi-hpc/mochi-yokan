@@ -39,7 +39,9 @@ static const char* backend_configs[] = {
     "{}",
 #endif
 #ifdef HAS_BERKELEYDB
-    "{}",
+    "{\"home\":\"/tmp/berkeleydb-test\","
+    " \"file\":\"my-bdb\","
+    " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_ROCKSDB
     "{\"path\":\"/tmp/rocksdb-test\","

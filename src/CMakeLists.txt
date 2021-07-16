@@ -26,6 +26,11 @@ if (ENABLE_ROCKSDB)
     list (APPEND DB_DEPENDENCIES PkgConfig::rocksdb stdc++fs)
 endif ()
 
+if (ENABLE_BERKELEYDB)
+    list (APPEND backend-src-files backends/berkeleydb.cpp)
+    list (APPEND DB_DEPENDENCIES Oracle::BerkeleyDB stdc++fs)
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

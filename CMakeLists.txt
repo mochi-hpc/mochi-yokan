@@ -4,6 +4,9 @@ cmake_minimum_required (VERSION 3.13)
 project (rkv C CXX)
 enable_testing ()
 
+set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+     "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -12,11 +15,12 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra -Wall -Wpedantic")
 
 add_library(coverage_config INTERFACE)
 
-option (ENABLE_COVERAGE "Enable coverage reporting" OFF)
-option (ENABLE_TESTS    "Build tests" OFF)
-option (ENABLE_BEDROCK  "Build bedrock module" OFF)
-option (ENABLE_LEVELDB  "Build with leveldb support" OFF)
-option (ENABLE_ROCKSDB  "Build with rocksdb support" OFF)
+option (ENABLE_COVERAGE   "Enable coverage reporting" OFF)
+option (ENABLE_TESTS      "Build tests" OFF)
+option (ENABLE_BEDROCK    "Build bedrock module" OFF)
+option (ENABLE_LEVELDB    "Build with leveldb support" OFF)
+option (ENABLE_ROCKSDB    "Build with rocksdb support" OFF)
+option (ENABLE_BERKELEYDB "Build with berkeleydb support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -71,6 +75,11 @@ endif ()
 if (ENABLE_ROCKSDB)
     pkg_check_modules (rocksdb REQUIRED IMPORTED_TARGET rocksdb)
     set (HAS_ROCKSDB ON)
+endif ()
+
+if (ENABLE_BERKELEYDB)
+    find_package (BerkeleyDB REQUIRED)
+    set (HAS_BERKELEYDB ON)
 endif ()
 
 # library version set here (e.g. for shared libs).

@@ -8,7 +8,7 @@ spack:
   - mercury~boostsys ^libfabric fabrics=tcp,rxm
   - leveldb@1.22
   - rocksdb
-#  - berkeley-db +cxx +stl
+  - berkeley-db+cxx+stl
 #  - lmdb
 #  - gdbm
 #  - tkrzw
