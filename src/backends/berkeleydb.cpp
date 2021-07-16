@@ -527,9 +527,18 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             if(status == 0 || status == DB_BUFFER_SMALL) {
 
                 bool key_was_too_small = key.get_size() > key.get_ulen();
-                bool val_was_too_small = val.get_size() > val.get_ulen();
-
                 key_buf_too_small = key_buf_too_small || key_was_too_small;
+
+                if(key_was_too_small) {
+                    // berkeleydb is annoying and won't load
+                    // the value if the key was too small
+                    key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+                    status = cursor->get(&key, &val, DB_CURRENT);
+                    // TODO do something with status
+                    key.set_flags(DB_DBT_USERMEM);
+                }
+
+                bool val_was_too_small = val.get_size() > val.get_ulen();
                 val_buf_too_small = val_buf_too_small || val_was_too_small;
 
                 if(packed) {
