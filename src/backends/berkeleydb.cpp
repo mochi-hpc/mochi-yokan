@@ -189,6 +189,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             // TODO enable DB_NOOVERWRITE is requested
             int flag = 0;
             int status = m_db->put(nullptr, &key, &val, flag);
+            (void)status;
             // TODO handle status conversion
             key_offset += ksizes[i];
             val_offset += vsizes[i];
@@ -264,108 +265,134 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status erase(const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
-#if 0
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto key = UserMem{ keys.data + offset, ksizes[i] };
+            auto key = Dbt{ keys.data + offset, (u_int32_t)ksizes[i] };
+            key.set_flags(DB_DBT_USERMEM);
+            key.set_ulen(ksizes[i]);
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            auto it = m_db->find(key);
-            if(it != m_db->end()) {
-                m_db->erase(it);
-            }
+            int status = m_db->del(nullptr, &key, 0);
+            (void)status;
+            // TODO handle status
             offset += ksizes[i];
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-#if 0
-        ScopedReadLock lock(m_lock);
 
-        if(!packed) {
+        auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
+        fromKeySlice.set_ulen(fromKey.size);
+        fromKeySlice.set_flags(DB_DBT_USERMEM);
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                size_t usize = keySizes[i];
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    i += 1;
-                    offset += usize;
-                    continue;
-                }
-                std::memcpy(umem, key.data(), key.size());
-                keySizes[i] = key.size();
-                offset += usize;
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto prefixSlice = Dbt{ prefix.data, (u_int32_t)prefix.size };
+        prefixSlice.set_ulen(prefix.size);
+        prefixSlice.set_flags(DB_DBT_USERMEM);
 
-        } else { // if packed
+        auto dummy_key = Dbt{ nullptr, 0 };
+        dummy_key.set_ulen(0);
+        dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            bool buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    buf_too_small = true;
-                } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
-                }
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto dummy_val = Dbt{ nullptr, 0 };
+        dummy_val.set_ulen(0);
+        dummy_val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
+        auto key = Dbt{ nullptr, 0 };
+        key.set_ulen(0);
+        key.set_flags(DB_DBT_USERMEM);
+
+        auto val = Dbt{ nullptr, 0 };
+        val.set_ulen(0);
+        val.set_flags(DB_DBT_USERMEM);
+
+        Dbc* cursor = nullptr;
+        int status = m_db->cursor(nullptr, &cursor, 0);
+
+        if(fromKey.size == 0) {
+            status = cursor->get(&dummy_key, &dummy_val, DB_FIRST);
+        } else {
+            status = cursor->get(&fromKeySlice, &dummy_val,  DB_SET_RANGE);
+            bool start_key_found =
+                   (status == 0 || status == DB_BUFFER_SMALL)
+                && (fromKeySlice.get_size() == fromKey.size)
+                && (std::memcmp(fromKeySlice.get_data(), fromKey.data, fromKey.size) == 0);
+            if(start_key_found && !inclusive) {
+                // not inclusive, make it point to the next key
+                cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+            }
         }
+
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t key_offset = 0;
+        bool buf_too_small = false;
+
+        while(i < max) {
+
+            if(packed && buf_too_small) {
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                i += 1;
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            auto key_ulen = packed ? (keys.size - key_offset) : keySizes[i];
+            key.set_data(keys.data + key_offset);
+            key.set_ulen(key_ulen);
+
+            status = cursor->get(&key, &dummy_val, DB_CURRENT);
+            if(status != 0 && status != DB_BUFFER_SMALL) {
+                // We got an unexpected error
+                // ...
+                // TODO handle status properly
+                break;
+            }
+
+            // check if we had enough space for the key
+            if(key.get_size() > key.get_ulen()) {
+                // we did not
+                // XXX here, if the current key doesn't start with the prefix, then it doesn't matter!
+                // (1) if get_size() < prefix.size we are good
+                // then we set DB_DBT_PARTIAL to get at least the beginning of the key
+                buf_too_small = true;
+                if(!packed) key_offset += keySizes[i];
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                i += 1;
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            // check if the key starts with the prefix
+            if((key.get_size() < prefix.size)
+            || (std::memcmp(key.get_data(), prefix.data, prefix.size) != 0)) {
+                // key doesn't start with the prefix
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            // here we know that the key was retrieved correctly
+            if(packed) {
+                key_offset += key.get_size();
+            } else {
+                key_offset += keySizes[i];
+            }
+            keySizes[i] = key.get_size();
+            i += 1;
+            status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+            if(status == DB_NOTFOUND) break;
+        }
+        keys.size = key_offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
+        cursor->close();
+
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status listKeyValues(bool packed,
@@ -376,111 +403,117 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
 #if 0
-        ScopedReadLock lock(m_lock);
+        auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
+        fromKeySlice.set_ulen(fromKey.size);
+        fromKeySlice.set_flags(DB_DBT_USERMEM);
 
-        if(!packed) {
+        auto prefixSlice = Dbt{ prefix.data, (u_int32_t)prefix.size };
+        prefixSlice.set_ulen(prefix.size);
+        prefixSlice.set_flags(DB_DBT_USERMEM);
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                size_t key_usize = keySizes[i];
-                size_t val_usize = valSizes[i];
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                }
-                key_offset += key_usize;
-                val_offset += val_usize;
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto dummy_key = Dbt{ nullptr, 0 };
+        dummy_key.set_ulen(0);
+        dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
-        } else { // if packed
+        auto dummy_val = Dbt{ nullptr, 0 };
+        dummy_val.set_ulen(0);
+        dummy_val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            bool key_buf_too_small = false;
-            bool val_buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_buf_too_small
-                || keys.size - key_offset < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
-                }
-                if(val_buf_too_small
-                || vals.size - val_offset < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
-                }
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto key = Dbt{ nullptr, 0 };
+        key.set_ulen(0);
+        key.set_flags(DB_DBT_USERMEM);
 
+        auto val = Dbt{ nullptr, 0 };
+        val.set_ulen(0);
+        val.set_flags(DB_DBT_USERMEM);
+
+        Dbc* cursor = nullptr;
+        int status = m_db->cursor(nullptr, &cursor, 0);
+
+        if(fromKey.size == 0) {
+            status = cursor->get(&dummy_key, &dummy_val, DB_FIRST);
+        } else {
+            status = cursor->get(&fromKeySlice, &dummy_val,  DB_SET_RANGE);
+            bool start_key_found =
+                   (status == 0 || status == DB_BUFFER_SMALL)
+                && (fromKeySlice.get_size() == fromKey.size)
+                && (std::memcmp(fromKeySlice.get_data(), fromKey.data, fromKey.size) == 0);
+            if(start_key_found && !inclusive) {
+                // not inclusive, make it point to the next key
+                cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+            }
         }
+
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t key_offset = 0;
+        size_t val_offset = 0;
+        bool key_buf_too_small = false;
+        bool val_buf_too_small = false;
+
+        while(i < max) {
+
+            if(packed && key_buf_too_small) {
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                i += 1;
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            auto key_ulen = packed ? (keys.size - key_offset) : keySizes[i];
+            key.set_data(keys.data + key_offset);
+            key.set_ulen(key_ulen);
+            auto val_ulen = packed ? (vals.size - val_offset) : valSizes[i];
+            val.set_data(vals.data + val_offset);
+            val.set_ulen(val_ulen);
+
+            status = cursor->get(&key, &val, DB_CURRENT);
+            if(status != 0 && status != DB_BUFFER_SMALL) {
+                // We got an unexpected error
+                // ...
+                // TODO handle status properly
+                break;
+            }
+
+            // check if we had enough space for the key
+            if(key.get_size() > key.get_ulen()) {
+                // we did not
+                key_buf_too_small = true;
+                if(!packed) key_offset += keySizes[i];
+                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                i += 1;
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            // check if the key starts with the prefix
+            if((key.get_size() < prefix.size)
+            || (std::memcmp(key.get_data(), prefix.data, prefix.size) != 0)) {
+                // key doesn't start with the prefix
+                status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                if(status == DB_NOTFOUND) break;
+                else continue;
+            }
+
+            // here we know that the key was retrieved correctly
+            if(packed) {
+                key_offset += key.get_size();
+            } else {
+                key_offset += keySizes[i];
+            }
+            keySizes[i] = key.get_size();
+            i += 1;
+            status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+            if(status == DB_NOTFOUND) break;
+        }
+        keys.size = key_offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
+        cursor->close();
+
         return Status::OK;
 #endif
         return Status::NotSupported;
