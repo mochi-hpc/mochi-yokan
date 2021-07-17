@@ -54,7 +54,7 @@ static const char* backend_configs[] = {
     "{}",
 #endif
 #ifdef HAS_TKRZW
-    "{}",
+    "{\"path\":\"/tmp/tkrzw-test\"}",
 #endif
 #ifdef HAS_UNQLITE
     "{}",
