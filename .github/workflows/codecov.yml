@@ -39,7 +39,7 @@ jobs:
       run: |
         eval `/opt/spack/bin/spack env activate --sh .` &&
         mkdir build && cd build &&
-        cmake .. -DENABLE_COVERAGE=ON -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_LEVELDB=ON -DENABLE_ROCKSDB=ON &&
+        cmake .. -DENABLE_COVERAGE=ON -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_LEVELDB=ON -DENABLE_ROCKSDB=ON -DENABLE_BERKELEYDB=ON &&
         make && make test
     - name: Upload code coverage files
       run: |
