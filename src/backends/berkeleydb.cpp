@@ -20,6 +20,25 @@ namespace rkv {
 using json = nlohmann::json;
 namespace fs = std::experimental::filesystem;
 
+static inline Status convertStatus(int bdb_status) {
+    switch(bdb_status) {
+        case 0:
+            return Status::OK;
+        case DB_BUFFER_SMALL:
+            return Status::SizeError;
+        case DB_KEYEMPTY:
+        case DB_NOTFOUND:
+            return Status::NotFound;
+        case DB_KEYEXIST:
+            return Status::KeyExists;
+        case DB_TIMEOUT:
+            return Status::TimedOut;
+        default:
+            break;
+    };
+    return Status::Other;
+}
+
 class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
     public:
@@ -69,15 +88,21 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(!db_home.empty()) {
             std::error_code ec;
             fs::create_directories(db_home, ec);
-            // TODO log on error
         }
 
         auto db_env = new DbEnv(DB_CXX_NO_EXCEPTIONS);
-        db_env->open(db_home.c_str(), db_env_flags, 0);
+        int status = db_env->open(db_home.c_str(), db_env_flags, 0);
+        if(status != 0)
+            return convertStatus(status);
         auto db = new Db(db_env, 0);
-        db->open(nullptr, db_file.empty() ? nullptr : db_file.c_str(),
+        status = db->open(nullptr, db_file.empty() ? nullptr : db_file.c_str(),
                           db_name.empty() ? nullptr : db_name.c_str(),
                           DB_BTREE, db_flags, 0);
+        if(status != 0) {
+            db_env->close(0);
+            delete db_env;
+            return convertStatus(status);
+        }
 
         *kvs = new BerkeleyDBKeyValueStore(cfg, db_env, db);
         return Status::OK;
@@ -152,7 +177,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             } else if(status == DB_NOTFOUND) {
                 vsizes[i] = KeyNotFound;
             } else {
-                return Status::Other; // TODO add proper status conversion
+                return convertStatus(status);
             }
             offset += ksizes[i];
         }
@@ -189,8 +214,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             // TODO enable DB_NOOVERWRITE is requested
             int flag = 0;
             int status = m_db->put(nullptr, &key, &val, flag);
-            (void)status;
-            // TODO handle status conversion
+            if(status != 0)
+                return convertStatus(status);
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }
@@ -224,7 +249,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 } else if(status == DB_BUFFER_SMALL) {
                     vsizes[i] = BufTooSmall;
                 } else {
-                    // TODO handle other status
+                    return convertStatus(status);
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -254,7 +279,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     }
                     break;
                 } else {
-                    // TODO handle other status conversion
+                    return convertStatus(status);
                 }
                 key_offset += ksizes[i];
             }
@@ -272,8 +297,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             key.set_ulen(ksizes[i]);
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             int status = m_db->del(nullptr, &key, 0);
-            (void)status;
-            // TODO handle status
+            if(status != 0 && status != DB_NOTFOUND)
+                return convertStatus(status);
             offset += ksizes[i];
         }
         return Status::OK;
@@ -288,6 +313,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         bool key_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
+
+        auto ret = Status::OK;
 
         // this buffer is used in dummy_key so we can at least load the prefix
         std::vector<char> prefix_check_buffer(prefix.size);
@@ -357,7 +384,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     goto complete;
                 }
                 if(status != 0) {
-                    // TODO handle status
+                    ret = convertStatus(status);
                     goto complete;
                 }
                 if(prefix.size == 0)
@@ -400,19 +427,21 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 key_buf_too_small = true;
 
             } else {
-                // TODO handle status properly
+                ret = convertStatus(status);
                 goto complete;
             }
         }
 
     complete:
-        keys.size = key_offset;
-        for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
+        if(ret == Status::OK) {
+            keys.size = key_offset;
+            for(; i < max; i++) {
+                keySizes[i] = RKV_NO_MORE_KEYS;
+            }
         }
         cursor->close();
 
-        return Status::OK;
+        return ret;
     }
 
     virtual Status listKeyValues(bool packed,
@@ -429,6 +458,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
+        auto ret = Status::OK;
 
         // this buffer is used in dummy_key so we can at least load the prefix
         std::vector<char> prefix_check_buffer(prefix.size);
@@ -500,7 +530,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     goto complete;
                 }
                 if(status != 0) {
-                    // TODO handle status
+                    ret = convertStatus(status);
                     goto complete;
                 }
                 if(prefix.size == 0)
@@ -534,8 +564,11 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     // the value if the key was too small
                     key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
                     status = cursor->get(&key, &val, DB_CURRENT);
-                    // TODO do something with status
                     key.set_flags(DB_DBT_USERMEM);
+                    if(status != 0 && status != DB_BUFFER_SMALL) {
+                        ret = convertStatus(status);
+                        goto complete;
+                    }
                 }
 
                 bool val_was_too_small = val.get_size() > val.get_ulen();
@@ -574,7 +607,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 }
 
             } else {
-                // TODO handle status properly
+                ret = convertStatus(status);
                 goto complete;
             }
         }
@@ -582,13 +615,15 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     complete:
         keys.size = key_offset;
         vals.size = val_offset;
-        for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
-            valSizes[i] = RKV_NO_MORE_KEYS;
+        if(ret == Status::OK) {
+            for(; i < max; i++) {
+                keySizes[i] = RKV_NO_MORE_KEYS;
+                valSizes[i] = RKV_NO_MORE_KEYS;
+            }
         }
         cursor->close();
 
-        return Status::OK;
+        return ret;
     }
 
     ~BerkeleyDBKeyValueStore() {
@@ -605,8 +640,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     private:
 
     json   m_config;
-    DbEnv* m_db_env;
-    Db*    m_db;
+    DbEnv* m_db_env = nullptr;
+    Db*    m_db = nullptr;
 
     BerkeleyDBKeyValueStore(json cfg, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
