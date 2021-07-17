@@ -9,7 +9,9 @@ spack:
   - leveldb@1.22
   - rocksdb
   - berkeley-db+cxx+stl
+  - tkrzw
 #  - lmdb
-#  - gdbm
-#  - tkrzw
+#  - unqlite
+#  - pmemkv
+#  - upscaledb
   concretization: together

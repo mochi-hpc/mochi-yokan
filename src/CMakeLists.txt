@@ -31,6 +31,11 @@ if (ENABLE_BERKELEYDB)
     list (APPEND DB_DEPENDENCIES Oracle::BerkeleyDB stdc++fs)
 endif ()
 
+if (ENABLE_TKRZW)
+    list (APPEND backend-src-files backends/tkrzw.cpp)
+    list (APPEND DB_DEPENDENCIES PkgConfig::tkrzw)
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

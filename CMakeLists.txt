@@ -21,6 +21,7 @@ option (ENABLE_BEDROCK    "Build bedrock module" OFF)
 option (ENABLE_LEVELDB    "Build with leveldb support" OFF)
 option (ENABLE_ROCKSDB    "Build with rocksdb support" OFF)
 option (ENABLE_BERKELEYDB "Build with berkeleydb support" OFF)
+option (ENABLE_TKRZW      "Build with tkrzw support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -80,6 +81,12 @@ endif ()
 if (ENABLE_BERKELEYDB)
     find_package (BerkeleyDB REQUIRED)
     set (HAS_BERKELEYDB ON)
+endif ()
+
+if (ENABLE_TKRZW)
+    pkg_check_modules (tkrzw REQUIRED IMPORTED_TARGET tkrzw)
+    set (HAS_TKRZW ON)
+    set (CMAKE_CXX_STANDARD 17)
 endif ()
 
 # library version set here (e.g. for shared libs).
