@@ -18,6 +18,38 @@ namespace rkv {
 
 using json = nlohmann::json;
 
+static Status convertStatus(const tkrzw::Status& status) {
+    switch(status.GetCode()) {
+        case tkrzw::Status::SUCCESS:
+            return Status::OK;
+        case tkrzw::Status::UNKNOWN_ERROR:
+            return Status::Other;
+        case tkrzw::Status::SYSTEM_ERROR:
+            return Status::System;
+        case tkrzw::Status::NOT_IMPLEMENTED_ERROR:
+            return Status::NotSupported;
+        case tkrzw::Status::PRECONDITION_ERROR:
+            return Status::Other;
+        case tkrzw::Status::INVALID_ARGUMENT_ERROR:
+            return Status::InvalidArg;
+        case tkrzw::Status::CANCELED_ERROR:
+            return Status::Canceled;
+        case tkrzw::Status::NOT_FOUND_ERROR:
+            return Status::NotFound;
+        case tkrzw::Status::PERMISSION_ERROR:
+            return Status::Permission;
+        case tkrzw::Status::INFEASIBLE_ERROR:
+            return Status::Other;
+        case tkrzw::Status::DUPLICATION_ERROR:
+            return Status::Other;
+        case tkrzw::Status::BROKEN_DATA_ERROR:
+            return Status::Corruption;
+        case tkrzw::Status::APPLICATION_ERROR:
+            return Status::Other;
+    }
+    return Status::OK;
+}
+
 class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     public:
@@ -53,7 +85,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
         auto db = new tkrzw::TreeDBM{};
         auto status = db->Open(path, writable);
-        // TODO check status and convert
+        if(!status.IsOK()) {
+            delete db;
+            return convertStatus(status);
+        }
         *kvs = new TkrzwKeyValueStore(std::move(cfg), db);
         return Status::OK;
     }
@@ -66,7 +101,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     // LCOV_EXCL_START
     virtual std::string config() const override {
-        return "{}";
+        return m_config.dump();
     }
     // LCOV_EXCL_STOP
 
@@ -126,7 +161,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         for(; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto status = m_db->Process({keys.data + offset, ksizes[i]}, &get_length, false);
-            // TODO do something with status
+            if(!status.IsOK())
+                return convertStatus(status);
             offset += ksizes[i];
         }
         return Status::OK;
@@ -156,8 +192,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
             auto status = m_db->Set({ keys.data + key_offset, ksizes[i] },
                                     { vals.data + val_offset, vsizes[i] });
             if(!status.IsOK()) {
-                // TODO convert status
-                return Status::Other;
+                return convertStatus(status);
             }
             key_offset += ksizes[i];
             val_offset += vsizes[i];
@@ -224,12 +259,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         auto get_value = GetValue(i, vsizes, vals, packed);
 
         for(; i < ksizes.size; i++) {
-            //std::cerr << "ksize = " << ksizes[i] << std::endl;
             auto status = m_db->Process({ keys.data + key_offset, ksizes[i] },
                                         &get_value, false);
-            // TODO do something with status
             if(!status.IsOK()) {
-                return Status::Other;
+                return convertStatus(status);
             }
             if(packed && (vsizes[i] == BufTooSmall)) {
                 for(; i < ksizes.size; i++)
@@ -250,7 +283,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto status = m_db->Remove({ keys.data + offset, ksizes[i] });
-            // TODO handle status
+            if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                return convertStatus(status);
             offset += ksizes[i];
         }
         return Status::OK;
@@ -337,7 +371,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                 std::string_view{ fromKey.data, fromKey.size },
                 inclusive);
         }
-        // TODO handle status
+        if(!status.IsOK()) return convertStatus(status);
 
         const auto max = keySizes.size;
         ssize_t i = 0;
@@ -346,10 +380,13 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keys, false);
-            if(!status.IsOK())
-                break;
+            if(!status.IsOK()) {
+                if(status == tkrzw::Status::NOT_FOUND_ERROR)
+                    break;
+                else return convertStatus(status);
+            }
             status = iterator->Next();
-            // TODO do something with status
+            if(!status.IsOK()) return convertStatus(status);
         }
 
         keys.size = list_keys.m_key_offset;
@@ -470,7 +507,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                 std::string_view{ fromKey.data, fromKey.size },
                 inclusive);
         }
-        // TODO handle status
+        if(!status.IsOK()) return convertStatus(status);
 
         const auto max = keySizes.size;
         ssize_t i = 0;
@@ -479,10 +516,13 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keyvals, false);
-            if(!status.IsOK())
-                break;
+            if(!status.IsOK()) {
+                if(status == tkrzw::Status::NOT_FOUND_ERROR)
+                    break;
+                else return convertStatus(status);
+            }
             status = iterator->Next();
-            // TODO do something with status
+            if(!status.IsOK()) return convertStatus(status);
         }
 
         keys.size = list_keyvals.m_key_offset;

@@ -96,6 +96,9 @@ enum class Status : uint8_t {
     Busy         = RKV_ERR_BUSY,
     Expired      = RKV_ERR_EXPIRED,
     TryAgain     = RKV_ERR_TRY_AGAIN,
+    System       = RKV_ERR_SYSTEM,
+    Canceled     = RKV_ERR_CANCELED,
+    Permission   = RKV_ERR_PERMISSION,
     Other        = RKV_ERR_OTHER
 };
 
