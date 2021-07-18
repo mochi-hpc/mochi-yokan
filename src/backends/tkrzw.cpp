@@ -7,6 +7,10 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include <tkrzw_dbm_tree.h>
+#include <tkrzw_dbm_hash.h>
+#include <tkrzw_dbm_skip.h>
+#include <tkrzw_dbm_tiny.h>
+#include <tkrzw_dbm_baby.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <string>
@@ -71,20 +75,188 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
             } \
         } while(0)
 
+#define CHECK_ENUM(__cfg__, ...) \
+        do { \
+            bool found = false; \
+            auto& c = __cfg__.get_ref<const std::string&>(); \
+            for(auto& val : { __VA_ARGS__ }) { \
+                if(c == val) { \
+                    found = true; \
+                    break; \
+                } \
+            } \
+            if(!found) { \
+                return Status::InvalidConf; \
+            } \
+        } while(0)
+
         try {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
-            CHECK_TYPE_AND_COMPLETE(cfg, "path", string, "", true);
+            if(!cfg.contains("type") || !cfg["type"].is_string())
+                return Status::InvalidConf;
+
+            auto type = cfg["type"].get<std::string>();
+            if(type == "tree") {
+                CHECK_TYPE_AND_COMPLETE(cfg, "max_page_size", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "max_branches", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "max_cached_pages", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "key_comparator", string, "", false);
+            }
+            if(type == "hash" || type == "tree") {
+                CHECK_TYPE_AND_COMPLETE(cfg, "update_mode", string, "default", false);
+                CHECK_ENUM(cfg["update_mode"], "default", "in_place", "appending");
+                CHECK_TYPE_AND_COMPLETE(cfg, "record_crc_mode", string, "default", false);
+                CHECK_ENUM(cfg["record_crc_mode"], "default", "none", "crc8", "crc16", "crc32");
+                CHECK_TYPE_AND_COMPLETE(cfg, "record_comp_mode", string, "default", false);
+                CHECK_ENUM(cfg["record_comp_mode"], "default", "none", "zlib", "zstd", "lz4", "lzma");
+                CHECK_TYPE_AND_COMPLETE(cfg, "offset_width", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "align_pow", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "num_buckets", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "restore_mode", string, "default", false);
+                CHECK_ENUM(cfg["restore_mode"], "default", "sync", "read_only", "noop");
+                CHECK_TYPE_AND_COMPLETE(cfg, "fbp_capacity", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "min_read_size", number, -1, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "lock_mem_buckets", boolean, false, false);
+                CHECK_TYPE_AND_COMPLETE(cfg, "cache_buckets", boolean, false, false);
+            } else if(type == "tiny") {
+                CHECK_TYPE_AND_COMPLETE(cfg, "num_buckets", number, -1, false);
+            } else if(type == "baby") {
+                CHECK_TYPE_AND_COMPLETE(cfg, "key_comparator", string, "", false);
+            } else {
+                return Status::InvalidConf;
+            }
             CHECK_TYPE_AND_COMPLETE(cfg, "writable", boolean, true, false);
-        } catch(...) {
+            CHECK_TYPE_AND_COMPLETE(cfg, "path", string, "", true);
+        } catch(const std::exception& ex) {
             return Status::InvalidConf;
         }
         auto path = cfg["path"].get<std::string>();
         auto writable = cfg["writable"].get<bool>();
 
-        auto db = new tkrzw::TreeDBM{};
-        auto status = db->Open(path, writable);
+        tkrzw::DBM* db = nullptr;
+
+        auto& type = cfg["type"].get_ref<const std::string&>();
+
+#define SET_TUNABLE(__tun__, __field__, __cfg__, __type__) \
+            do { if(!__cfg__.contains(#__field__)) \
+                __tun__.__field__ = __cfg__[#__field__].get<__type__>(); \
+            } while(0)
+
+#define CONVERT_ENUM(__tun__, __field__, __cfg__, __strings__, __enums__) \
+        do { \
+            auto vs = std::vector<std::string> __strings__; \
+            auto ve = std::vector<int> __enums__; \
+            for(unsigned i = 0; i < vs.size(); i++) { \
+                if(vs[i] == __cfg__[#__field__].get_ref<const std::string&>()) { \
+                    __tun__.__field__ = (decltype(__tun__.__field__))ve[i]; \
+                    break; \
+                } \
+            } \
+        } while(0)
+
+        tkrzw::Status status;
+        if(type == "hash") {
+            auto tmp = new tkrzw::HashDBM{};
+            tkrzw::HashDBM::TuningParameters params;
+            CONVERT_ENUM(params, update_mode, cfg,
+                ({"default", "in_place", "appending"}),
+                ({tkrzw::HashDBM::UPDATE_DEFAULT,
+                  tkrzw::HashDBM::UPDATE_IN_PLACE,
+                  tkrzw::HashDBM::UPDATE_APPENDING}));
+            // Those appeared in more recent tkrzw
+            /*
+            CONVERT_ENUM(params, record_crc_mode, cfg,
+                ({"default", "none", "crc8", "crc16", "crc32"}),
+                ({tkrzw::HashDBM::RECORD_CRC_DEFAULT,
+                  tkrzw::HashDBM::RECORD_CRC_NONE,
+                  tkrzw::HashDBM::RECORD_CRC_8,
+                  tkrzw::HashDBM::RECORD_CRC_16,
+                  tkrzw::HashDBM::RECORD_CRC_32}));
+            CONVERT_ENUM(params, record_comp_mode, cfg,
+                ({"default", "none", "zlib", "zstd", "lz4", "lzma"}),
+                ({tkrzw::HashDBM::RECORD_COMP_DEFAULT,
+                  tkrzw::HashDBM::RECORD_COMP_NONE,
+                  tkrzw::HashDBM::RECORD_COMP_ZLIB,
+                  tkrzw::HashDBM::RECORD_COMP_ZSTD,
+                  tkrzw::HashDBM::RECORD_COMP_LZ4,
+                  tkrzw::HashDBM::RECORD_COMP_LZMA}));
+            CONVERT_ENUM(params, restore_mode, cfg,
+                ({"default", "sync", "read_only", "noop"}),
+                ({tkrzw::HashDBM::RESTORE_DEFAULT,
+                  tkrzw::HashDBM::RESTORE_SYNC,
+                  tkrzw::HashDBM::RESTORE_READ_ONLY,
+                  tkrzw::HashDBM::RESTORE_NOOP}));
+            */
+            SET_TUNABLE(params, offset_width, cfg, int32_t);
+            SET_TUNABLE(params, align_pow, cfg, int32_t);
+            SET_TUNABLE(params, num_buckets, cfg, int32_t);
+            SET_TUNABLE(params, fbp_capacity, cfg, int32_t);
+            SET_TUNABLE(params, min_read_size, cfg, int32_t);
+            params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
+            params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
+            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
+            db = tmp;
+        } else if(type == "tree") {
+            auto tmp = new tkrzw::TreeDBM{};
+            tkrzw::TreeDBM::TuningParameters params;
+            CONVERT_ENUM(params, update_mode, cfg,
+                ({"default", "in_place", "appending"}),
+                ({tkrzw::HashDBM::UPDATE_DEFAULT,
+                  tkrzw::HashDBM::UPDATE_IN_PLACE,
+                  tkrzw::HashDBM::UPDATE_APPENDING}));
+            // Those appeared in more recent tkrzw
+            /*
+            CONVERT_ENUM(params, record_crc_mode, cfg,
+                ({"default", "none", "crc8", "crc16", "crc32"}),
+                ({tkrzw::HashDBM::RECORD_CRC_DEFAULT,
+                  tkrzw::HashDBM::RECORD_CRC_NONE,
+                  tkrzw::HashDBM::RECORD_CRC_8,
+                  tkrzw::HashDBM::RECORD_CRC_16,
+                  tkrzw::HashDBM::RECORD_CRC_32}));
+            CONVERT_ENUM(params, record_comp_mode, cfg,
+                ({"default", "none", "zlib", "zstd", "lz4", "lzma"}),
+                ({tkrzw::HashDBM::RECORD_COMP_DEFAULT,
+                  tkrzw::HashDBM::RECORD_COMP_NONE,
+                  tkrzw::HashDBM::RECORD_COMP_ZLIB,
+                  tkrzw::HashDBM::RECORD_COMP_ZSTD,
+                  tkrzw::HashDBM::RECORD_COMP_LZ4,
+                  tkrzw::HashDBM::RECORD_COMP_LZMA}));
+            CONVERT_ENUM(params, restore_mode, cfg,
+                ({"default", "sync", "read_only", "noop"}),
+                ({tkrzw::HashDBM::RESTORE_DEFAULT,
+                  tkrzw::HashDBM::RESTORE_SYNC,
+                  tkrzw::HashDBM::RESTORE_READ_ONLY,
+                  tkrzw::HashDBM::RESTORE_NOOP}));
+            */
+            SET_TUNABLE(params, offset_width, cfg, int32_t);
+            SET_TUNABLE(params, align_pow, cfg, int32_t);
+            SET_TUNABLE(params, num_buckets, cfg, int32_t);
+            SET_TUNABLE(params, fbp_capacity, cfg, int32_t);
+            SET_TUNABLE(params, min_read_size, cfg, int32_t);
+            SET_TUNABLE(params, max_page_size, cfg, int32_t);
+            SET_TUNABLE(params, max_branches, cfg, int32_t);
+            SET_TUNABLE(params, max_cached_pages, cfg, int32_t);
+            auto key_comparator_name = cfg["key_comparator"].get<std::string>();
+            // TODO add support for key_comparator argument
+            params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
+            params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
+            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
+            db = tmp;
+        } else if(type == "tiny") {
+            auto num_buckets = cfg["num_buckets"].get<int64_t>();
+            auto tmp = new tkrzw::TinyDBM{num_buckets};
+            status = tmp->Open(path, writable);
+            db = tmp;
+        } else if(type == "baby") {
+            auto key_comparator_name = cfg["key_comparator"].get<std::string>();
+            // TODO add support for key_comparator
+            auto tmp = new tkrzw::BabyDBM{};
+            status = tmp->Open(path, writable);
+            db = tmp;
+        }
+
         if(!status.IsOK()) {
             delete db;
             return convertStatus(status);
@@ -107,6 +279,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     virtual void destroy() override {
         auto path = m_config["path"].get<std::string>();
+        auto type = m_config["type"].get<std::string>();
         m_db->Close();
         delete m_db;
         m_db = nullptr;
