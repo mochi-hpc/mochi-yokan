@@ -9,7 +9,7 @@
 #include "../common/locks.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <cstring>
 #include <iostream>
@@ -19,7 +19,7 @@ namespace rkv {
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct MapKeyValueStoreCompare {
+struct UnorderedMapKeyValueStoreCompare {
 
     // LCOV_EXCL_START
     static bool DefaultMemCmp(const void* lhs, size_t lhsize,
@@ -37,9 +37,9 @@ struct MapKeyValueStoreCompare {
 
     cmp_type cmp = &DefaultMemCmp;
 
-    MapKeyValueStoreCompare() = default;
+    UnorderedMapKeyValueStoreCompare() = default;
 
-    MapKeyValueStoreCompare(cmp_type comparator)
+    UnorderedMapKeyValueStoreCompare(cmp_type comparator)
     : cmp(comparator) {}
 
     bool operator()(const KeyType& lhs, const KeyType& rhs) const {
@@ -61,7 +61,7 @@ struct MapKeyValueStoreCompare {
     using is_transparent = int;
 };
 
-class MapKeyValueStore : public KeyValueStoreInterface {
+class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
     public:
 
@@ -138,13 +138,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(use_lock, cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapKeyValueStore(use_lock, cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "map";
+        return "unordered_map";
     }
     // LCOV_EXCL_STOP
 
@@ -304,85 +304,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-        ScopedReadLock lock(m_lock);
-
-        if(!packed) {
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                size_t usize = keySizes[i];
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    i += 1;
-                    offset += usize;
-                    continue;
-                }
-                std::memcpy(umem, key.data(), key.size());
-                keySizes[i] = key.size();
-                offset += usize;
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        } else { // if packed
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            bool buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    buf_too_small = true;
-                } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
-                }
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        }
-        return Status::OK;
+        (void)packed;
+        (void)fromKey;
+        (void)inclusive;
+        (void)prefix;
+        (void)keys;
+        (void)keySizes;
+        return Status::NotSupported;
     }
 
     virtual Status listKeyValues(bool packed,
@@ -392,115 +320,18 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
-        ScopedReadLock lock(m_lock);
-
-        if(!packed) {
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                size_t key_usize = keySizes[i];
-                size_t val_usize = valSizes[i];
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                }
-                key_offset += key_usize;
-                val_offset += val_usize;
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        } else { // if packed
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            bool key_buf_too_small = false;
-            bool val_buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_buf_too_small
-                || keys.size - key_offset < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
-                }
-                if(val_buf_too_small
-                || vals.size - val_offset < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
-                }
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        }
-        return Status::OK;
+        (void)packed;
+        (void)fromKey;
+        (void)inclusive;
+        (void)prefix;
+        (void)keys;
+        (void)keySizes;
+        (void)vals;
+        (void)valSizes;
+        return Status::NotSupported;
     }
 
-    ~MapKeyValueStore() {
+    ~UnorderedMapKeyValueStore() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -514,12 +345,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                        Allocator<char>>;
     using value_type = std::basic_string<char, std::char_traits<char>,
                                          Allocator<char>>;
-    using comparator = MapKeyValueStoreCompare<key_type>;
+    using comparator = UnorderedMapKeyValueStoreCompare<key_type>;
     using cmp_type = comparator::cmp_type;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
     using map_type = std::map<key_type, value_type, comparator, allocator>;
 
-    MapKeyValueStore(bool use_lock,
+    UnorderedMapKeyValueStore(bool use_lock,
                      cmp_type cmp_fun,
                      const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator,
@@ -542,4 +373,4 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-RKV_REGISTER_BACKEND(map, rkv::MapKeyValueStore);
+RKV_REGISTER_BACKEND(unordered_map, rkv::UnorderedMapKeyValueStore);

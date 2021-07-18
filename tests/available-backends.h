@@ -2,6 +2,7 @@
 
 static const char* available_backends[] = {
     "map",
+    "unordered_map",
 #ifdef HAS_LEVELDB
     "leveldb",
 #endif
@@ -30,6 +31,7 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
+    "{}",
     "{}",
 #ifdef HAS_LEVELDB
     "{\"path\":\"/tmp/leveldb-test\","
