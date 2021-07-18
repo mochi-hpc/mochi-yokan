@@ -320,6 +320,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
             return tkrzw::DBM::RecordProcessor::NOOP;
         }
     };
+
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
@@ -358,6 +359,97 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
+    struct ListKeyVals : public tkrzw::DBM::RecordProcessor {
+
+        ssize_t&              m_index;
+        const UserMem&        m_prefix;
+        BasicUserMem<size_t>& m_ksizes;
+        UserMem&              m_keys;
+        BasicUserMem<size_t>& m_vsizes;
+        UserMem&              m_vals;
+        bool                  m_packed;
+        bool                  m_key_buf_too_small = false;
+        bool                  m_val_buf_too_small = false;
+        size_t                m_key_offset = 0;
+        size_t                m_val_offset = 0;
+
+        ListKeyVals(ssize_t& i,
+                    const UserMem& prefix,
+                    BasicUserMem<size_t>& ksizes,
+                    UserMem& keys,
+                    BasicUserMem<size_t>& vsizes,
+                    UserMem& vals,
+                    bool packed)
+        : m_index(i)
+        , m_prefix(prefix)
+        , m_ksizes(ksizes)
+        , m_keys(keys)
+        , m_vsizes(vsizes)
+        , m_vals(vals)
+        , m_packed(packed) {}
+
+        std::string_view ProcessFull(std::string_view key,
+                                     std::string_view val) override {
+            if((key.size() < m_prefix.size)
+            || std::memcmp(key.data(), m_prefix.data, m_prefix.size) != 0) {
+                m_index -= 1;
+                return tkrzw::DBM::RecordProcessor::NOOP;
+            }
+
+            if(m_packed) {
+
+                if(m_key_buf_too_small) {
+                    m_ksizes[m_index] = BufTooSmall;
+                } else if(m_keys.size - m_key_offset < key.size()) {
+                    m_ksizes[m_index] = BufTooSmall;
+                    m_key_buf_too_small = true;
+                } else {
+                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
+                    m_ksizes[m_index] = key.size();
+                    m_key_offset += key.size();
+                }
+
+                if(m_val_buf_too_small) {
+                    m_vsizes[m_index] = BufTooSmall;
+                } else if(m_vals.size - m_val_offset < val.size()) {
+                    m_vsizes[m_index] = BufTooSmall;
+                    m_val_buf_too_small = true;
+                } else {
+                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
+                    m_vsizes[m_index] = val.size();
+                    m_val_offset += val.size();
+                }
+
+            } else {
+
+                if(m_ksizes[m_index] < key.size()) {
+                    m_key_offset += m_ksizes[m_index];
+                    m_ksizes[m_index] = BufTooSmall;
+                } else {
+                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
+                    m_key_offset += m_ksizes[m_index];
+                    m_ksizes[m_index] = key.size();
+                }
+
+                if(m_vsizes[m_index] < val.size()) {
+                    m_val_offset += m_vsizes[m_index];
+                    m_vsizes[m_index] = BufTooSmall;
+                } else {
+                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
+                    m_val_offset += m_vsizes[m_index];
+                    m_vsizes[m_index] = val.size();
+                }
+
+            }
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+
+        std::string_view ProcessEmpty(std::string_view key) override {
+            (void)key;
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+    };
+
     virtual Status listKeyValues(bool packed,
                                  const UserMem& fromKey,
                                  bool inclusive, const UserMem& prefix,
@@ -365,115 +457,41 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
-#if 0
-        ScopedReadLock lock(m_lock);
+        if(!m_db->IsOrdered())
+            return Status::NotSupported;
 
-        if(!packed) {
+        tkrzw::Status status;
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                size_t key_usize = keySizes[i];
-                size_t val_usize = valSizes[i];
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                }
-                key_offset += key_usize;
-                val_offset += val_usize;
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto iterator = m_db->MakeIterator();
+        if(fromKey.size == 0) {
+            status = iterator->First();
+        } else {
+            status = iterator->JumpUpper(
+                std::string_view{ fromKey.data, fromKey.size },
+                inclusive);
+        }
+        // TODO handle status
 
-        } else { // if packed
+        const auto max = keySizes.size;
+        ssize_t i = 0;
 
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            size_t val_offset = 0;
-            bool key_buf_too_small = false;
-            bool val_buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = it->first;
-                auto& val = it->second;
-                if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
-                        continue;
-                }
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                auto val_umem = static_cast<char*>(vals.data) + val_offset;
-                if(key_buf_too_small
-                || keys.size - key_offset < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
-                }
-                if(val_buf_too_small
-                || vals.size - val_offset < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
-                }
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = val_offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
+        auto list_keyvals = ListKeyVals{i, prefix, keySizes, keys, valSizes, vals, packed};
 
+        for(; (i < (ssize_t)max); i++) {
+            status = iterator->Process(&list_keyvals, false);
+            if(!status.IsOK())
+                break;
+            status = iterator->Next();
+            // TODO do something with status
+        }
+
+        keys.size = list_keyvals.m_key_offset;
+        vals.size = list_keyvals.m_val_offset;
+        for(; i < (ssize_t)max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+            valSizes[i] = RKV_NO_MORE_KEYS;
         }
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     ~TkrzwKeyValueStore() {
