@@ -95,6 +95,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(status != 0)
             return convertStatus(status);
         auto db = new Db(db_env, 0);
+        // TODO allow using DB_HASH
         status = db->open(nullptr, db_file.empty() ? nullptr : db_file.c_str(),
                           db_name.empty() ? nullptr : db_name.c_str(),
                           DB_BTREE, db_flags, 0);
