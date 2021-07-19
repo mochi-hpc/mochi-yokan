@@ -12,7 +12,7 @@ spack:
   - tkrzw
   - gdbm
   - lmdb
+  - unqlite
 #  - pmemkv
-#  - unqlite
 #  - upscaledb
   concretization: together

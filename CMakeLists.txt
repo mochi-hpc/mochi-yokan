@@ -24,6 +24,7 @@ option (ENABLE_BERKELEYDB "Build with berkeleydb support" OFF)
 option (ENABLE_TKRZW      "Build with tkrzw support" OFF)
 option (ENABLE_LMDB       "Build with lmdb support" OFF)
 option (ENABLE_GDBM       "Build with gdbm support" OFF)
+option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -99,6 +100,11 @@ endif ()
 if (ENABLE_LMDB)
     pkg_check_modules (lmdb REQUIRED IMPORTED_TARGET lmdb)
     set (HAS_LMDB ON)
+endif ()
+
+if (ENABLE_UNQLITE)
+   find_package (UnQLite REQUIRED)
+   set (HAS_UNQLITE ON)
 endif ()
 
 # library version set here (e.g. for shared libs).

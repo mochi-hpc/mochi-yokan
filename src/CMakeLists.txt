@@ -58,6 +58,12 @@ if (ENABLE_LMDB)
     list (APPEND DB_DEPENDENCIES PkgConfig::lmdb)
 endif ()
 
+if (ENABLE_UNQLITE)
+    list (APPEND backend-src-files backends/unqlite.cpp)
+    list (APPEND DB_DEPENDENCIES ${UNQLITE_LIBRARIES})
+    include_directories (${UNQLITE_INCLUDE_DIRS})
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp
