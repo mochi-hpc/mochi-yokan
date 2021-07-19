@@ -55,10 +55,21 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             __cfg__[__field__] = __default__; \
         } } while(0)
 
+        auto db_type = DB_BTREE;
+
         try {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
+            if(!cfg.contains("type") || !cfg["type"].is_string())
+                return Status::InvalidConf;
+            if(cfg["type"].get<std::string>() == "btree") {
+                db_type = DB_BTREE;
+            } else if(cfg["type"].get<std::string>() == "hash") {
+                db_type = DB_HASH;
+            } else {
+                return Status::InvalidConf;
+            }
             CHECK_TYPE_AND_SET_DEFAULT(cfg, "create_if_missing", boolean, true);
             CHECK_TYPE_AND_SET_DEFAULT(cfg, "home", string, ".");
             CHECK_TYPE_AND_SET_DEFAULT(cfg, "file", string, "");
@@ -95,17 +106,16 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(status != 0)
             return convertStatus(status);
         auto db = new Db(db_env, 0);
-        // TODO allow using DB_HASH
         status = db->open(nullptr, db_file.empty() ? nullptr : db_file.c_str(),
                           db_name.empty() ? nullptr : db_name.c_str(),
-                          DB_BTREE, db_flags, 0);
+                          db_type, db_flags, 0);
         if(status != 0) {
             db_env->close(0);
             delete db_env;
             return convertStatus(status);
         }
 
-        *kvs = new BerkeleyDBKeyValueStore(cfg, db_env, db);
+        *kvs = new BerkeleyDBKeyValueStore(cfg, db_type, db_env, db);
         return Status::OK;
     }
 
@@ -308,6 +318,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        if(m_db_type != DB_BTREE)
+            return Status::NotSupported;
 
         auto max = keySizes.size;
         size_t i = 0;
@@ -452,6 +464,9 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
+        if(m_db_type != DB_BTREE)
+            return Status::NotSupported;
+
         auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
@@ -641,11 +656,13 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     private:
 
     json   m_config;
+    int    m_db_type;
     DbEnv* m_db_env = nullptr;
     Db*    m_db = nullptr;
 
-    BerkeleyDBKeyValueStore(json cfg, DbEnv* env, Db* db)
+    BerkeleyDBKeyValueStore(json cfg, int db_type, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
+    , m_db_type(db_type)
     , m_db_env(env)
     , m_db(db) {}
 };
