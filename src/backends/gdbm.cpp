@@ -37,6 +37,9 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
+        if(path.empty())
+            return Status::InvalidConf;
+
         auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
         *kvs = new GDBMKeyValueStore(std::move(cfg), use_lock, db);
         return Status::OK;
