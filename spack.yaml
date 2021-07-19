@@ -10,6 +10,7 @@ spack:
   - rocksdb
   - berkeley-db+cxx+stl
   - tkrzw
+  - gdbm
 #  - lmdb
 #  - unqlite
 #  - pmemkv

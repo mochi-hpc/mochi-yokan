@@ -37,6 +37,12 @@ if (ENABLE_TKRZW)
     list (APPEND DB_DEPENDENCIES PkgConfig::tkrzw)
 endif ()
 
+if (ENABLE_GDBM)
+    list (APPEND backend-src-files backends/gdbm.cpp)
+    list (APPEND DB_DEPENDENCIES ${GDBM_LIBRARIES})
+    include_directories (${GDBM_INCLUDE_DIRS})
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

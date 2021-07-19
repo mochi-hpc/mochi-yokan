@@ -51,7 +51,8 @@ static const char* backend_configs[] = {
     " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_GDBM
-    "{}",
+    "{\"path\":\"/tmp/gdbm-test\","
+    " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_PMEMKV
     "{}",

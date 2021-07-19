@@ -89,6 +89,11 @@ if (ENABLE_TKRZW)
     set (CMAKE_CXX_STANDARD 17)
 endif ()
 
+if (ENABLE_GDBM)
+   find_package (GDBM REQUIRED)
+   set (HAS_GDBM ON)
+endif ()
+
 # library version set here (e.g. for shared libs).
 set (RKV_VERSION_MAJOR 0)
 set (RKV_VERSION_MINOR 1)
