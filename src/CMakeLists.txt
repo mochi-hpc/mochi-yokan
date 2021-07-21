@@ -43,6 +43,11 @@ if (ENABLE_GDBM)
     include_directories (${GDBM_INCLUDE_DIRS})
 endif ()
 
+if (ENABLE_LMDB)
+    list (APPEND backend-src-files backends/lmdb.cpp)
+    list (APPEND DB_DEPENDENCIES PkgConfig::lmdb)
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

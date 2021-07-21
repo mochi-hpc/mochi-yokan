@@ -11,8 +11,8 @@ spack:
   - berkeley-db+cxx+stl
   - tkrzw
   - gdbm
-#  - lmdb
-#  - unqlite
+  - lmdb
 #  - pmemkv
+#  - unqlite
 #  - upscaledb
   concretization: together

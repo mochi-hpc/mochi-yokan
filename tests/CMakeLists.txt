@@ -14,5 +14,5 @@ foreach (test-source ${test-sources})
         rkv-server
         rkv-admin
         rkv-client)
-    add_test (NAME ${test-target} COMMAND timeout 60 ./${test-target})
+    add_test (NAME ${test-target} COMMAND timeout 200 ./${test-target})
 endforeach ()

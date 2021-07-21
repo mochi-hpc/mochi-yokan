@@ -38,7 +38,8 @@ static const char* backend_configs[] = {
     " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_LMDB
-    "{}",
+    "{\"path\":\"/tmp/lmdb-test\","
+    " \"create_if_missing\":true}",
 #endif
 #ifdef HAS_BERKELEYDB
     "{\"home\":\"/tmp/berkeleydb-test\","

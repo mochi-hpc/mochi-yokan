@@ -22,6 +22,7 @@ option (ENABLE_LEVELDB    "Build with leveldb support" OFF)
 option (ENABLE_ROCKSDB    "Build with rocksdb support" OFF)
 option (ENABLE_BERKELEYDB "Build with berkeleydb support" OFF)
 option (ENABLE_TKRZW      "Build with tkrzw support" OFF)
+option (ENABLE_LMDB       "Build with lmdb support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -92,6 +93,11 @@ endif ()
 if (ENABLE_GDBM)
    find_package (GDBM REQUIRED)
    set (HAS_GDBM ON)
+endif ()
+
+if (ENABLE_LMDB)
+    pkg_check_modules (lmdb REQUIRED IMPORTED_TARGET lmdb)
+    set (HAS_LMDB ON)
 endif ()
 
 # library version set here (e.g. for shared libs).

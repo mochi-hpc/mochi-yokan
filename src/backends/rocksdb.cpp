@@ -202,6 +202,8 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual void destroy() override {
+        delete m_db;
+        m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
         std::experimental::filesystem::remove_all(path);
     }
@@ -518,7 +520,8 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     ~RocksDBKeyValueStore() {
-        delete m_db;
+        if(m_db)
+            delete m_db;
     }
 
     private:
