@@ -76,6 +76,8 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         } while(0)
 
         CHECK_AND_ADD_MISSING(cfg, "path", string, "", true);
+        CHECK_AND_ADD_MISSING(cfg, "create_if_missing", boolean, true, false);
+        CHECK_AND_ADD_MISSING(cfg, "no_lock", boolean, false, false);
 
         auto path = cfg["path"].get<std::string>();
         std::error_code ec;
@@ -87,8 +89,9 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
         ret = mdb_env_create(&env);
         if(ret != MDB_SUCCESS) return convertStatus(ret);
-        // TODO add MDB_NOLOCK flag if requested, and maybe other flags
-        ret = mdb_env_open(env, path.c_str(), MDB_WRITEMAP, 0644);
+        int flags = MDB_WRITEMAP;
+        if(cfg["no_lock"].get<bool>()) flags |= MDB_NOLOCK;
+        ret = mdb_env_open(env, path.c_str(), flags, 0644);
         if(ret != MDB_SUCCESS) {
             mdb_env_close(env);
             return convertStatus(ret);
@@ -98,7 +101,8 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             mdb_env_close(env);
             return convertStatus(ret);
         }
-        ret = mdb_dbi_open(txn, nullptr, MDB_CREATE, &db);
+        flags = cfg["create_if_missing"].get<bool>() ? MDB_CREATE : 0;
+        ret = mdb_dbi_open(txn, nullptr, flags, &db);
         if(ret != MDB_SUCCESS) {
             mdb_txn_abort(txn);
             mdb_env_close(env);
@@ -328,65 +332,113 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeys(bool packed, const UserMem& fromKey,
                             bool inclusive, const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-#if 0
-        auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
 
-        auto iterator = m_db->NewIterator(m_read_options);
+        MDB_cursor* cursor = nullptr;
+        ret = mdb_cursor_open(txn, m_db, &cursor);
+        if(ret != MDB_SUCCESS) {
+            mdb_txn_abort(txn);
+            return convertStatus(ret);
+        }
+
         if(fromKey.size == 0) {
-            iterator->SeekToFirst();
+            MDB_val k, v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
         } else {
-            iterator->Seek(fromKeySlice);
+            MDB_val k{ fromKey.size, fromKey.data };
+            MDB_val v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
             if(!inclusive) {
-                if(iterator->key().compare(fromKeySlice) == 0) {
-                    iterator->Next();
+                if(k.mv_size == fromKey.size
+                && std::memcmp(k.mv_data, fromKey.data, fromKey.size) == 0) {
+                    ret = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+                    if(ret != MDB_SUCCESS) {
+                        mdb_txn_abort(txn);
+                        return convertStatus(ret);
+                    }
                 }
             }
         }
 
         auto max = keySizes.size;
         size_t i = 0;
-        size_t offset = 0;
-        bool buf_too_small = false;
+        size_t key_offset = 0;
+        bool key_buf_too_small = false;
 
-        while(iterator->Valid() && i < max) {
-            auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
-                iterator->Next();
+        while(i < max) {
+            MDB_val key, val;
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
+
+            if(key.mv_size < prefix.size
+            || std::memcmp(key.mv_data, prefix.data, prefix.size) != 0) {
+                ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+                if(ret == MDB_NOTFOUND)
+                    break;
+                if(ret != MDB_SUCCESS) {
+                    mdb_cursor_close(cursor);
+                    mdb_txn_abort(txn);
+                    return convertStatus(ret);
+                }
                 continue;
             }
-            size_t usize = keySizes[i];
-            auto umem = static_cast<char*>(keys.data) + offset;
+
+            size_t key_usize = keySizes[i];
+            auto key_umem = static_cast<char*>(keys.data) + key_offset;
             if(packed) {
-                if(keys.size - offset < key.size() || buf_too_small) {
+                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    buf_too_small = true;
+                    key_buf_too_small = true;
                 } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
+                    std::memcpy(key_umem, key.mv_data, key.mv_size);
+                    keySizes[i] = key.mv_size;
+                    key_offset += key.mv_size;
                 }
             } else {
-                if(usize < key.size()) {
+                if(key_usize < key.mv_size) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    offset += usize;
+                    key_offset += key_usize;
                 } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += usize;
+                    std::memcpy(key_umem, key.mv_data, key.mv_size);
+                    keySizes[i] = key.mv_size;
+                    key_offset += key_usize;
                 }
             }
             i += 1;
-            iterator->Next();
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
         }
-        keys.size = offset;
+
+        mdb_cursor_close(cursor);
+        mdb_txn_abort(txn);
+
+        keys.size = key_offset;
         for(; i < max; i++) {
             keySizes[i] = RKV_NO_MORE_KEYS;
         }
-        delete iterator;
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     virtual Status listKeyValues(bool packed,
@@ -396,18 +448,40 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
-#if 0
-        auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
 
-        auto iterator = m_db->NewIterator(m_read_options);
+        MDB_cursor* cursor = nullptr;
+        ret = mdb_cursor_open(txn, m_db, &cursor);
+        if(ret != MDB_SUCCESS) {
+            mdb_txn_abort(txn);
+            return convertStatus(ret);
+        }
+
         if(fromKey.size == 0) {
-            iterator->SeekToFirst();
+            MDB_val k, v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
         } else {
-            iterator->Seek(fromKeySlice);
+            MDB_val k{ fromKey.size, fromKey.data };
+            MDB_val v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
             if(!inclusive) {
-                if(iterator->key().compare(fromKeySlice) == 0) {
-                    iterator->Next();
+                if(k.mv_size == fromKey.size
+                && std::memcmp(k.mv_data, fromKey.data, fromKey.size) == 0) {
+                    ret = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+                    if(ret != MDB_SUCCESS) {
+                        mdb_txn_abort(txn);
+                        return convertStatus(ret);
+                    }
                 }
             }
         }
@@ -419,65 +493,90 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
 
-        while(iterator->Valid() && i < max) {
-            auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
-                iterator->Next();
+        while(i < max) {
+            MDB_val key, val;
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
+
+            if(key.mv_size < prefix.size
+            || std::memcmp(key.mv_data, prefix.data, prefix.size) != 0) {
+                ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+                if(ret == MDB_NOTFOUND)
+                    break;
+                if(ret != MDB_SUCCESS) {
+                    mdb_cursor_close(cursor);
+                    mdb_txn_abort(txn);
+                    return convertStatus(ret);
+                }
                 continue;
             }
-            auto val = iterator->value();
+
             size_t key_usize = keySizes[i];
             size_t val_usize = valSizes[i];
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
-                if(keys.size - key_offset < key.size() || key_buf_too_small) {
+                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                     key_buf_too_small = true;
                 } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
+                    std::memcpy(key_umem, key.mv_data, key.mv_size);
+                    keySizes[i] = key.mv_size;
+                    key_offset += key.mv_size;
                 }
-                if(vals.size - val_offset < val.size() || val_buf_too_small) {
+                if(vals.size - val_offset < val.mv_size || val_buf_too_small) {
                     valSizes[i] = RKV_SIZE_TOO_SMALL;
                     val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
+                    std::memcpy(val_umem, val.mv_data, val.mv_size);
+                    valSizes[i] = val.mv_size;
+                    val_offset += val.mv_size;
                 }
             } else {
-                if(key_usize < key.size()) {
+                if(key_usize < key.mv_size) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                     key_offset += key_usize;
                 } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
+                    std::memcpy(key_umem, key.mv_data, key.mv_size);
+                    keySizes[i] = key.mv_size;
                     key_offset += key_usize;
                 }
-                if(val_usize < val.size()) {
+                if(val_usize < val.mv_size) {
                     valSizes[i] = RKV_SIZE_TOO_SMALL;
                     val_offset += val_usize;
                 } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
+                    std::memcpy(val_umem, val.mv_data, val.mv_size);
+                    valSizes[i] = val.mv_size;
                     val_offset += val_usize;
                 }
             }
             i += 1;
-            iterator->Next();
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
         }
+
+        mdb_cursor_close(cursor);
+        mdb_txn_abort(txn);
+
         keys.size = key_offset;
         vals.size = val_offset;
         for(; i < max; i++) {
             keySizes[i] = RKV_NO_MORE_KEYS;
             valSizes[i] = RKV_NO_MORE_KEYS;
         }
-        delete iterator;
         return Status::OK;
-#endif
-        return Status::NotSupported;
     }
 
     ~LMDBKeyValueStore() {
