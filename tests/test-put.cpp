@@ -6,6 +6,7 @@
 #include "test-common-setup.hpp"
 #include <numeric>
 #include <vector>
+#include <array>
 
 /**
  * @brief Check that we can put key/value pairs from the reference map.

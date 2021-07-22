@@ -95,7 +95,7 @@ extern "C" rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
     hg_return_t hret = HG_SUCCESS;
     margo_instance_id mid = dbh->client->mid;
     std::vector<void*> ptrs;
-    std::vector<size_t> sizes;
+    std::vector<hg_size_t> sizes;
     // from_key
     if(from_key && from_ksize) {
         ptrs.push_back(const_cast<void*>(from_key));

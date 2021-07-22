@@ -32,7 +32,8 @@ inline auto defer(F&& f) {
 
 #define _UTILITY_DEFERRED_LINENAME_CAT(name, line) name##line
 #define _UTILITY_DEFERRED_LINENAME(name, line) _UTILITY_DEFERRED_LINENAME_CAT(name, line)
-#define DEFER(f) const auto& _UTILITY_DEFERRED_LINENAME(EXIT, __LINE__) = ::rkv::defer([&]() { f; })
+#define DEFER(f) \
+    const auto& _UTILITY_DEFERRED_LINENAME(EXIT, __LINE__) = ::rkv::defer([&]() { f; }); (void)_UTILITY_DEFERRED_LINENAME(EXIT, __LINE__)
 
 }
 

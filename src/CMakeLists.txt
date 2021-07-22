@@ -17,19 +17,29 @@ set (backend-src-files
 
 set(DB_DEPENDENCIES "")
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
+        list (APPEND DB_DEPENDENCIES c++fs)
+    endif()
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
+        list (APPEND DB_DEPENDENCIES stdc++fs)
+    endif()
+endif()
+
 if (ENABLE_LEVELDB)
     list (APPEND backend-src-files backends/leveldb.cpp)
-    list (APPEND DB_DEPENDENCIES PkgConfig::leveldb stdc++fs)
+    list (APPEND DB_DEPENDENCIES PkgConfig::leveldb)
 endif ()
 
 if (ENABLE_ROCKSDB)
     list (APPEND backend-src-files backends/rocksdb.cpp)
-    list (APPEND DB_DEPENDENCIES PkgConfig::rocksdb stdc++fs)
+    list (APPEND DB_DEPENDENCIES PkgConfig::rocksdb)
 endif ()
 
 if (ENABLE_BERKELEYDB)
     list (APPEND backend-src-files backends/berkeleydb.cpp)
-    list (APPEND DB_DEPENDENCIES Oracle::BerkeleyDB stdc++fs)
+    list (APPEND DB_DEPENDENCIES Oracle::BerkeleyDB)
 endif ()
 
 if (ENABLE_TKRZW)

@@ -7,6 +7,7 @@
 #include <numeric>
 #include <vector>
 #include <cmath>
+#include <array>
 
 static void* test_exists_context_setup(const MunitParameter params[], void* user_data)
 {

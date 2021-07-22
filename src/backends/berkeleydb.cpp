@@ -13,12 +13,21 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#if __cplusplus >= 201703L
+#include <filesystem>
+#else
 #include <experimental/filesystem>
+#endif
 
 namespace rkv {
 
 using json = nlohmann::json;
+
+#if __cplusplus >= 201703L
+namespace fs = std::filesystem;
+#else
 namespace fs = std::experimental::filesystem;
+#endif
 
 static inline Status convertStatus(int bdb_status) {
     switch(bdb_status) {

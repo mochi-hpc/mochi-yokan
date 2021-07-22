@@ -8,6 +8,9 @@
 
 #include <margo.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+
 #define RKV_LOG_TRACE(__mid__, __msg__, ...) \
     margo_trace(__mid__, "[rkv] %s:%d: " __msg__, __func__, __LINE__, ##__VA_ARGS__)
 #define RKV_LOG_DEBUG(__mid__, __msg__, ...) \
@@ -21,4 +24,5 @@
 #define RKV_LOG_CRITICAL(__mid__, __msg__, ...) \
     margo_critical(__mid__, "[rkv] %s:%d: " __msg__, __func__, __LINE__, ##__VA_ARGS__)
 
+#pragma clang diagnostic pop
 #endif

@@ -6,6 +6,7 @@
 #include "test-common-setup.hpp"
 #include <numeric>
 #include <vector>
+#include <array>
 
 static void* test_length_context_setup(const MunitParameter params[], void* user_data)
 {
