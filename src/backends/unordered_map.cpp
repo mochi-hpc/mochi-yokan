@@ -13,52 +13,21 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#include <string_view>
 
 namespace rkv {
 
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct UnorderedMapKeyValueStoreCompare {
+struct UnorderedMapKeyValueStoreHash {
 
-    // LCOV_EXCL_START
-    static bool DefaultMemCmp(const void* lhs, size_t lhsize,
-                              const void* rhs, size_t rhsize) {
-        auto r = std::memcmp(lhs, rhs, std::min(lhsize, rhsize));
-        if(r < 0) return true;
-        if(r > 0) return false;
-        if(lhsize < rhsize)
-            return true;
-        return false;
+    using sv = std::string_view;
+
+    std::size_t operator()(KeyType const& key) const noexcept
+    {
+        return std::hash<sv>{}({ key.data(), key.size() });
     }
-    // LCOV_EXCL_STOP
-
-    using cmp_type = bool (*)(const void*, size_t, const void*, size_t);
-
-    cmp_type cmp = &DefaultMemCmp;
-
-    UnorderedMapKeyValueStoreCompare() = default;
-
-    UnorderedMapKeyValueStoreCompare(cmp_type comparator)
-    : cmp(comparator) {}
-
-    bool operator()(const KeyType& lhs, const KeyType& rhs) const {
-        return cmp(lhs.data(), lhs.size(), rhs.data(), rhs.size());
-    }
-
-    bool operator()(const KeyType& lhs, const UserMem& rhs) const {
-        return cmp(lhs.data(), lhs.size(), rhs.data, rhs.size);
-    }
-
-    bool operator()(const UserMem& lhs, const KeyType& rhs) const {
-        return cmp(lhs.data, lhs.size, rhs.data(), rhs.size());
-    }
-
-    bool operator()(const UserMem& lhs, const UserMem& rhs) const {
-        return cmp(lhs.data, lhs.size, rhs.data, rhs.size);
-    }
-
-    using is_transparent = int;
 };
 
 class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
@@ -68,7 +37,6 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
         bool use_lock;
-        cmp_type cmp = comparator::DefaultMemCmp;
         rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         rkv_allocator_t key_alloc, val_alloc, node_alloc;
         std::string key_alloc_conf, val_alloc_conf, node_alloc_conf;
@@ -80,14 +48,15 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             // check use_lock
             use_lock = cfg.value("use_lock", true);
             cfg["use_lock"] = use_lock;
-            // check comparator field
-            if(!cfg.contains("comparator"))
-                cfg["comparator"] = "default";
-            auto comparator = cfg.value("comparator", "default");
-            if(comparator != "default")
-                cmp = Linker::load<cmp_type>(comparator);
-            if(cmp == nullptr)
-                return Status::InvalidConf;
+
+            // bucket number
+            if(!cfg.contains("initial_bucket_count")) {
+                cfg["initial_bucket_count"] = 23;
+            } else {
+                if(!cfg["initial_bucket_count"].is_number_unsigned())
+                    return Status::InvalidConf;
+            }
+
             // check allocators
             if(!cfg.contains("allocators")) {
                 cfg["allocators"]["key_allocator"] = "default";
@@ -120,7 +89,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                 val_alloc_init = default_allocator_init;
             else
                 val_alloc_init = Linker::load<decltype(val_alloc_init)>(val_allocator_name);
-            if(val_alloc_init == nullptr) return Status::InvalidConf;
+            if(val_alloc_init == nullptr) {
+                key_alloc.finalize(key_alloc.context);
+                return Status::InvalidConf;
+            }
             val_alloc_init(&val_alloc, val_allocator_config.dump().c_str());
 
             // node allocator
@@ -132,13 +104,17 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                 node_alloc_init = default_allocator_init;
             else
                 node_alloc_init = Linker::load<decltype(node_alloc_init)>(node_allocator_name);
-            if(node_alloc_init == nullptr) return Status::InvalidConf;
+            if(node_alloc_init == nullptr) {
+                key_alloc.finalize(key_alloc.context);
+                val_alloc.finalize(val_alloc.context);
+                return Status::InvalidConf;
+            }
             node_alloc_init(&node_alloc, node_allocator_config.dump().c_str());
 
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapKeyValueStore(use_lock, cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapKeyValueStore(std::move(cfg), use_lock, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -150,7 +126,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
     // LCOV_EXCL_START
     virtual std::string config() const override {
-        return "{}";
+        return m_config.dump();
     }
     // LCOV_EXCL_STOP
 
@@ -165,9 +141,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
+            key.assign(keys.data + offset, ksizes[i]);
             flags[i] = m_db->count(key) > 0;
             offset += ksizes[i];
         }
@@ -180,9 +157,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
+            key.assign(keys.data + offset, ksizes[i]);
             auto it = m_db->find(key);
             if(it == m_db->end()) vsizes[i] = KeyNotFound;
             else vsizes[i] = it->second.size();
@@ -239,8 +217,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
         if(!packed) {
 
+            auto key = key_type(m_key_allocator);
             for(size_t i = 0; i < ksizes.size; i++) {
-                const UserMem key{ keys.data + key_offset, ksizes[i] };
+                key.assign(keys.data + key_offset, ksizes[i]);
                 auto it = m_db->find(key);
                 const auto original_vsize = vsizes[i];
                 if(it == m_db->end()) {
@@ -261,9 +240,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         } else { // if packed
 
             size_t val_remaining_size = vals.size;
+            auto key = key_type(m_key_allocator);
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                auto key = UserMem{ keys.data + key_offset, ksizes[i] };
+                key.assign(keys.data + key_offset, ksizes[i]);
                 auto it = m_db->find(key);
                 if(it == m_db->end()) {
                     vsizes[i] = KeyNotFound;
@@ -289,9 +269,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                          const BasicUserMem<size_t>& ksizes) override {
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto key = UserMem{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
+            key.assign(keys.data + offset, ksizes[i]);
             auto it = m_db->find(key);
             if(it != m_db->end()) {
                 m_db->erase(it);
@@ -346,30 +327,36 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                                        Allocator<char>>;
     using value_type = std::basic_string<char, std::char_traits<char>,
                                          Allocator<char>>;
-    using comparator = UnorderedMapKeyValueStoreCompare<key_type>;
-    using cmp_type = comparator::cmp_type;
+    using equal_type = std::equal_to<key_type>;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
-    using map_type = std::map<key_type, value_type, comparator, allocator>;
+    using hash_type = UnorderedMapKeyValueStoreHash<key_type>;
+    using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
-    UnorderedMapKeyValueStore(bool use_lock,
-                     cmp_type cmp_fun,
+    UnorderedMapKeyValueStore(json cfg,
+                     bool use_lock,
                      const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator,
                      const rkv_allocator_t& val_allocator)
-    : m_node_allocator(node_allocator)
+    : m_config(std::move(cfg))
+    , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
     {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
-        m_db = new map_type(cmp_fun, allocator(m_node_allocator));
+        m_db = new unordered_map_type(
+                m_config["initial_bucket_count"].get<size_t>(),
+                hash_type(),
+                equal_type(),
+                allocator(m_node_allocator));
     }
 
-    map_type*       m_db;
-    ABT_rwlock      m_lock = ABT_RWLOCK_NULL;
-    rkv_allocator_t m_node_allocator;
-    rkv_allocator_t m_key_allocator;
-    rkv_allocator_t m_val_allocator;
+    unordered_map_type* m_db;
+    json                m_config;
+    ABT_rwlock          m_lock = ABT_RWLOCK_NULL;
+    mutable rkv_allocator_t     m_node_allocator;
+    mutable rkv_allocator_t     m_key_allocator;
+    mutable rkv_allocator_t     m_val_allocator;
 };
 
 }
