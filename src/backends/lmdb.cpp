@@ -10,11 +10,21 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#if __cplusplus >= 201703L
+#include <filesystem>
+#else
 #include <experimental/filesystem>
+#endif
 
 namespace rkv {
 
 using json = nlohmann::json;
+
+#if __cplusplus >= 201703L
+namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
+#endif
 
 class LMDBKeyValueStore : public KeyValueStoreInterface {
 
@@ -81,7 +91,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
         auto path = cfg["path"].get<std::string>();
         std::error_code ec;
-        std::experimental::filesystem::create_directories(path, ec);
+        fs::create_directories(path, ec);
         int ret;
         MDB_env* env = nullptr;
         MDB_txn *txn = nullptr;
@@ -138,7 +148,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         }
         m_env = nullptr;
         auto path = m_config["path"].get<std::string>();
-        std::experimental::filesystem::remove_all(path);
+        fs::remove_all(path);
     }
 
     virtual Status exists(const UserMem& keys,

@@ -9,13 +9,23 @@
 #include <abt.h>
 #include <string>
 #include <cstring>
-#include <experimental/filesystem>
 #include <iostream>
 #include <gdbm.h>
+#if __cplusplus >= 201703L
+#include <filesystem>
+#else
+#include <experimental/filesystem>
+#endif
 
 namespace rkv {
 
 using json = nlohmann::json;
+
+#if __cplusplus >= 201703L
+namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
+#endif
 
 class GDBMKeyValueStore : public KeyValueStoreInterface {
 
@@ -62,7 +72,7 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
         gdbm_close(m_db);
         m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
-        std::experimental::filesystem::remove(path);
+        fs::remove(path);
     }
 
     virtual Status exists(const UserMem& keys,

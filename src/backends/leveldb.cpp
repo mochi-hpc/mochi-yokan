@@ -13,9 +13,19 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#if __cplusplus >= 201703L
+#include <filesystem>
+#else
 #include <experimental/filesystem>
+#endif
 
 namespace rkv {
+
+#if __cplusplus >= 201703L
+namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
+#endif
 
 using json = nlohmann::json;
 
@@ -110,7 +120,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
     virtual void destroy() override {
         auto path = m_config["path"].get<std::string>();
-        std::experimental::filesystem::remove_all(path);
+        fs::remove_all(path);
     }
 
     virtual Status exists(const UserMem& keys,

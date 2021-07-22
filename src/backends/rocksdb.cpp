@@ -13,11 +13,21 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#if __cplusplus >= 201703L
+#include <filesystem>
+#else
 #include <experimental/filesystem>
+#endif
 
 namespace rkv {
 
 using json = nlohmann::json;
+
+#if __cplusplus >= 201703L
+namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
+#endif
 
 class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
@@ -205,7 +215,7 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         delete m_db;
         m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
-        std::experimental::filesystem::remove_all(path);
+        fs::remove_all(path);
     }
 
     virtual Status exists(const UserMem& keys,
