@@ -13,7 +13,11 @@
 #include <string>
 #include <cstring>
 #include <iostream>
+#if __cplusplus >= 201703L
 #include <string_view>
+#else
+#include <experimental/string_view>
+#endif
 
 namespace rkv {
 
@@ -22,7 +26,11 @@ using json = nlohmann::json;
 template<typename KeyType>
 struct UnorderedMapKeyValueStoreHash {
 
+#if __cplusplus >= 201703L
     using sv = std::string_view;
+#else
+    using sv = std::experimental::string_view;
+#endif
 
     std::size_t operator()(KeyType const& key) const noexcept
     {
