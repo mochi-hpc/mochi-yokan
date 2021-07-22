@@ -4,6 +4,7 @@ static const char* available_backends[] = {
     "map",
     "unordered_map",
     "set",
+    "unordered_set",
 #ifdef HAS_LEVELDB
     "leveldb",
 #endif
@@ -32,6 +33,7 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
+    "{}",
     "{}",
     "{}",
     "{}",

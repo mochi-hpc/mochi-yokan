@@ -14,7 +14,8 @@ set (backend-src-files
      backends/backends.cpp
      backends/map.cpp
      backends/unordered_map.cpp
-     backends/set.cpp)
+     backends/set.cpp
+     backends/unordered_set.cpp)
 
 set(DB_DEPENDENCIES "")
 
