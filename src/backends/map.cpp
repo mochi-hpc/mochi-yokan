@@ -506,6 +506,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         delete m_db;
         m_key_allocator.finalize(m_key_allocator.context);
         m_val_allocator.finalize(m_val_allocator.context);
+        m_node_allocator.finalize(m_node_allocator.context);
     }
 
     private:

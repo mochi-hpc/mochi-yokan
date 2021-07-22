@@ -13,7 +13,8 @@ set (server-src-files
 set (backend-src-files
      backends/backends.cpp
      backends/map.cpp
-     backends/unordered_map.cpp)
+     backends/unordered_map.cpp
+     backends/set.cpp)
 
 set(DB_DEPENDENCIES "")
 

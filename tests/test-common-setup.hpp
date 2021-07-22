@@ -29,6 +29,7 @@ struct test_context {
     rkv_database_id_t                           id;
     rkv_database_handle_t                       dbh;
     std::unordered_map<std::string,std::string> reference;
+    bool                                        empty_values = false;
 };
 
 static const uint16_t provider_id = 42;
@@ -59,6 +60,11 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     if(min_val_size) g_min_val_size = std::atol(min_key_size);
     if(max_val_size) g_max_val_size = std::atol(max_key_size);
     if(num_keyvals)  g_num_keyvals  = std::atol(num_keyvals);
+    if(strcmp(backend_type, "set") == 0
+    || strcmp(backend_type, "unordered_set") == 0) {
+        g_max_val_size = 0;
+        g_min_val_size = 0;
+    }
 
     margo_init_info margo_args = MARGO_INIT_INFO_INITIALIZER;
     margo_args.json_config = "{ \"handle_cache_size\" : 0 }";
@@ -102,12 +108,20 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     context->provider = provider;
     context->id       = id;
     context->dbh      = dbh;
+    if(g_max_val_size == 0 && g_min_val_size == 0) {
+        context->empty_values = true;
+    }
     // create random key/value pairs with an empty value every 8 values
     for(unsigned i = 0; i < g_num_keyvals; i++) {
         std::string key;
         std::string val;
         int ksize = munit_rand_int_range(g_min_key_size, g_max_key_size);
-        int vsize = i % 8 == 0 ? 0 : munit_rand_int_range(g_min_val_size, g_max_val_size);
+        int vsize;
+        if(g_min_val_size == 0 && g_max_val_size == 0) {
+            vsize = 0;
+        } else {
+            vsize = i % 8 == 0 ? 0 : munit_rand_int_range(g_min_val_size, g_max_val_size);
+        }
         key.resize(ksize);
         val.resize(vsize);
         for(int j = 0; j < ksize; j++) {

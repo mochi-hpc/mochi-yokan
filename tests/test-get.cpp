@@ -79,7 +79,7 @@ static MunitResult test_get_too_small(const MunitParameter params[], void* data)
     rkv_return_t ret;
 
     auto it = context->reference.begin();
-    while(it->second.size() == 0 && it != context->reference.end()) it++;
+    while(it != context->reference.end() && it->second.size() == 0) it++;
 
     if(it == context->reference.end())
         return MUNIT_SKIP;
@@ -691,9 +691,15 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
     auto useful_size = std::accumulate(
             seg_sizes.begin()+1, seg_sizes.end(), 0);
 
-    hret = margo_bulk_create(context->mid,
+    if(pvals.size() != 0) {
+        hret = margo_bulk_create(context->mid,
             5, seg_ptrs.data(), seg_sizes.data(),
             HG_BULK_READWRITE, &bulk);
+    } else {
+        hret = margo_bulk_create(context->mid,
+            4, seg_ptrs.data(), seg_sizes.data(),
+            HG_BULK_READWRITE, &bulk);
+    }
     munit_assert_int(hret, ==, HG_SUCCESS);
 
     char addr_str[256];
@@ -731,7 +737,8 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,
                        garbage_size, invalid_size, false);
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    if(!context->empty_values)
+        munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
 
     /* third invalid size of 0 */
     ret = rkv_get_bulk(dbh, count, nullptr, bulk,

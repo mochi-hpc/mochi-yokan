@@ -318,9 +318,11 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
     ret = rkv_put_packed(dbh, count, pkeys.data(), nullptr,
                                      pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
-    ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
-                                     nullptr, vsizes.data());
+    if(!context->empty_values) {
+        munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+        ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
+                                         nullptr, vsizes.data());
+    }
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
     ret = rkv_put_packed(dbh, count, pkeys.data(), ksizes.data(),
@@ -496,9 +498,15 @@ static MunitResult test_put_bulk(const MunitParameter params[], void* data)
     auto useful_size = std::accumulate(
             seg_sizes.begin()+1, seg_sizes.end(), 0);
 
-    hret = margo_bulk_create(context->mid,
-            5, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READ_ONLY, &bulk);
+    if(pvals.size() != 0) {
+        hret = margo_bulk_create(context->mid,
+                5, seg_ptrs.data(), seg_sizes.data(),
+                HG_BULK_READ_ONLY, &bulk);
+    } else {
+        hret = margo_bulk_create(context->mid,
+                4, seg_ptrs.data(), seg_sizes.data(),
+                HG_BULK_READ_ONLY, &bulk);
+    }
     munit_assert_int(hret, ==, HG_SUCCESS);
 
     char addr_str[256];
@@ -676,10 +684,17 @@ static MunitResult test_put_bulk_empty_key(const MunitParameter params[], void* 
     auto useful_size = std::accumulate(
             seg_sizes.begin()+1, seg_sizes.end(), 0);
 
-    hret = margo_bulk_create(context->mid,
-            5, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READ_ONLY, &bulk);
-    munit_assert_int(hret, ==, HG_SUCCESS);
+    if(pvals.size() != 0) {
+        hret = margo_bulk_create(context->mid,
+                5, seg_ptrs.data(), seg_sizes.data(),
+                HG_BULK_READ_ONLY, &bulk);
+        munit_assert_int(hret, ==, HG_SUCCESS);
+    } else {
+        hret = margo_bulk_create(context->mid,
+                4, seg_ptrs.data(), seg_sizes.data(),
+                HG_BULK_READ_ONLY, &bulk);
+        munit_assert_int(hret, ==, HG_SUCCESS);
+    }
 
     char addr_str[256];
     hg_size_t addr_str_size = 256;

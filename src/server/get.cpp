@@ -125,18 +125,22 @@ void rkv_get_ult(hg_handle_t h)
         // transfer the vsizes and values back the client
         // this is done using two concurrent bulk transfers
         margo_request req = MARGO_REQUEST_NULL;
-        hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
-                in.bulk, in.offset + vals_offset,
-                buffer->bulk, vals_offset, remaining_vsize, &req);
-        CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+        if(vals.size != 0) {
+            hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
+                    in.bulk, in.offset + vals_offset,
+                    buffer->bulk, vals_offset, remaining_vsize, &req);
+            CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+        }
 
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + vsizes_offset,
                 buffer->bulk, vsizes_offset, in.count*sizeof(size_t));
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-        hret = margo_wait(req);
-        CHECK_HRET_OUT(hret, margo_wait);
+        if(req != MARGO_REQUEST_NULL) {
+            hret = margo_wait(req);
+            CHECK_HRET_OUT(hret, margo_wait);
+        }
     }
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_get_ult)
