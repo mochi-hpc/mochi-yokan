@@ -23,6 +23,8 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
     if(count != 0 && size == 0)
         return RKV_ERR_INVALID_ARGS;
 
+    CHECK_MODE_VALID(mode);
+
     margo_instance_id mid = dbh->client->mid;
     rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;

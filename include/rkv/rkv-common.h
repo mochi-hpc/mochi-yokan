@@ -84,17 +84,23 @@ typedef enum rkv_return_t {
  *   will still return the last key found (as keys[0]/ksizes[0]
  *   for non-packed list_keyvals and at the beginning of the buffer
  *   and with ksizes[0] for packed list_keyvals).
+ * - RKV_MODE_SUFFIX: consider the "prefix" argument of "list_keys"
+ *   and "list_keyvals" as a suffix instead. RKV_MODE_NO_PREFIX, if
+ *   provided, will be re-interpreted accordingly, removing the suffix
+ *   from the resulting keys.
  *
- *   Important: not all backends support all modes.
+ * Important: not all backends support all modes.
  */
-#define RKV_MODE_INCLUSIVE    0b00000001
-#define RKV_MODE_APPEND       0b00000010
-#define RKV_MODE_CONSUME      0b00000100
-#define RKV_MODE_WAIT         0b00001000
-#define RKV_MODE_NEW_ONLY     0b00010000
-#define RKV_MODE_NO_PREFIX    0b00100000
-#define RKV_MODE_IGNORE_KEYS  0b01000000
-#define RKV_MODE_KEEP_LAST    0b11000000
+#define RKV_MODE_INCLUSIVE    0b0000000001
+#define RKV_MODE_APPEND       0b0000000010
+#define RKV_MODE_CONSUME      0b0000000100
+#define RKV_MODE_WAIT         0b0000001000
+#define RKV_MODE_NEW_ONLY     0b0000010000
+#define RKV_MODE_EXIST_ONLY   0b0000100000
+#define RKV_MODE_NO_PREFIX    0b0001000000
+#define RKV_MODE_IGNORE_KEYS  0b0010000000
+#define RKV_MODE_KEEP_LAST    0b0110000000
+#define RKV_MODE_SUFFIX       0b1000000000
 
 /**
  * @brief Identifier for a database.

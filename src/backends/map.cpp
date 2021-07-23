@@ -206,6 +206,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
+        const auto mode_append = mode & RKV_MODE_APPEND;
+        const auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+        // note: mode_append and mode_new_only can't be provided
+        // at the same time. mode_new_only and mode_exist_only either.
+        // mode_append and mode_exists_only can.
+
         size_t key_offset = 0;
         size_t val_offset = 0;
 
@@ -221,14 +228,54 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto p = m_db->emplace(std::piecewise_construct,
-                std::forward_as_tuple(keys.data + key_offset,
-                                      ksizes[i], m_key_allocator),
-                std::forward_as_tuple(vals.data + val_offset,
-                                      vsizes[i], m_val_allocator));
-            if(!p.second) {
-                p.first->second.assign(vals.data + val_offset,
-                                       vsizes[i]);
+
+            if(mode_new_only) {
+
+                auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                if(it == m_db->end()) {
+                    m_db->emplace(std::piecewise_construct,
+                            std::forward_as_tuple(keys.data + key_offset,
+                                ksizes[i], m_key_allocator),
+                            std::forward_as_tuple(vals.data + val_offset,
+                                vsizes[i], m_val_allocator));
+                }
+
+            } else if(mode_exist_only) { // may of may not have mode_append
+
+                auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                if(it != m_db->end()) {
+                    if(mode_append) {
+                        it->second.append(keys.data + key_offset, ksizes[i]);
+                    } else {
+                        it->second.assign(keys.data + key_offset, ksizes[i]);
+                    }
+                }
+
+            } else if(mode_append) { // but node mode_exist_only
+
+                auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                if(it != m_db->end()) {
+                    it->second.assign(keys.data + key_offset, ksizes[i]);
+                } else {
+                    m_db->emplace(std::piecewise_construct,
+                            std::forward_as_tuple(keys.data + key_offset,
+                                ksizes[i], m_key_allocator),
+                            std::forward_as_tuple(vals.data + val_offset,
+                                vsizes[i], m_val_allocator));
+                }
+
+            } else { // normal mode
+
+                auto p = m_db->emplace(std::piecewise_construct,
+                        std::forward_as_tuple(keys.data + key_offset,
+                                              ksizes[i], m_key_allocator),
+                        std::forward_as_tuple(vals.data + val_offset,
+                                              vsizes[i], m_val_allocator));
+                if(!p.second) {
+                    p.first->second.assign(vals.data + val_offset,
+                                           vsizes[i]);
+                }
+
             }
             key_offset += ksizes[i];
             val_offset += vsizes[i];

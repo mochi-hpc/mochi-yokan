@@ -72,4 +72,20 @@
         } \
     } while(0)
 
+static inline constexpr int32_t incompatible_modes[][2] = {
+    { RKV_MODE_APPEND, RKV_MODE_NEW_ONLY },
+    { RKV_MODE_NEW_ONLY, RKV_MODE_EXIST_ONLY },
+    { 0, 0 }};
+
+#define CHECK_MODE_VALID(__mode__) \
+    do { \
+        int __i = 0; \
+        while(incompatible_modes[__i][0] != 0) { \
+            if(((__mode__) & incompatible_modes[__i][0]) \
+            && ((__mode__) & incompatible_modes[__i][1])) \
+                return RKV_ERR_MODE; \
+            __i += 1; \
+        } \
+    } while(0)
+
 #endif

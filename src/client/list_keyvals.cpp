@@ -41,6 +41,8 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     if(count == 0)
         return RKV_SUCCESS;
 
+    CHECK_MODE_VALID(mode);
+
     margo_instance_id mid = dbh->client->mid;
     rkv_return_t ret = RKV_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
