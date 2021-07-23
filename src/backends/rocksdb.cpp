@@ -211,6 +211,10 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
     }
     // LCOV_EXCL_STOP
 
+    virtual bool supportsMode(int32_t mode) const override {
+        return mode == 0 || mode == 1;
+    }
+
     virtual void destroy() override {
         delete m_db;
         m_db = nullptr;

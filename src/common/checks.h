@@ -54,6 +54,15 @@
         } \
     } while(0)
 
+#define CHECK_MODE_SUPPORTED(__db__, __mode__) \
+    do { \
+        if(!__db__->supportsMode(__mode__)) { \
+            out.ret = RKV_ERR_MODE; \
+            RKV_LOG_ERROR(mid, "Mode not supported by database"); \
+            return; \
+        } \
+    } while(0)
+
 #define CHECK_BUFFER(__buf__) \
     do { \
         if(!__buf__) { \

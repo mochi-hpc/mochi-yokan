@@ -140,6 +140,10 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     }
     // LCOV_EXCL_STOP
 
+    virtual bool supportsMode(int32_t mode) const override {
+        return mode == 0 || mode == 1;
+    }
+
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
         m_db->clear();

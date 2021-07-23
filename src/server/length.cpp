@@ -45,6 +45,7 @@ void rkv_length_ult(hg_handle_t h)
 
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
 
     rkv_buffer_t buffer = provider->bulk_cache.get(
         provider->bulk_cache_data, in.size, HG_BULK_READWRITE);

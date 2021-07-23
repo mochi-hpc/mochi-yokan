@@ -46,6 +46,7 @@ void rkv_list_keys_ult(hg_handle_t h)
 
     rkv_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
 
     size_t buffer_size = in.from_ksize + in.prefix_size
                        + in.count*sizeof(size_t)

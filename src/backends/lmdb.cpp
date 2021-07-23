@@ -141,6 +141,10 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     }
     // LCOV_EXCL_STOP
 
+    virtual bool supportsMode(int32_t mode) const override {
+        return mode == 0 || mode == 1;
+    }
+
     virtual void destroy() override {
         if(m_env) {
             mdb_dbi_close(m_env, m_db);

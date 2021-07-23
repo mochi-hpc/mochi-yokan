@@ -277,6 +277,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     }
     // LCOV_EXCL_STOP
 
+    virtual bool supportsMode(int32_t mode) const override {
+        return mode == 0 || mode == 1;
+    }
+
     virtual void destroy() override {
         auto path = m_config["path"].get<std::string>();
         auto type = m_config["type"].get<std::string>();

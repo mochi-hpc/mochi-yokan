@@ -151,6 +151,19 @@ class KeyValueStoreInterface {
      */
     virtual void destroy() = 0;
 
+
+    /**
+     * @brief Check if the backend supports the specified mode.
+     *
+     * @param mode Mode.
+     *
+     * @return true/false.
+     */
+    virtual bool supportsMode(int32_t mode) const {
+        (void)mode;
+        return false;
+    }
+
     /**
      * @brief Check if the provided keys exist. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory
