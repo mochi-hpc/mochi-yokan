@@ -151,9 +151,10 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         fs::remove_all(path);
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         auto count = ksizes.size;
         size_t offset = 0;
@@ -177,9 +178,10 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         auto count = ksizes.size;
         size_t offset = 0;
@@ -205,10 +207,11 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -242,10 +245,11 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return convertStatus(ret);
     }
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -314,8 +318,9 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t key_offset = 0;
         size_t total_ksizes = std::accumulate(ksizes.data,
                                               ksizes.data + ksizes.size,
@@ -339,9 +344,11 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return convertStatus(ret);
     }
 
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+
         MDB_txn* txn = nullptr;
         int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
         if(ret != MDB_SUCCESS) return convertStatus(ret);
@@ -451,13 +458,16 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode,
+                                 bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+
         MDB_txn* txn = nullptr;
         int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
         if(ret != MDB_SUCCESS) return convertStatus(ret);

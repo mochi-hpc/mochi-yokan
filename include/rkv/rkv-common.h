@@ -45,6 +45,7 @@ extern "C" {
     X(RKV_ERR_SYSTEM, "System error")                  \
     X(RKV_ERR_CANCELED, "Canceled")                    \
     X(RKV_ERR_PERMISSION, "Permission error")          \
+    X(RKV_ERR_MODE, "Invalid mode")                    \
     X(RKV_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,
@@ -61,6 +62,39 @@ typedef enum rkv_return_t {
 #define RKV_KEY_NOT_FOUND  (ULLONG_MAX)
 #define RKV_SIZE_TOO_SMALL (ULLONG_MAX-1)
 #define RKV_NO_MORE_KEYS   (ULLONG_MAX-2)
+
+/**
+ * @brief Modes can be passed to many functions to alter the
+ * semantics of the function.
+ * - RKV_MODE_PACKED: indicate that the data is packed in memory.
+ * - RKV_MODE_INCLUSIVE: "start" key in "list_keys"/"list_keyvals"
+ *   is included in results if it is found.
+ * - RKV_MODE_APPEND: "put" functions will append the provided
+ *   data to any existing value instead of replacing it.
+ * - RKV_MODE_CONSUME: "get" and "list" functions will also remove
+ *   the returned key/value pairs from the database.
+ * - RKV_MODE_WAIT: "get" will wait for any non-present key to
+ *   appear in the database instead of returning RKV_KEY_NODE_FOUND.
+ * - RKV_MODE_NEW_ONLY: "put" will only add key/value pairs if the
+ *   key was not already present in the database.
+ * - RKV_MODE_NO_PREFIX: "list_keys" and "list_keyvals" will remove
+ *   the prefix from results before sending the keys back.
+ * - RKV_MODE_IGNORE_KEY: "list_keyvals" will only return values.
+ * - RKV_MODE_KEEP_LAST: implies RKV_MODE_IGNORE_KEYS but "list_keyvals"
+ *   will still return the last key found (as keys[0]/ksizes[0]
+ *   for non-packed list_keyvals and at the beginning of the buffer
+ *   and with ksizes[0] for packed list_keyvals).
+ *
+ *   Important: not all backends support all modes.
+ */
+#define RKV_MODE_INCLUSIVE    0b00000001
+#define RKV_MODE_APPEND       0b00000010
+#define RKV_MODE_CONSUME      0b00000100
+#define RKV_MODE_WAIT         0b00001000
+#define RKV_MODE_NEW_ONLY     0b00010000
+#define RKV_MODE_NO_PREFIX    0b00100000
+#define RKV_MODE_IGNORE_KEYS  0b01000000
+#define RKV_MODE_KEEP_LAST    0b11000000
 
 /**
  * @brief Identifier for a database.

@@ -99,6 +99,7 @@ enum class Status : uint8_t {
     System       = RKV_ERR_SYSTEM,
     Canceled     = RKV_ERR_CANCELED,
     Permission   = RKV_ERR_PERMISSION,
+    InvalidMode  = RKV_ERR_MODE,
     Other        = RKV_ERR_OTHER
 };
 
@@ -157,15 +158,22 @@ class KeyValueStoreInterface {
      * ksizes.size and b.size, which should be equal (otherwise
      * Status::InvalidArg is returned).
      *
+     * @param mode Mode.
      * @param keys Packed keys.
      * @param ksizes Packed key sizes.
      * @param b Memory segment holding booleans indicating whether each key exists.
      *
      * @return Status.
      */
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
-                          BitField& b) const = 0;
+                          BitField& b) const {
+        (void)mode;
+        (void)keys;
+        (void)ksizes;
+        (void)b;
+        return Status::NotSupported;
+    }
     /**
      * @brief Get the size of values associated with the keys. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory holding the
@@ -173,15 +181,23 @@ class KeyValueStoreInterface {
      * to be stored. The number of keys is conveyed by ksizes.size and vsizes.size,
      * which should be equal (otherwise Status::InvalidArg is returned).
      *
+     * @param mode Mode.
      * @param keys Packed keys.
      * @param ksizes Packed key sizes
      * @param b Memory segment to store value sizes.
      *
      * @return Status.
      */
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode,
+                          const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
-                          BasicUserMem<size_t>& vsizes) const = 0;
+                          BasicUserMem<size_t>& vsizes) const {
+        (void)mode;
+        (void)keys;
+        (void)ksizes;
+        (void)vsizes;
+        return Status::NotSupported;
+    }
 
     /**
      * @brief Put multiple key/value pairs into the database.
@@ -189,6 +205,7 @@ class KeyValueStoreInterface {
      * memory segments. The number of key/value pairs is conveyed by
      * ksizes.size and vsizes.size, which should be equal.
      *
+     * @param [in] mode Mode.
      * @param [in] keys Keys to put.
      * @param [in] ksizes Key sizes.
      * @param [in] vals Values to put.
@@ -196,10 +213,18 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
-                       const BasicUserMem<size_t>& vsizes) = 0;
+                       const BasicUserMem<size_t>& vsizes) {
+        (void)mode;
+        (void)keys;
+        (void)vals;
+        (void)ksizes;
+        (void)vsizes;
+        return Status::NotSupported;
+    }
 
     /**
      * @brief This verion of getMulti uses the user-provided memory.
@@ -212,6 +237,8 @@ class KeyValueStoreInterface {
      * - the sum of ksizes <= keys.size
      * - the sum of vsizes <= vals.size
      *
+     * @param mode Mode.
+     * @param packed whether data is packed.
      * @param keys Keys to get.
      * @param ksizes Size of the keys.
      * @param vals Values to get.
@@ -219,22 +246,36 @@ class KeyValueStoreInterface {
      *
      * @return Status.
      */
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
-                       BasicUserMem<size_t>& vsizes) const = 0;
+                       BasicUserMem<size_t>& vsizes) const {
+        (void)mode;
+        (void)packed;
+        (void)keys;
+        (void)vals;
+        (void)ksizes;
+        (void)vsizes;
+        return Status::NotSupported;
+    }
 
     /**
      * @brief Erase a set of key/value pairs. Keys are packed into
      * a single buffer. The number of keys is conveyed by ksizes.size.
      *
+     * @param [in] mode Mode.
      * @param [in] keys Keys to erase.
      * @param [in] ksizes Size of the keys.
      *
      * @return Status.
      */
-    virtual Status erase(const UserMem& keys,
-                         const BasicUserMem<size_t>& ksizes) = 0;
+    virtual Status erase(int32_t mode, const UserMem& keys,
+                         const BasicUserMem<size_t>& ksizes) {
+        (void)mode;
+        (void)keys;
+        (void)ksizes;
+        return Status::NotSupported;
+    }
 
     /**
      * @brief This version of listKeys uses a single contiguous buffer
@@ -246,28 +287,47 @@ class KeyValueStoreInterface {
      * size that should be used for each keys in the keys buffer. As an output,
      * it stores the actual size of each key.
      *
+     * @param [in] mode Mode.
+     * @param [in] packed Whether data is packed.
      * @param [in] fromKey Starting key.
-     * @param [in] inclusive Whether to include the start key if found.
      * @param [in] prefix Prefix to filter with.
      * @param [out] keys Resulting keys.
      * @param [inout] keySizes Resulting key sizes.
      *
      * @return Status.
      */
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
-                            UserMem& keys, BasicUserMem<size_t>& keySizes) const = 0;
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
+                            UserMem& keys, BasicUserMem<size_t>& keySizes) const {
+        (void)mode;
+        (void)packed;
+        (void)fromKey;
+        (void)prefix;
+        (void)keys;
+        (void)keySizes;
+        return Status::NotSupported;
+    }
 
     /**
      * @brief Same as listKeys but also returns the values.
      */
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
-                                 BasicUserMem<size_t>& valSizes) const = 0;
+                                 BasicUserMem<size_t>& valSizes) const {
+        (void)mode;
+        (void)packed;
+        (void)fromKey;
+        (void)prefix;
+        (void)keys;
+        (void)keySizes;
+        (void)vals;
+        (void)valSizes;
+        return Status::NotSupported;
+    }
 };
 
 /**

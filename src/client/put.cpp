@@ -13,6 +13,7 @@
 #include "../common/checks.h"
 
 extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
+                                     int32_t mode,
                                      size_t count,
                                      const char* origin,
                                      hg_bulk_t data,
@@ -30,6 +31,7 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id  = dbh->database_id;
+    in.mode   = mode;
     in.count  = count;
     in.bulk   = data;
     in.offset = offset;
@@ -54,6 +56,7 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
 }
 
 extern "C" rkv_return_t rkv_put(rkv_database_handle_t dbh,
+                                int32_t mode,
                                 const void* key,
                                 size_t ksize,
                                 const void* value,
@@ -61,10 +64,11 @@ extern "C" rkv_return_t rkv_put(rkv_database_handle_t dbh,
 {
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
-    return rkv_put_packed(dbh, 1, key, &ksize, value, &vsize);
+    return rkv_put_packed(dbh, mode, 1, key, &ksize, value, &vsize);
 }
 
 extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
+                                      int32_t mode,
                                       size_t count,
                                       const void* const* keys,
                                       const size_t* ksizes,
@@ -110,10 +114,11 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }
 
 extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
+                                       int32_t mode,
                                        size_t count,
                                        const void* keys,
                                        const size_t* ksizes,
@@ -155,5 +160,5 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }

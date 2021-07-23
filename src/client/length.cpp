@@ -23,6 +23,7 @@
  */
 
 extern "C" rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
+                                        int32_t mode,
                                         size_t count,
                                         const char* origin,
                                         hg_bulk_t data,
@@ -40,6 +41,7 @@ extern "C" rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id  = dbh->database_id;
+    in.mode   = mode;
     in.count  = count;
     in.bulk   = data;
     in.offset = offset;
@@ -64,13 +66,14 @@ extern "C" rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
 }
 
 extern "C" rkv_return_t rkv_length(rkv_database_handle_t dbh,
+                                   int32_t mode,
                                    const void* key,
                                    size_t ksize,
                                    size_t* vsize)
 {
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
-    rkv_return_t ret = rkv_length_packed(dbh, 1, key, &ksize, vsize);
+    rkv_return_t ret = rkv_length_packed(dbh, mode, 1, key, &ksize, vsize);
     if(ret == RKV_SUCCESS) {
         if(*vsize == RKV_KEY_NOT_FOUND) ret = RKV_ERR_KEY_NOT_FOUND;
     }
@@ -78,10 +81,11 @@ extern "C" rkv_return_t rkv_length(rkv_database_handle_t dbh,
 }
 
 extern "C" rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
-                                      size_t count,
-                                      const void* const* keys,
-                                      const size_t* ksizes,
-                                      size_t* vsizes)
+                                         int32_t mode,
+                                         size_t count,
+                                         const void* const* keys,
+                                         const size_t* ksizes,
+                                         size_t* vsizes)
 {
     if(count == 0)
         return RKV_SUCCESS;
@@ -116,14 +120,15 @@ extern "C" rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_length_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_length_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }
 
 extern "C" rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
-                                       size_t count,
-                                       const void* keys,
-                                       const size_t* ksizes,
-                                       size_t* vsizes)
+                                          int32_t mode,
+                                          size_t count,
+                                          const void* keys,
+                                          const size_t* ksizes,
+                                          size_t* vsizes)
 {
     if(count == 0)
         return RKV_SUCCESS;
@@ -151,5 +156,5 @@ extern "C" rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_length_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_length_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }

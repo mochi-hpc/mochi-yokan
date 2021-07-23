@@ -82,6 +82,6 @@ void rkv_erase_ult(hg_handle_t h)
     auto keys = rkv::UserMem{ ptr, total_ksize };
 
     out.ret = static_cast<rkv_return_t>(
-            database->erase(keys, ksizes));
+            database->erase(in.mode, keys, ksizes));
 }
 DEFINE_MARGO_RPC_HANDLER(rkv_erase_ult)

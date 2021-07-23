@@ -31,7 +31,7 @@ struct list_keyvals_context {
     test_context*                     base;
     std::map<std::string,std::string> ordered_ref;
     std::string                       prefix;
-    bool                              inclusive;
+    int32_t                           mode;
     size_t                            keys_per_op; // max keys per operation
 };
 
@@ -45,7 +45,7 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
 
     context->prefix = munit_parameters_get(params, "prefix");
     g_max_key_size += context->prefix.size(); // important!
-    context->inclusive = to_bool(munit_parameters_get(params, "inclusive"));
+    context->mode = atoi(munit_parameters_get(params, "mode"));
     const char* keys_per_op_str = munit_parameters_get(params, "keys-per-op");
     context->keys_per_op = keys_per_op_str ? atol(keys_per_op_str) : 6;
 
@@ -83,7 +83,7 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
         vsizes.push_back(vsize);
     }
 
-    rkv_put_multi(base_context->dbh, count,
+    rkv_put_multi(base_context->dbh, 0,count,
                   kptrs.data(), ksizes.data(),
                   vptrs.data(), vsizes.data());
     return context;
@@ -136,7 +136,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         // failing cases
         if(from_key.size() > 0) {
             ret = rkv_list_keyvals(dbh,
-                context->inclusive,
+                context->mode,
                 nullptr,
                 from_key.size(),
                 prefix.data(),
@@ -151,7 +151,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         }
         if(prefix.size() > 0) {
             ret = rkv_list_keyvals(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -166,7 +166,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         }
         // with a count of 0 (correct but won't return anything)
         ret = rkv_list_keyvals(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -180,7 +180,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         munit_assert_int(ret, ==, RKV_SUCCESS);
         // correct case
         ret = rkv_list_keyvals(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -209,7 +209,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
             }
         }
         i += count;
-        if(context->inclusive)
+        if(context->mode & RKV_MODE_INCLUSIVE)
             i -= 1;
 
         ksizes.clear();
@@ -269,7 +269,7 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
     std::string prefix = context->prefix;
 
     ret = rkv_list_keyvals(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -344,7 +344,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         // invalid cases
         if(from_key.size() > 0) {
             ret = rkv_list_keyvals_packed(dbh,
-                context->inclusive,
+                context->mode,
                 nullptr,
                 from_key.size(),
                 prefix.data(),
@@ -361,7 +361,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         }
         if(prefix.size() > 0) {
             ret = rkv_list_keyvals_packed(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -378,7 +378,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         }
         // case with count = 0
         ret = rkv_list_keyvals_packed(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -394,7 +394,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         munit_assert_int(ret, ==, RKV_SUCCESS);
         // correct case
         ret = rkv_list_keyvals_packed(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -431,7 +431,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
             }
         }
         i += count;
-        if(context->inclusive)
+        if(context->mode & RKV_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -484,7 +484,7 @@ static MunitResult test_list_keyvals_packed_key_too_small(const MunitParameter p
     std::string prefix = context->prefix;
 
     ret = rkv_list_keyvals_packed(dbh,
-            context->inclusive,
+            context->mode,
             from_key.data(),
             from_key.size(),
             prefix.data(),
@@ -568,7 +568,7 @@ static MunitResult test_list_keyvals_packed_val_too_small(const MunitParameter p
     std::string prefix = context->prefix;
 
     ret = rkv_list_keyvals_packed(dbh,
-            context->inclusive,
+            context->mode,
             from_key.data(),
             from_key.size(),
             prefix.data(),
@@ -686,7 +686,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
         }
         // count = 0
         ret = rkv_list_keyvals_bulk(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.size(),
                 prefix.size(),
                 addr_str, data,
@@ -698,7 +698,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
         munit_assert_int(ret, ==, RKV_SUCCESS);
         // correct count
         ret = rkv_list_keyvals_bulk(dbh,
-                context->inclusive,
+                context->mode,
                 from_key.size(),
                 prefix.size(),
                 addr_str, data,
@@ -735,7 +735,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
             }
         }
         i += count;
-        if(context->inclusive)
+        if(context->mode & RKV_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -747,8 +747,8 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
     return MUNIT_OK;
 }
 
-static char* inclusive_params[] = {
-    (char*)"true", (char*)"false", NULL
+static char* mode_params[] = {
+    (char*)"0", (char*)"1", NULL
 };
 
 static char* prefix_params[] = {
@@ -757,7 +757,7 @@ static char* prefix_params[] = {
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
-  { (char*)"inclusive", inclusive_params },
+  { (char*)"mode", mode_params },
   { (char*)"prefix", prefix_params },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },

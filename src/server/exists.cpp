@@ -108,7 +108,7 @@ void rkv_exists_ult(hg_handle_t h)
     std::memset(flags.data, 0, flags_size);
 
     out.ret = static_cast<rkv_return_t>(
-            database->exists(keys, ksizes, flags));
+            database->exists(in.mode, keys, ksizes, flags));
 
     if(out.ret == RKV_SUCCESS) {
         // transfer the bit field back the client

@@ -286,9 +286,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         std::filesystem::remove(path);
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -322,9 +323,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         }
     };
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t i = 0;
 
@@ -341,10 +343,12 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -421,10 +425,11 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         }
     };
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -450,8 +455,9 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -465,7 +471,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     struct ListKeys : public tkrzw::DBM::RecordProcessor {
 
-        ssize_t&               m_index;
+        ssize_t&              m_index;
         const UserMem&        m_prefix;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
@@ -528,11 +534,13 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         }
     };
 
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
+
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
         tkrzw::Status status;
 
@@ -660,15 +668,18 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         }
     };
 
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode,
+                                 bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
+
+        bool inclusive = mode & RKV_MODE_INCLUSIVE;
 
         tkrzw::Status status;
 

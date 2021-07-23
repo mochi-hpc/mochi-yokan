@@ -28,6 +28,7 @@
  */
 
 extern "C" rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
+                                        int32_t mode,
                                         size_t count,
                                         const char* origin,
                                         hg_bulk_t data,
@@ -45,6 +46,7 @@ extern "C" rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id  = dbh->database_id;
+    in.mode   = mode;
     in.count  = count;
     in.bulk   = data;
     in.offset = offset;
@@ -69,16 +71,18 @@ extern "C" rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
 }
 
 extern "C" rkv_return_t rkv_exists(rkv_database_handle_t dbh,
+                                   int32_t mode,
                                    const void* key,
                                    size_t ksize,
                                    uint8_t* flag)
 {
     if(ksize == 0)
         return RKV_ERR_INVALID_ARGS;
-    return rkv_exists_packed(dbh, 1, key, &ksize, flag);
+    return rkv_exists_packed(dbh, mode, 1, key, &ksize, flag);
 }
 
 extern "C" rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
+                                         int32_t mode,
                                          size_t count,
                                          const void* const* keys,
                                          const size_t* ksizes,
@@ -117,10 +121,11 @@ extern "C" rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_exists_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_exists_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }
 
 extern "C" rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
+                                          int32_t mode,
                                           size_t count,
                                           const void* keys,
                                           const size_t* ksizes,
@@ -152,5 +157,5 @@ extern "C" rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_exists_bulk(dbh, count, nullptr, bulk, 0, total_size);
+    return rkv_exists_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }

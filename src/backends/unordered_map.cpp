@@ -23,6 +23,7 @@ namespace rkv {
 
 using json = nlohmann::json;
 
+// TODO we could dependency-inject a hash function (and the to_equal<T> function)
 template<typename KeyType>
 struct UnorderedMapKeyValueStoreHash {
 
@@ -44,7 +45,6 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
-        bool use_lock;
         rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         rkv_allocator_t key_alloc, val_alloc, node_alloc;
         std::string key_alloc_conf, val_alloc_conf, node_alloc_conf;
@@ -54,7 +54,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             if(!cfg.is_object())
                 return Status::InvalidConf;
             // check use_lock
-            use_lock = cfg.value("use_lock", true);
+            bool use_lock = cfg.value("use_lock", true);
             cfg["use_lock"] = use_lock;
 
             // bucket number
@@ -122,7 +122,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapKeyValueStore(std::move(cfg), use_lock, node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapKeyValueStore(std::move(cfg), node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -143,9 +143,11 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         m_db->clear();
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode,
+                          const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -159,9 +161,11 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode,
+                          const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -177,10 +181,12 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -213,10 +219,12 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode,
+                       bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -273,8 +281,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
@@ -288,36 +297,6 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             offset += ksizes[i];
         }
         return Status::OK;
-    }
-
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
-                            UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-        (void)packed;
-        (void)fromKey;
-        (void)inclusive;
-        (void)prefix;
-        (void)keys;
-        (void)keySizes;
-        return Status::NotSupported;
-    }
-
-    virtual Status listKeyValues(bool packed,
-                                 const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
-                                 UserMem& keys,
-                                 BasicUserMem<size_t>& keySizes,
-                                 UserMem& vals,
-                                 BasicUserMem<size_t>& valSizes) const override {
-        (void)packed;
-        (void)fromKey;
-        (void)inclusive;
-        (void)prefix;
-        (void)keys;
-        (void)keySizes;
-        (void)vals;
-        (void)valSizes;
-        return Status::NotSupported;
     }
 
     ~UnorderedMapKeyValueStore() {
@@ -341,7 +320,6 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
     UnorderedMapKeyValueStore(json cfg,
-                     bool use_lock,
                      const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator,
                      const rkv_allocator_t& val_allocator)
@@ -350,7 +328,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
     {
-        if(use_lock)
+        if(m_config["use_lock"].get<bool>())
             ABT_rwlock_create(&m_lock);
         m_db = new unordered_map_type(
                 m_config["initial_bucket_count"].get<size_t>(),

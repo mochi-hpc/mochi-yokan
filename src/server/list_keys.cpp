@@ -80,7 +80,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     auto keys = rkv::UserMem{ ptr + keys_offset, in.keys_buf_size };
 
     out.ret = static_cast<rkv_return_t>(
-            database->listKeys(in.packed, from_key, in.inclusive, prefix, keys, ksizes));
+            database->listKeys(in.mode, in.packed, from_key, prefix, keys, ksizes));
 
     if(out.ret == RKV_SUCCESS) {
         size_to_transfer = in.count*sizeof(size_t)

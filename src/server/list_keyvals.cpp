@@ -89,8 +89,8 @@ void rkv_list_keyvals_ult(hg_handle_t h)
 
     out.ret = static_cast<rkv_return_t>(
             database->listKeyValues(
-                in.packed,
-                from_key, in.inclusive, prefix,
+                in.mode, in.packed,
+                from_key, prefix,
                 keys, ksizes, vals, vsizes));
 
     if(out.ret == RKV_SUCCESS) {

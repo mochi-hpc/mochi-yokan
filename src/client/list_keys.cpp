@@ -26,7 +26,7 @@
  */
 
 extern "C" rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
-                                           bool inclusive,
+                                           int32_t mode,
                                            size_t from_ksize,
                                            size_t prefix_size,
                                            const char* origin,
@@ -47,7 +47,7 @@ extern "C" rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id         = dbh->database_id;
-    in.inclusive     = inclusive;
+    in.mode          = mode;
     in.packed        = packed;
     in.count         = count;
     in.from_ksize    = from_ksize;
@@ -75,7 +75,7 @@ extern "C" rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
 }
 
 extern "C" rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
-                                      bool inclusive,
+                                      int32_t mode,
                                       const void* from_key,
                                       size_t from_ksize,
                                       const void* prefix,
@@ -126,13 +126,13 @@ extern "C" rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keys_bulk(dbh, inclusive, from_ksize, prefix_size,
+    return rkv_list_keys_bulk(dbh, mode, from_ksize, prefix_size,
                               nullptr, bulk, 0, keys_buf_size,
                               false, count);
 }
 
 extern "C" rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
-                                             bool inclusive,
+                                             int32_t mode,
                                              const void* from_key,
                                              size_t from_ksize,
                                              const void* prefix,
@@ -179,7 +179,7 @@ extern "C" rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keys_bulk(dbh, inclusive, from_ksize, prefix_size,
+    return rkv_list_keys_bulk(dbh, mode, from_ksize, prefix_size,
                               nullptr, bulk, 0, keys_buf_size,
                               true, count);
 }

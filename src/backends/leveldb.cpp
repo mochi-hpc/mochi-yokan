@@ -123,9 +123,10 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         fs::remove_all(path);
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         std::string value;
@@ -138,9 +139,10 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         std::string value;
@@ -160,10 +162,12 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -205,10 +209,11 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;;
     }
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -268,8 +273,9 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         leveldb::WriteBatch wb;
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -282,10 +288,11 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return convertStatus(status);
     }
 
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
         auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
@@ -344,14 +351,16 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode,
+                                 bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
 
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
         auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 

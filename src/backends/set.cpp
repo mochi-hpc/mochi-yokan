@@ -67,7 +67,6 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
-        bool use_lock;
         cmp_type cmp = comparator::DefaultMemCmp;
         rkv_allocator_init_fn key_alloc_init, node_alloc_init;
         rkv_allocator_t key_alloc, node_alloc;
@@ -78,7 +77,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
             if(!cfg.is_object())
                 return Status::InvalidConf;
             // check use_lock
-            use_lock = cfg.value("use_lock", true);
+            bool use_lock = cfg.value("use_lock", true);
             cfg["use_lock"] = use_lock;
             // check comparator field
             if(!cfg.contains("comparator"))
@@ -125,7 +124,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new SetKeyValueStore(cfg, use_lock, cmp, node_alloc, key_alloc);
+        *kvs = new SetKeyValueStore(cfg, cmp, node_alloc, key_alloc);
         return Status::OK;
     }
 
@@ -146,9 +145,10 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         m_db->clear();
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -161,9 +161,10 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -178,10 +179,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         if(vals.size != 0) return Status::InvalidArg;
 
@@ -206,10 +209,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode,
+                       bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         (void)packed;
         size_t key_offset = 0;
@@ -230,8 +235,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -246,10 +252,13 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        (void)mode;
         ScopedReadLock lock(m_lock);
+
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
         if(!packed) {
 
@@ -330,14 +339,17 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode,
+                                 bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
         ScopedReadLock lock(m_lock);
+
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
         if(!packed) {
 
@@ -441,7 +453,6 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     using set_type = std::set<key_type, comparator, allocator>;
 
     SetKeyValueStore(json cfg,
-                     bool use_lock,
                      cmp_type cmp_fun,
                      const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator)
@@ -449,7 +460,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     {
-        if(use_lock)
+        if(m_config["use_lock"].get<bool>())
             ABT_rwlock_create(&m_lock);
         m_db = new set_type(cmp_fun, allocator(m_node_allocator));
     }

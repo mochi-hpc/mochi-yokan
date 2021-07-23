@@ -60,6 +60,7 @@ rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
  * @brief Put a single key/value pair into the database.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] key Key.
  * @param[in] ksize Size of the key.
  * @param[in] value Value.
@@ -68,6 +69,7 @@ rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_put(rkv_database_handle_t dbh,
+                     int32_t mode,
                      const void* key,
                      size_t ksize,
                      const void* value,
@@ -79,6 +81,7 @@ rkv_return_t rkv_put(rkv_database_handle_t dbh,
  * and may not be contiguous in memory.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/value pairs.
  * @param[in] keys Array of pointers to keys.
  * @param[in] ksizes Array of key sizes.
@@ -88,6 +91,7 @@ rkv_return_t rkv_put(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
+                           int32_t mode,
                            size_t count,
                            const void* const* keys,
                            const size_t* ksizes,
@@ -100,6 +104,7 @@ rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
  * segments.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/value pairs.
  * @param[in] keys Buffer containing keys.
  * @param[in] ksizes Array of key sizes.
@@ -109,6 +114,7 @@ rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
+                            int32_t mode,
                             size_t count,
                             const void* keys,
                             const size_t* ksizes,
@@ -134,6 +140,7 @@ rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
  * an RKV provider.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/values in the bulk data.
  * @param[in] origin Address of the process that created the bulk handle.
  * @param[in] data Bulk handle containing the data.
@@ -143,6 +150,7 @@ rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
+                          int32_t mode,
                           size_t count,
                           const char* origin,
                           hg_bulk_t data,
@@ -154,6 +162,7 @@ rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
  * exists is set to 1 if the key exists, 0 otherwise.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] key Key.
  * @param[in] ksize Size of the key.
  * @param[out] exists Whether the key exists.
@@ -161,6 +170,7 @@ rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_exists(rkv_database_handle_t dbh,
+                        int32_t mode,
                         const void* key,
                         size_t ksize,
                         uint8_t* exists);
@@ -174,6 +184,7 @@ rkv_return_t rkv_exists(rkv_database_handle_t dbh,
  * proper booleans from this array.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of keys to check.
  * @param[in] keys Array of pointers to keys.
  * @param[in] ksizes Array of key sizes.
@@ -182,6 +193,7 @@ rkv_return_t rkv_exists(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
+                              int32_t mode,
                               size_t count,
                               const void* const* keys,
                               const size_t* ksizes,
@@ -191,15 +203,17 @@ rkv_return_t rkv_exists_multi(rkv_database_handle_t dbh,
  * @brief Same as rkv_exists_multi but keys are packed
  * contiguously in memory.
  *
- * @param dbh Database handle.
- * @param count Number of keys to check.
- * @param keys Packed keys.
- * @param ksizes Array of key sizes.
- * @param flags Bitfield indicating whether each key exists.
+ * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
+ * @param[in] count Number of keys to check.
+ * @param[in] keys Packed keys.
+ * @param[in] ksizes Array of key sizes.
+ * @param[out] flags Bitfield indicating whether each key exists.
  *
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
+                               int32_t mode,
                                size_t count,
                                const void* keys,
                                const size_t* ksizes,
@@ -225,6 +239,7 @@ rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
  * Note: the bulk handle must have been created with HG_BULK_READWRITE.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/values in the bulk data.
  * @param[in] origin Address of the process that created the bulk handle.
  * @param[in] data Bulk handle containing the data.
@@ -234,6 +249,7 @@ rkv_return_t rkv_exists_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_exists_bulk(rkv_database_handle_t dbh,
+                             int32_t mode,
                              size_t count,
                              const char* origin,
                              hg_bulk_t data,
@@ -261,6 +277,7 @@ static inline bool rkv_unpack_exists_flag(const uint8_t* flags, size_t i)
  * @brief Get the length of the value associated with a key.
  *
  * @param[in] dbh Database Handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] key Key.
  * @param[in] ksize Size of the key.
  * @param[out] vsize Size of the value.
@@ -268,6 +285,7 @@ static inline bool rkv_unpack_exists_flag(const uint8_t* flags, size_t i)
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_length(rkv_database_handle_t dbh,
+                        int32_t mode,
                         const void* key,
                         size_t ksize,
                         size_t* vsize);
@@ -283,6 +301,7 @@ rkv_return_t rkv_length(rkv_database_handle_t dbh,
  * not found will be set to RKV_KEY_NOT_FOUND.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of keys.
  * @param[in] keys Array of pointers to keys.
  * @param[in] ksizes Array of key sizes.
@@ -291,6 +310,7 @@ rkv_return_t rkv_length(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
+                              int32_t mode,
                               size_t count,
                               const void* const* keys,
                               const size_t* ksizes,
@@ -301,6 +321,7 @@ rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
  * contiguously in memory.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of keys.
  * @param[in] keys Packed keys.
  * @param[in] ksizes Array of key sizes.
@@ -309,6 +330,7 @@ rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
+                               int32_t mode,
                                size_t count,
                                const void* keys,
                                const size_t* ksizes,
@@ -334,6 +356,7 @@ rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
  * Note: the bulk handle must have been created with HG_BULK_READWRITE.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/values in the bulk data.
  * @param[in] origin Address of the process that created the bulk handle.
  * @param[in] data Bulk handle containing the data.
@@ -343,6 +366,7 @@ rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
+                             int32_t mode,
                              size_t count,
                              const char* origin,
                              hg_bulk_t data,
@@ -360,6 +384,7 @@ rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
  * RKV_SIZE_TOO_SMALL respectively.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] key Key.
  * @param[in] ksize Size of the key.
  * @param[out] value Value buffer.
@@ -368,6 +393,7 @@ rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_get(rkv_database_handle_t dbh,
+                     int32_t mode,
                      const void* key,
                      size_t ksize,
                      void* value,
@@ -382,6 +408,7 @@ rkv_return_t rkv_get(rkv_database_handle_t dbh,
  * value size will be set to RKV_SIZE_TOO_SMALL.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/value pairs.
  * @param[in] keys Array of keys.
  * @param[in] ksizes Arrat of key sizes.
@@ -391,6 +418,7 @@ rkv_return_t rkv_get(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
+                           int32_t mode,
                            size_t count,
                            const void* const* keys,
                            const size_t* ksizes,
@@ -409,6 +437,7 @@ rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
  * will be set to RKV_SIZE_TOO_SMALL.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/value pairs.
  * @param[in] keys Packed keys.
  * @param[in] ksizes Arrat of key sizes.
@@ -419,6 +448,7 @@ rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
+                            int32_t mode,
                             size_t count,
                             const void* keys,
                             const size_t* ksizes,
@@ -452,6 +482,7 @@ rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
  * the value sizes do matter as an input).
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/values in the bulk data.
  * @param[in] origin Address of the process that created the bulk handle.
  * @param[in] data Bulk handle containing the data.
@@ -462,6 +493,7 @@ rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_get_bulk(rkv_database_handle_t dbh,
+                          int32_t mode,
                           size_t count,
                           const char* origin,
                           hg_bulk_t data,
@@ -475,12 +507,14 @@ rkv_return_t rkv_get_bulk(rkv_database_handle_t dbh,
  * does not exist.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] key Key to erase.
  * @param[in] ksize Size of the key.
  *
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_erase(rkv_database_handle_t dbh,
+                       int32_t mode,
                        const void* key,
                        size_t ksize);
 
@@ -488,6 +522,7 @@ rkv_return_t rkv_erase(rkv_database_handle_t dbh,
  * @brief Erase multiple key/value pairs.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/value pairs.
  * @param[in] keys Array of keys.
  * @param[in] ksizes Array of key sizes.
@@ -495,6 +530,7 @@ rkv_return_t rkv_erase(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
+                             int32_t mode,
                              size_t count,
                              const void* const* keys,
                              const size_t* ksizes);
@@ -505,6 +541,7 @@ rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
  * contiguous buffer.
  *
  * @param dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param count Number of key/value pairs.
  * @param keys Packed keys.
  * @param ksizes Size of the keys.
@@ -512,6 +549,7 @@ rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
+                              int32_t mode,
                               size_t count,
                               const void* keys,
                               const size_t* ksizes);
@@ -532,6 +570,7 @@ rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
  * an RKV provider.
  *
  * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] count Number of key/values in the bulk data.
  * @param[in] origin Address of the process that created the bulk handle.
  * @param[in] data Bulk handle containing the data.
@@ -541,6 +580,7 @@ rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
+                            int32_t mode,
                             size_t count,
                             const char* origin,
                             hg_bulk_t data,
@@ -557,7 +597,7 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
  * set to RKV_SIZE_TOO_SMALL.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
@@ -569,7 +609,7 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
-                           bool inclusive,
+                           int32_t mode,
                            const void* from_key,
                            size_t from_ksize,
                            const void* prefix,
@@ -582,7 +622,7 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
  * @brief Same as rkv_list_keys but using a contiguous buffer to hold keys.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
@@ -595,7 +635,7 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
-                                  bool inclusive,
+                                  int32_t mode,
                                   const void* from_key,
                                   size_t from_ksize,
                                   const void* prefix,
@@ -625,7 +665,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
  * Note: the bulk handle must have been created with HG_BULK_READWRITE.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix_size Prefix size.
  * @param[in] origin Origin address.
@@ -638,7 +678,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
-                                bool inclusive,
+                                int32_t mode,
                                 size_t from_ksize,
                                 size_t prefix_size,
                                 const char* origin,
@@ -660,7 +700,7 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
  * set to RKV_SIZE_TOO_SMALL.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
@@ -674,7 +714,7 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
-                              bool inclusive,
+                              int32_t mode,
                               const void* from_key,
                               size_t from_ksize,
                               const void* prefix,
@@ -690,7 +730,7 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
  * to hold keys and values.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix Key prefix.
@@ -706,7 +746,7 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
-                                     bool inclusive,
+                                     int32_t mode,
                                      const void* from_key,
                                      size_t from_ksize,
                                      const void* prefix,
@@ -740,7 +780,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
  * Note: the bulk handle must have been created with HG_BULK_READWRITE.
  *
  * @param[in] dbh Database handle.
- * @param[in] inclusive Whether to include from_key in the result.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_ksize Starting key size.
  * @param[in] prefix_size Prefix size.
  * @param[in] origin Origin address.
@@ -754,7 +794,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
  * @return RKV_SUCCESS or corresponding error code.
  */
 rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
-                                   bool inclusive,
+                                   int32_t mode,
                                    size_t from_ksize,
                                    size_t prefix_size,
                                    const char* origin,

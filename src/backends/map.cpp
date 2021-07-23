@@ -67,7 +67,6 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
-        bool use_lock;
         cmp_type cmp = comparator::DefaultMemCmp;
         rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         rkv_allocator_t key_alloc, val_alloc, node_alloc;
@@ -78,7 +77,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             if(!cfg.is_object())
                 return Status::InvalidConf;
             // check use_lock
-            use_lock = cfg.value("use_lock", true);
+            auto use_lock = cfg.value("use_lock", true);
             cfg["use_lock"] = use_lock;
             // check comparator field
             if(!cfg.contains("comparator"))
@@ -138,7 +137,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(use_lock, cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new MapKeyValueStore(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -150,7 +149,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     // LCOV_EXCL_START
     virtual std::string config() const override {
-        return "{}";
+        return m_config.dump();
     }
     // LCOV_EXCL_STOP
 
@@ -159,9 +158,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         m_db->clear();
     }
 
-    virtual Status exists(const UserMem& keys,
+    virtual Status exists(int32_t mode,
+                          const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -174,9 +175,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status length(const UserMem& keys,
+    virtual Status length(int32_t mode,
+                          const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -191,10 +194,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status put(const UserMem& keys,
+    virtual Status put(int32_t mode,
+                       const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -227,10 +232,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status get(bool packed, const UserMem& keys,
+    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -285,8 +291,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status erase(const UserMem& keys,
+    virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -301,10 +308,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeys(bool packed, const UserMem& fromKey,
-                            bool inclusive, const UserMem& prefix,
+    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+                            const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
+
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
         if(!packed) {
 
@@ -385,14 +394,17 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeyValues(bool packed,
+    virtual Status listKeyValues(int32_t mode,
+                                 bool packed,
                                  const UserMem& fromKey,
-                                 bool inclusive, const UserMem& prefix,
+                                 const UserMem& prefix,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
         ScopedReadLock lock(m_lock);
+
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
         if(!packed) {
 
@@ -520,21 +532,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     using allocator = Allocator<std::pair<const key_type, value_type>>;
     using map_type = std::map<key_type, value_type, comparator, allocator>;
 
-    MapKeyValueStore(bool use_lock,
+    MapKeyValueStore(json cfg,
                      cmp_type cmp_fun,
                      const rkv_allocator_t& node_allocator,
                      const rkv_allocator_t& key_allocator,
                      const rkv_allocator_t& val_allocator)
-    : m_node_allocator(node_allocator)
+    : m_config(std::move(cfg))
+    , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
     {
-        if(use_lock)
+        if(m_config["use_lock"].get<bool>())
             ABT_rwlock_create(&m_lock);
         m_db = new map_type(cmp_fun, allocator(m_node_allocator));
     }
 
     map_type*       m_db;
+    json            m_config;
     ABT_rwlock      m_lock = ABT_RWLOCK_NULL;
     rkv_allocator_t m_node_allocator;
     rkv_allocator_t m_key_allocator;
