@@ -6,6 +6,7 @@
 #include "rkv/rkv-backend.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
+#include "../common/modes.hpp"
 #include <tkrzw_dbm_tree.h>
 #include <tkrzw_dbm_hash.h>
 #include <tkrzw_dbm_skip.h>
@@ -476,6 +477,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     struct ListKeys : public tkrzw::DBM::RecordProcessor {
 
         ssize_t&              m_index;
+        int32_t               m_mode;
         const UserMem&        m_prefix;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
@@ -484,11 +486,13 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         size_t                m_key_offset = 0;
 
         ListKeys(ssize_t& i,
+                 int32_t mode,
                  const UserMem& prefix,
                  BasicUserMem<size_t>& ksizes,
                  UserMem& keys,
                  bool packed)
         : m_index(i)
+        , m_mode(mode)
         , m_prefix(prefix)
         , m_ksizes(ksizes)
         , m_keys(keys)
@@ -498,8 +502,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                                      std::string_view value) override {
             (void)value;
 
-            if((key.size() < m_prefix.size)
-            || std::memcmp(key.data(), m_prefix.data, m_prefix.size) != 0) {
+            if(!checkPrefix(m_mode, key.data(), key.size(),
+                            m_prefix.data, m_prefix.size)) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
@@ -561,7 +565,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keys = ListKeys{i, prefix, keySizes, keys, packed};
+        auto list_keys = ListKeys{i, mode, prefix, keySizes, keys, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keys, false);
@@ -584,6 +588,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     struct ListKeyVals : public tkrzw::DBM::RecordProcessor {
 
         ssize_t&              m_index;
+        int32_t               m_mode;
         const UserMem&        m_prefix;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
@@ -596,6 +601,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         size_t                m_val_offset = 0;
 
         ListKeyVals(ssize_t& i,
+                    int32_t mode,
                     const UserMem& prefix,
                     BasicUserMem<size_t>& ksizes,
                     UserMem& keys,
@@ -603,6 +609,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                     UserMem& vals,
                     bool packed)
         : m_index(i)
+        , m_mode(mode)
         , m_prefix(prefix)
         , m_ksizes(ksizes)
         , m_keys(keys)
@@ -612,8 +619,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
-            if((key.size() < m_prefix.size)
-            || std::memcmp(key.data(), m_prefix.data, m_prefix.size) != 0) {
+            if(!checkPrefix(m_mode, key.data(), key.size(),
+                            m_prefix.data, m_prefix.size)) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
@@ -700,7 +707,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keyvals = ListKeyVals{i, prefix, keySizes, keys, valSizes, vals, packed};
+        auto list_keyvals = ListKeyVals{i, mode, prefix, keySizes, keys, valSizes, vals, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keyvals, false);

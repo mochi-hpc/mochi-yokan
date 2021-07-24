@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <leveldb/db.h>
@@ -298,7 +299,6 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -319,7 +319,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
+            if(!checkPrefix(mode, key.data(), key.size(),
+                                  prefix.data, prefix.size)) {
                 iterator->Next();
                 continue;
             }
@@ -366,7 +367,6 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = leveldb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -389,7 +389,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
+            if(!checkPrefix(mode, key.data(), key.size(),
+                                  prefix.data, prefix.size)) {
                 iterator->Next();
                 continue;
             }

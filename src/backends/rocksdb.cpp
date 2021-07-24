@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <rocksdb/db.h>
@@ -393,7 +394,6 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -414,7 +414,8 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
+            if(!checkPrefix(mode, key.data(), key.size(),
+                            prefix.data, prefix.size)) {
                 iterator->Next();
                 continue;
             }
@@ -460,7 +461,6 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
-        auto prefixSlice = rocksdb::Slice { prefix.data, prefix.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
@@ -483,7 +483,8 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key.starts_with(prefixSlice)) {
+            if(!checkPrefix(mode, key.data(), key.size(),
+                            prefix.data, prefix.size)) {
                 iterator->Next();
                 continue;
             }

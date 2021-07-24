@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <lmdb.h>
@@ -407,8 +408,9 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
                 return convertStatus(ret);
             }
 
-            if(key.mv_size < prefix.size
-            || std::memcmp(key.mv_data, prefix.data, prefix.size) != 0) {
+            if((key.mv_size < prefix.size)
+            || !checkPrefix(mode, key.mv_data, key.mv_size,
+                           prefix.data, prefix.size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -529,7 +531,8 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             }
 
             if(key.mv_size < prefix.size
-            || std::memcmp(key.mv_data, prefix.data, prefix.size) != 0) {
+            || !checkPrefix(mode, key.mv_data, key.mv_size,
+                            prefix.data, prefix.size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

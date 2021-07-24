@@ -91,6 +91,7 @@ typedef enum rkv_return_t {
  *
  * Important: not all backends support all modes.
  */
+#define RKV_MODE_DEFAULT      0b0000000000
 #define RKV_MODE_INCLUSIVE    0b0000000001
 #define RKV_MODE_APPEND       0b0000000010
 #define RKV_MODE_CONSUME      0b0000000100

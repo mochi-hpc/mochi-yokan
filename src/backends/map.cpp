@@ -7,6 +7,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/locks.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
@@ -382,8 +383,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             for(auto it = fromKeyIt; it != end && i < max; it++) {
                 auto& key = it->first;
                 if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    if(!checkPrefix(mode, key.data(), key.size(),
+                                          prefix.data, prefix.size))
                         continue;
                 }
                 size_t usize = keySizes[i];
@@ -421,8 +422,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             for(auto it = fromKeyIt; it != end && i < max; it++) {
                 auto& key = it->first;
                 if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    if(!checkPrefix(mode, key.data(), key.size(),
+                                          prefix.data, prefix.size))
                         continue;
                 }
                 auto umem = static_cast<char*>(keys.data) + offset;
@@ -475,8 +476,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 auto& key = it->first;
                 auto& val = it->second;
                 if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    if(!checkPrefix(mode, key.data(), key.size(),
+                                          prefix.data, prefix.size))
                         continue;
                 }
                 size_t key_usize = keySizes[i];
@@ -526,8 +527,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 auto& key = it->first;
                 auto& val = it->second;
                 if(prefix.size != 0) {
-                    if(prefix.size > key.size()) continue;
-                    if(std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    if(!checkPrefix(mode, key.data(), key.size(),
+                                          prefix.data, prefix.size))
                         continue;
                 }
                 auto key_umem = static_cast<char*>(keys.data) + key_offset;

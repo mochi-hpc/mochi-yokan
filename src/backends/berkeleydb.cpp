@@ -6,6 +6,7 @@
 #include "rkv/rkv-backend.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <db_cxx.h>
 #include <dbstl_map.h>
@@ -423,7 +424,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 if(prefix.size == 0)
                     break;
                 else if((dummy_key.get_size() >= prefix.size) &&
-                  (std::memcmp(dummy_key.get_data(), prefix.data, prefix.size) == 0))
+                        checkPrefix(mode, dummy_key.get_data(), dummy_key.get_size(),
+                                    prefix.data, prefix.size))
                     break;
             }
 
@@ -575,7 +577,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 if(prefix.size == 0)
                     break;
                 else if((dummy_key.get_size() >= prefix.size) &&
-                  (std::memcmp(dummy_key.get_data(), prefix.data, prefix.size) == 0))
+                  checkPrefix(mode, dummy_key.get_data(), dummy_key.get_size(),
+                              prefix.data, prefix.size))
                     break;
             }
 
