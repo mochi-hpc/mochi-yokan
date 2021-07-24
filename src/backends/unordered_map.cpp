@@ -139,7 +139,20 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
-        return mode == 0 || mode == 1;
+        return mode ==
+            (mode & (
+                     RKV_MODE_INCLUSIVE
+        //            |RKV_MODE_APPEND
+        //            |RKV_MODE_CONSUME
+        //            |RKV_MODE_WAIT
+        //            |RKV_MODE_NEW_ONLY
+        //            |RKV_MODE_EXIST_ONLY
+        //            |RKV_MODE_NO_PREFIX
+        //            |RKV_MODE_IGNORE_KEYS
+        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_SUFFIX
+                    )
+            );
     }
 
     virtual void destroy() override {

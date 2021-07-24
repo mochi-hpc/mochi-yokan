@@ -6,6 +6,7 @@
 #ifndef __RKV_MODES_HPP
 #define __RKV_MODES_HPP
 
+#include "rkv/rkv-common.h"
 #include <cstring>
 
 namespace rkv {
@@ -26,6 +27,36 @@ static inline bool checkPrefix(int32_t mode,
         return std::memcmp(key, prefix, psize) == 0;
     } else {
         return std::memcmp(((const char*)key)+ksize-psize, prefix, psize) == 0;
+    }
+}
+
+/**
+ * This function will copy a key into a buffer according to the mode
+ * provided, i.e. eliminating 
+ */
+static inline size_t keyCopy(int32_t mode,
+        void* dst, size_t dst_size,
+        const void* key, size_t ksize,
+        size_t prefix_size,
+        bool is_last = false) {
+    if(mode & RKV_MODE_IGNORE_KEYS) {
+        if(!(is_last && (mode & RKV_MODE_KEEP_LAST)))
+            return 0;
+    }
+    if(!(mode & RKV_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
+        if(dst_size < ksize) return RKV_SIZE_TOO_SMALL;
+        std::memcpy(dst, key, ksize);
+        return ksize;
+    } else { // eliminate prefix/suffix
+        auto final_ksize = ksize - prefix_size;
+        if(dst_size < final_ksize)
+            return RKV_SIZE_TOO_SMALL;
+        if(mode & RKV_MODE_SUFFIX) { // eliminate suffix
+            std::memcpy(dst, (const char*)key, final_ksize);
+        } else { // eliminate prefix
+            std::memcpy(dst, (const char*)key + prefix_size, final_ksize);
+        }
+        return final_ksize;
     }
 }
 

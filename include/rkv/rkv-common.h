@@ -81,9 +81,8 @@ typedef enum rkv_return_t {
  *   the prefix from results before sending the keys back.
  * - RKV_MODE_IGNORE_KEY: "list_keyvals" will only return values.
  * - RKV_MODE_KEEP_LAST: implies RKV_MODE_IGNORE_KEYS but "list_keyvals"
- *   will still return the last key found (as keys[0]/ksizes[0]
- *   for non-packed list_keyvals and at the beginning of the buffer
- *   and with ksizes[0] for packed list_keyvals).
+ *   will still return the last key found. The rest of the keys will
+ *   be set as empty.
  * - RKV_MODE_SUFFIX: consider the "prefix" argument of "list_keys"
  *   and "list_keyvals" as a suffix instead. RKV_MODE_NO_PREFIX, if
  *   provided, will be re-interpreted accordingly, removing the suffix
