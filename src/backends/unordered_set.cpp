@@ -121,17 +121,23 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
+        // note: RKV_MODE_APPEND, NEW_ONLY, and EXIST_ONLY
+        // are marked as supported but they don't really do
+        // anything because this backend doesn't store values.
+        // RKV_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX are
+        // marked as supported but listKeys and listKeyvals
+        // are not supported anyway.
         return mode ==
             (mode & (
                      RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
+                    |RKV_MODE_APPEND
         //            |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_EXIST_ONLY
+                    |RKV_MODE_NO_PREFIX
+                    |RKV_MODE_IGNORE_KEYS
+                    |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
                     )
             );

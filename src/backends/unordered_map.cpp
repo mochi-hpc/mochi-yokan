@@ -140,6 +140,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
+        // note we mark RKV_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX
+        // as supported, but the listKeys and listKeyvals are not
+        // supported anyway.
         return mode ==
             (mode & (
                      RKV_MODE_INCLUSIVE
@@ -148,9 +151,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         //            |RKV_MODE_WAIT
                     |RKV_MODE_NEW_ONLY
                     |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_NO_PREFIX
+                    |RKV_MODE_IGNORE_KEYS
+                    |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
                     )
             );

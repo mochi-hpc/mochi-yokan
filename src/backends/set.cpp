@@ -142,17 +142,20 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
+        // note: technically RKV_MODE_APPEND, NEW_ONLY, and EXIST_ONLY
+        // are supported but they are useless for a backend that doesn't
+        // store any value!
         return mode ==
             (mode & (
                      RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
+                    |RKV_MODE_APPEND
         //            |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_EXIST_ONLY
+                    |RKV_MODE_NO_PREFIX
+                    |RKV_MODE_IGNORE_KEYS
+                    |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
                     )
             );
@@ -278,82 +281,67 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
-        if(!packed) {
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = *it;
-                if(prefix.size != 0) {
-                    if(!checkPrefix(mode, key.data(), key.size(),
-                                          prefix.data, prefix.size))
-                        continue;
-                }
-                size_t usize = keySizes[i];
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    i += 1;
-                    offset += usize;
-                    continue;
-                }
-                std::memcpy(umem, key.data(), key.size());
-                keySizes[i] = key.size();
-                offset += usize;
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        } else { // if packed
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t offset = 0;
-            bool buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = *it;
-                if(prefix.size != 0) {
-                    if(!checkPrefix(mode, key.data(), key.size(),
-                                          prefix.data, prefix.size))
-                        continue;
-                }
-                auto umem = static_cast<char*>(keys.data) + offset;
-                if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    buf_too_small = true;
-                } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
-                }
-                i += 1;
-            }
-            keys.size = offset;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-            }
-
+        using iterator = decltype(m_db->begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db->begin();
+        } else {
+            fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
         }
+
+        const auto end = m_db->end();
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t offset = 0;
+        bool buf_too_small = false;
+
+        for(auto it = fromKeyIt; it != end && i < max; ++it) {
+            auto& key = *it;
+            if(prefix.size != 0) {
+                if(!checkPrefix(mode, key.data(), key.size(),
+                            prefix.data, prefix.size))
+                    continue;
+            }
+            auto umem = static_cast<char*>(keys.data) + offset;
+
+            bool is_last = false;
+            if(mode & RKV_MODE_KEEP_LAST) {
+                auto next = it;
+                ++next;
+                is_last = (i+1 == max) || (next == end);
+            }
+
+            if(!packed) {
+
+                size_t usize = keySizes[i];
+                keySizes[i] = keyCopy(mode, umem, usize,
+                                      key.data(), key.size(),
+                                      prefix.size, is_last);
+                offset += usize;
+
+            } else { // if packed
+
+                if(buf_too_small)
+                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                else {
+                    keySizes[i] = keyCopy(mode, umem, keys.size - offset,
+                                          key.data(), key.size(), prefix.size,
+                                          is_last);
+                    if(keySizes[i] == RKV_SIZE_TOO_SMALL)
+                        buf_too_small = true;
+                    else
+                        offset += keySizes[i];
+                }
+
+            }
+            i += 1;
+        }
+
+        keys.size = offset;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+        }
+
         return Status::OK;
     }
 
@@ -369,87 +357,68 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
-        if(!packed) {
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = *it;
-                if(prefix.size != 0) {
-                    if(!checkPrefix(mode, key.data(), key.size(),
-                                          prefix.data, prefix.size))
-                        continue;
-                }
-                size_t key_usize = keySizes[i];
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                }
-                valSizes[i] = 0;
-                key_offset += key_usize;
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = 0;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
-
-        } else { // if packed
-
-            using iterator = decltype(m_db->begin());
-            iterator fromKeyIt;
-            if(fromKey.size == 0) {
-                fromKeyIt = m_db->begin();
-            } else {
-                fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
-            }
-            const auto end = m_db->end();
-            auto max = keySizes.size;
-            size_t i = 0;
-            size_t key_offset = 0;
-            bool key_buf_too_small = false;
-            for(auto it = fromKeyIt; it != end && i < max; it++) {
-                auto& key = *it;
-                if(prefix.size != 0) {
-                    if(!checkPrefix(mode, key.data(), key.size(),
-                                          prefix.data, prefix.size))
-                        continue;
-                }
-                auto key_umem = static_cast<char*>(keys.data) + key_offset;
-                if(key_buf_too_small
-                || keys.size - key_offset < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
-                }
-                valSizes[i] = 0;
-                i += 1;
-            }
-            keys.size = key_offset;
-            vals.size = 0;
-            for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
-            }
-
+        using iterator = decltype(m_db->begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db->begin();
+        } else {
+            fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
         }
+        const auto end = m_db->end();
+        auto max = keySizes.size;
+        size_t i = 0;
+        size_t key_offset = 0;
+        bool key_buf_too_small = false;
+
+        for(auto it = fromKeyIt; it != end && i < max; it++) {
+            auto& key = *it;
+            if(prefix.size != 0) {
+                if(!checkPrefix(mode, key.data(), key.size(),
+                            prefix.data, prefix.size))
+                    continue;
+            }
+            auto key_umem = static_cast<char*>(keys.data) + key_offset;
+
+            bool is_last = false;
+            if(mode & RKV_MODE_KEEP_LAST) {
+                auto next = it;
+                ++next;
+                is_last = (i+1 == max) || (next == end);
+            }
+
+            if(!packed) {
+
+                size_t key_usize = keySizes[i];
+                keySizes[i] = keyCopy(mode, key_umem, key_usize,
+                                      key.data(), key.size(),
+                                      prefix.size, is_last);
+                key_offset += key_usize;
+
+            } else { // not packed
+
+                if(key_buf_too_small)
+                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                else {
+                    keySizes[i] = keyCopy(mode, key_umem, keys.size - key_offset,
+                                          key.data(), key.size(),
+                                          prefix.size, is_last);
+                    if(keySizes[i] == RKV_SIZE_TOO_SMALL)
+                        key_buf_too_small = true;
+                    else
+                        key_offset += key.size();
+                }
+
+            }
+            valSizes[i] = 0;
+            i += 1;
+        }
+        keys.size = key_offset;
+        vals.size = 0;
+        for(; i < max; i++) {
+            keySizes[i] = RKV_NO_MORE_KEYS;
+            valSizes[i] = RKV_NO_MORE_KEYS;
+        }
+
         return Status::OK;
     }
 
