@@ -75,6 +75,8 @@ typedef enum rkv_return_t {
  *   the returned key/value pairs from the database.
  * - RKV_MODE_WAIT: "get" will wait for any non-present key to
  *   appear in the database instead of returning RKV_KEY_NODE_FOUND.
+ *   Writers need to put their key with RKV_MODE_NOTIFY in order
+ *   to wake up waiters.
  * - RKV_MODE_NEW_ONLY: "put" will only add key/value pairs if the
  *   key was not already present in the database.
  * - RKV_MODE_NO_PREFIX: "list_keys" and "list_keyvals" will remove
@@ -95,6 +97,7 @@ typedef enum rkv_return_t {
 #define RKV_MODE_APPEND       0b0000000010
 #define RKV_MODE_CONSUME      0b0000000100
 #define RKV_MODE_WAIT         0b0000001000
+#define RKV_MODE_NOTIFY       0b0000001000
 #define RKV_MODE_NEW_ONLY     0b0000010000
 #define RKV_MODE_EXIST_ONLY   0b0000100000
 #define RKV_MODE_NO_PREFIX    0b0001000000

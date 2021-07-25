@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "rkv/rkv-watcher.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/locks.hpp"
@@ -148,7 +149,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                      RKV_MODE_INCLUSIVE
                     |RKV_MODE_APPEND
         //            |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
+                    |RKV_MODE_WAIT
+                    |RKV_MODE_NOTIFY
                     |RKV_MODE_NEW_ONLY
                     |RKV_MODE_EXIST_ONLY
                     |RKV_MODE_NO_PREFIX
@@ -168,15 +170,30 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                           const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
-        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
+        const auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             key.assign(keys.data + offset, ksizes[i]);
-            flags[i] = m_db->count(key) > 0;
+            retry:
+            if(m_db->count(key) > 0)
+                flags[i] = true;
+            else if(mode_wait) {
+                auto key_umem = UserMem{keys.data + offset, ksizes[i]};
+                m_watcher.addKey(key_umem);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key_umem);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
+            } else {
+                flags[i] = false;
+            }
             offset += ksizes[i];
         }
         return Status::OK;
@@ -186,17 +203,31 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                           const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
+        const auto mode_wait = mode & RKV_MODE_WAIT;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             key.assign(keys.data + offset, ksizes[i]);
+            retry:
             auto it = m_db->find(key);
-            if(it == m_db->end()) vsizes[i] = KeyNotFound;
-            else vsizes[i] = it->second.size();
+            if(it != m_db->end())
+                vsizes[i] = it->second.size();
+            else if(mode_wait) {
+                auto key_umem = UserMem{keys.data + offset, ksizes[i]};
+                m_watcher.addKey(key_umem);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key_umem);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
+            } else {
+                vsizes[i] = KeyNotFound;
+            }
             offset += ksizes[i];
         }
         return Status::OK;
@@ -213,9 +244,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         size_t val_offset = 0;
 
-        const auto mode_append = mode & RKV_MODE_APPEND;
-        const auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        const auto mode_append     = mode & RKV_MODE_APPEND;
+        const auto mode_new_only   = mode & RKV_MODE_NEW_ONLY;
         const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+        const auto mode_notify     = mode & RKV_MODE_NOTIFY;
         // note: mode_append and mode_new_only can't be provided
         // at the same time. mode_new_only and mode_exist_only either.
         // mode_append and mode_exists_only can.
@@ -247,6 +279,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                                 ksizes[i], m_key_allocator),
                             std::forward_as_tuple(vals.data + val_offset,
                                 vsizes[i], m_val_allocator));
+                    if(mode_notify)
+                        m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
                 }
 
             } else if(mode_exist_only) { // may of may not have mode_append
@@ -260,6 +294,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                     } else {
                         it->second.assign(keys.data + key_offset, ksizes[i]);
                     }
+                    if(mode_notify)
+                        m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
                 }
 
             } else if(mode_append) { // but not mode_exist_only
@@ -276,6 +312,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                             std::forward_as_tuple(vals.data + val_offset,
                                 vsizes[i], m_val_allocator));
                 }
+                if(mode_notify)
+                    m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
 
             } else { // normal mode
 
@@ -288,6 +326,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                     p.first->second.assign(vals.data + val_offset,
                                            vsizes[i]);
                 }
+                if(mode_notify)
+                    m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
 
             }
             key_offset += ksizes[i];
@@ -304,6 +344,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
+        const auto mode_wait = mode & RKV_MODE_WAIT;
+
         size_t key_offset = 0;
         size_t val_offset = 0;
         ScopedReadLock lock(m_lock);
@@ -313,10 +355,23 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             auto key = key_type(m_key_allocator);
             for(size_t i = 0; i < ksizes.size; i++) {
                 key.assign(keys.data + key_offset, ksizes[i]);
-                auto it = m_db->find(key);
                 const auto original_vsize = vsizes[i];
+                retry:
+                auto it = m_db->find(key);
                 if(it == m_db->end()) {
-                    vsizes[i] = KeyNotFound;
+                    if(mode_wait) {
+                        auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+                        m_watcher.addKey(key_umem);
+                        lock.unlock();
+                        auto ret = m_watcher.waitKey(key_umem);
+                        lock.lock();
+                        if(ret == KeyWatcher::KeyPresent)
+                            goto retry;
+                        else
+                            return Status::TimedOut;
+                    } else {
+                        vsizes[i] = KeyNotFound;
+                    }
                 } else {
                     auto& v = it->second;
                     vsizes[i] = valCopy(mode, vals.data + val_offset,
@@ -335,9 +390,22 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 key.assign(keys.data + key_offset, ksizes[i]);
+                retry_packed:
                 auto it = m_db->find(key);
                 if(it == m_db->end()) {
-                    vsizes[i] = KeyNotFound;
+                    if(mode_wait) {
+                        auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+                        m_watcher.addKey(key_umem);
+                        lock.unlock();
+                        auto ret = m_watcher.waitKey(key_umem);
+                        lock.lock();
+                        if(ret == KeyWatcher::KeyPresent)
+                            goto retry_packed;
+                        else
+                            return Status::TimedOut;
+                    } else {
+                        vsizes[i] = KeyNotFound;
+                    }
                 } else if(buf_too_small) {
                     vsizes[i] = BufTooSmall;
                 } else {
@@ -368,14 +436,26 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
         size_t offset = 0;
+        const auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             key.assign(keys.data + offset, ksizes[i]);
+            retry:
             auto it = m_db->find(key);
             if(it != m_db->end()) {
                 m_db->erase(it);
+            } else if(mode_wait) {
+                auto key_umem = UserMem{keys.data + offset, ksizes[i]};
+                m_watcher.addKey(key_umem);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key_umem);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
             }
             offset += ksizes[i];
         }
@@ -426,6 +506,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     mutable rkv_allocator_t     m_node_allocator;
     mutable rkv_allocator_t     m_key_allocator;
     mutable rkv_allocator_t     m_val_allocator;
+    mutable KeyWatcher m_watcher;
 };
 
 }

@@ -160,7 +160,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             (mode & (
                      RKV_MODE_INCLUSIVE
                     |RKV_MODE_APPEND
-        //            |RKV_MODE_CONSUME
+                    |RKV_MODE_CONSUME
                     |RKV_MODE_WAIT
                     |RKV_MODE_NEW_ONLY
                     |RKV_MODE_EXIST_ONLY
@@ -251,9 +251,10 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
-        const auto mode_append = mode & RKV_MODE_APPEND;
-        const auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        const auto mode_append     = mode & RKV_MODE_APPEND;
+        const auto mode_new_only   = mode & RKV_MODE_NEW_ONLY;
         const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+        const auto mode_notify     = mode & RKV_MODE_NOTIFY;
         // note: mode_append and mode_new_only can't be provided
         // at the same time. mode_new_only and mode_exist_only either.
         // mode_append and mode_exists_only can.
@@ -285,7 +286,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                 ksizes[i], m_key_allocator),
                             std::forward_as_tuple(vals.data + val_offset,
                                 vsizes[i], m_val_allocator));
-                    m_watcher.notifyKey(key_umem);
+                    if(mode_notify)
+                        m_watcher.notifyKey(key_umem);
                 }
 
             } else if(mode_exist_only) { // may of may not have mode_append
@@ -297,7 +299,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                     } else {
                         it->second.assign(keys.data + key_offset, ksizes[i]);
                     }
-                    m_watcher.notifyKey(key_umem);
+                    if(mode_notify)
+                        m_watcher.notifyKey(key_umem);
                 }
 
             } else if(mode_append) { // but not mode_exist_only
@@ -312,7 +315,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                             std::forward_as_tuple(vals.data + val_offset,
                                 vsizes[i], m_val_allocator));
                 }
-                m_watcher.notifyKey(key_umem);
+                if(mode_notify)
+                    m_watcher.notifyKey(key_umem);
 
             } else { // normal mode
 
@@ -325,7 +329,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                     p.first->second.assign(vals.data + val_offset,
                                            vsizes[i]);
                 }
-                m_watcher.notifyKey(key_umem);
+                if(mode_notify)
+                    m_watcher.notifyKey(key_umem);
 
             }
             key_offset += ksizes[i];
