@@ -165,7 +165,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                     |RKV_MODE_EXIST_ONLY
                     |RKV_MODE_NO_PREFIX
                     |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
                     )
             );
@@ -265,7 +265,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                     }
                 }
 
-            } else if(mode_append) { // but node mode_exist_only
+            } else if(mode_append) { // but not mode_exist_only
 
                 auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
                 if(it != m_db->end()) {

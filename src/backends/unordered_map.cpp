@@ -7,6 +7,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/locks.hpp"
+#include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <unordered_map>
@@ -142,11 +143,11 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return mode ==
             (mode & (
                      RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
+                    |RKV_MODE_APPEND
         //            |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
+                    |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_EXIST_ONLY
         //            |RKV_MODE_NO_PREFIX
         //            |RKV_MODE_IGNORE_KEYS
         //            |RKV_MODE_KEEP_LAST
@@ -209,6 +210,13 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         size_t val_offset = 0;
 
+        const auto mode_append = mode & RKV_MODE_APPEND;
+        const auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+        // note: mode_append and mode_new_only can't be provided
+        // at the same time. mode_new_only and mode_exist_only either.
+        // mode_append and mode_exists_only can.
+
         size_t total_ksizes = std::accumulate(ksizes.data,
                                               ksizes.data + ksizes.size,
                                               0);
@@ -221,14 +229,63 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto p = m_db->emplace(std::piecewise_construct,
-                std::forward_as_tuple(keys.data + key_offset,
-                                      ksizes[i], m_key_allocator),
-                std::forward_as_tuple(vals.data + val_offset,
-                                      vsizes[i], m_val_allocator));
-            if(!p.second) {
-                p.first->second.assign(vals.data + val_offset,
-                                       vsizes[i]);
+
+            if(mode_new_only) {
+
+                // contrary to std::map, std::unordered_map::find is not a template
+                // function, and it needs to take a Key argument matching the type
+                // stored. Templated find will be available in C++20, but for now
+                // the following is not possible:
+                // auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                auto it = m_db->find(key_type{ keys.data + key_offset, ksizes[i], m_key_allocator });
+                if(it == m_db->end()) {
+                    m_db->emplace(std::piecewise_construct,
+                            std::forward_as_tuple(keys.data + key_offset,
+                                ksizes[i], m_key_allocator),
+                            std::forward_as_tuple(vals.data + val_offset,
+                                vsizes[i], m_val_allocator));
+                }
+
+            } else if(mode_exist_only) { // may of may not have mode_append
+
+                // See earlier comment. Until C++20, the following is not possible:
+                //auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                auto it = m_db->find(key_type{ keys.data + key_offset, ksizes[i], m_key_allocator });
+                if(it != m_db->end()) {
+                    if(mode_append) {
+                        it->second.append(keys.data + key_offset, ksizes[i]);
+                    } else {
+                        it->second.assign(keys.data + key_offset, ksizes[i]);
+                    }
+                }
+
+            } else if(mode_append) { // but not mode_exist_only
+
+                // See earlier comment. Until C++20, the following is not possible:
+                // auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
+                auto it = m_db->find(key_type{ keys.data + key_offset, ksizes[i], m_key_allocator });
+                if(it != m_db->end()) {
+                    it->second.assign(keys.data + key_offset, ksizes[i]);
+                } else {
+                    m_db->emplace(std::piecewise_construct,
+                            std::forward_as_tuple(keys.data + key_offset,
+                                ksizes[i], m_key_allocator),
+                            std::forward_as_tuple(vals.data + val_offset,
+                                vsizes[i], m_val_allocator));
+                }
+
+            } else { // normal mode
+
+                auto p = m_db->emplace(std::piecewise_construct,
+                        std::forward_as_tuple(keys.data + key_offset,
+                                              ksizes[i], m_key_allocator),
+                        std::forward_as_tuple(vals.data + val_offset,
+                                              vsizes[i], m_val_allocator));
+                if(!p.second) {
+                    p.first->second.assign(vals.data + val_offset,
+                                           vsizes[i]);
+                }
+
             }
             key_offset += ksizes[i];
             val_offset += vsizes[i];
@@ -259,12 +316,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                     vsizes[i] = KeyNotFound;
                 } else {
                     auto& v = it->second;
-                    if(v.size() > vsizes[i]) {
-                        vsizes[i] = BufTooSmall;
-                    } else {
-                        std::memcpy(vals.data + val_offset, v.data(), v.size());
-                        vsizes[i] = v.size();
-                    }
+                    vsizes[i] = valCopy(mode, vals.data + val_offset,
+                                        original_vsize,
+                                        v.data(), v.size());
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -274,22 +328,26 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
             size_t val_remaining_size = vals.size;
             auto key = key_type(m_key_allocator);
+            bool buf_too_small = false;
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 key.assign(keys.data + key_offset, ksizes[i]);
                 auto it = m_db->find(key);
                 if(it == m_db->end()) {
                     vsizes[i] = KeyNotFound;
-                } else if(it->second.size() > val_remaining_size) {
-                    for(; i < ksizes.size; i++) {
-                        vsizes[i] = BufTooSmall;
-                    }
+                } else if(buf_too_small) {
+                    vsizes[i] = BufTooSmall;
                 } else {
                     auto& v = it->second;
-                    std::memcpy(vals.data + val_offset, v.data(), v.size());
-                    vsizes[i] = v.size();
-                    val_remaining_size -= vsizes[i];
-                    val_offset += vsizes[i];
+                    vsizes[i] = valCopy(mode, vals.data+val_offset,
+                                        val_remaining_size,
+                                        v.data(), v.size());
+                    if(vsizes[i] == BufTooSmall)
+                        buf_too_small = true;
+                    else {
+                        val_remaining_size -= vsizes[i];
+                        val_offset += vsizes[i];
+                    }
                 }
                 key_offset += ksizes[i];
             }
