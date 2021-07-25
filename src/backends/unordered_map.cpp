@@ -356,6 +356,11 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             }
             vals.size = vals.size - val_remaining_size;
         }
+
+        if(mode & RKV_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
         return Status::OK;
     }
 

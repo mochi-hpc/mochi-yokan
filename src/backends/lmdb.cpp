@@ -147,7 +147,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             (mode & (
                      RKV_MODE_INCLUSIVE
         //            |RKV_MODE_APPEND
-        //            |RKV_MODE_CONSUME
+                    |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
         //            |RKV_MODE_NEW_ONLY
         //            |RKV_MODE_EXIST_ONLY
@@ -332,6 +332,9 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             }
             mdb_txn_abort(txn);
             vals.size = vals.size - val_remaining_size;
+        }
+        if(mode & RKV_MODE_CONSUME) {
+            return erase(mode, keys, ksizes);
         }
         return Status::OK;
     }

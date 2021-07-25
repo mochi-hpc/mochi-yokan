@@ -234,6 +234,10 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
             key_offset += ksizes[i];
         }
         vals.size = 0;
+        if(mode & RKV_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
         return Status::OK;
     }
 

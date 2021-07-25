@@ -72,13 +72,13 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
             (mode & (
                      RKV_MODE_INCLUSIVE
         //            |RKV_MODE_APPEND
-        //            |RKV_MODE_CONSUME
+                    |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
+                    |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_EXIST_ONLY
+                    |RKV_MODE_NO_PREFIX
+                    |RKV_MODE_IGNORE_KEYS
+                    |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
                     )
             );
@@ -151,11 +151,21 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
+        auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const auto key = datum { keys.data + key_offset, (int)ksizes[i] };
             const auto val = datum { vals.data + val_offset, (int)vsizes[i] };
-            int ret = gdbm_store(m_db, key, val, GDBM_REPLACE);
+            int ret = 0;
+            if(mode_exist_only) {
+                if(gdbm_exists(m_db, key))
+                    ret = gdbm_store(m_db, key, val, GDBM_REPLACE);
+            } else {
+                auto flag = mode_new_only ? GDBM_INSERT : GDBM_REPLACE;
+                ret = gdbm_store(m_db, key, val, flag);
+            }
             if(ret != 0) // TODO convert status ?
                 return Status::Other;
             key_offset += ksizes[i];
@@ -220,6 +230,10 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
                 key_offset += ksizes[i];
             }
             vals.size = vals.size - val_remaining_size;
+        }
+        if(mode & RKV_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
         }
         return Status::OK;
     }
