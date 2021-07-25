@@ -149,7 +149,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
         //            |RKV_MODE_NOTIFY
-        //            |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_NEW_ONLY
         //            |RKV_MODE_EXIST_ONLY
         //            |RKV_MODE_NO_PREFIX
         //            |RKV_MODE_IGNORE_KEYS

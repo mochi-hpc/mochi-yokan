@@ -285,7 +285,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         //            |RKV_MODE_APPEND
                     |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NEW_ONLY
+                    |RKV_MODE_NEW_ONLY
         //            |RKV_MODE_EXIST_ONLY
         //            |RKV_MODE_NO_PREFIX
         //            |RKV_MODE_IGNORE_KEYS
@@ -382,11 +382,13 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
+        bool overwrite = !(mode & RKV_MODE_NEW_ONLY);
+
         for(size_t i = 0; i < ksizes.size; i++) {
-            // TODO we can give the option to use SetMulti instead
             auto status = m_db->Set({ keys.data + key_offset, ksizes[i] },
-                                    { vals.data + val_offset, vsizes[i] });
-            if(!status.IsOK()) {
+                                    { vals.data + val_offset, vsizes[i] },
+                                    overwrite);
+            if(!status.IsOK() && (status != tkrzw::Status::DUPLICATION_ERROR)) {
                 return convertStatus(status);
             }
             key_offset += ksizes[i];
