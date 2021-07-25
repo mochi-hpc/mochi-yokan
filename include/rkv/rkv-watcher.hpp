@@ -64,6 +64,7 @@ class KeyWatcher {
 
     std::multimap<string_view, Entry> m_expected_keys;
     ABT_mutex                         m_mutex;
+    ABT_cond_memory                   m_cond = ABT_COND_INITIALIZER;
 
     public:
 
@@ -81,11 +82,8 @@ class KeyWatcher {
                 ABT_cond_signal(cond);
             }
         }
-        do {
-            ABT_mutex_unlock(m_mutex);
-            ABT_thread_yield();
-            ABT_mutex_lock(m_mutex);
-        } while(!m_expected_keys.empty());
+        while(!m_expected_keys.empty())
+            ABT_cond_wait(ABT_COND_MEMORY_GET_HANDLE(&m_cond), m_mutex);
         ABT_mutex_unlock(m_mutex);
         ABT_mutex_free(&m_mutex);
     }
@@ -123,6 +121,8 @@ class KeyWatcher {
             ABT_cond_wait(cond, m_mutex);
         auto status = entry.m_status;
         m_expected_keys.erase(it);
+        if(m_expected_keys.empty())
+            ABT_cond_signal(ABT_COND_MEMORY_GET_HANDLE(&m_cond));
         ABT_mutex_unlock(m_mutex);
         return status;
     }
