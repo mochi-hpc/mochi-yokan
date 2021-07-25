@@ -392,7 +392,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t offset = 0;
         bool buf_too_small = false;
 
-        for(auto it = fromKeyIt; it != end && i < max; it++) {
+        for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = it->first;
             if(prefix.size != 0) {
                 if(!checkPrefix(mode, key.data(), key.size(),
@@ -403,14 +403,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             size_t usize = packed ? (keys.size - offset) : keySizes[i];
             auto umem = static_cast<char*>(keys.data) + offset;
 
+            bool is_last = false;
+            if(mode & RKV_MODE_KEEP_LAST) {
+                auto next = it;
+                ++next;
+                is_last = (i+1 == max) || (next == end);
+            }
+
             if(!packed) {
-                keySizes[i] = keyCopy(mode, umem, usize, key.data(), key.size(), prefix.size);
+                keySizes[i] = keyCopy(mode, umem, usize, key.data(),
+                                      key.size(), prefix.size, is_last);
                 offset += usize;
             } else {
                 if(buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, umem, usize, key.data(), key.size(), prefix.size);
+                    keySizes[i] = keyCopy(mode, umem, usize, key.data(),
+                                          key.size(), prefix.size, is_last);
                     if(keySizes[i] == RKV_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
@@ -468,19 +477,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
 
+            bool is_last = false;
+            if(mode & RKV_MODE_KEEP_LAST) {
+                auto next = it;
+                ++next;
+                is_last = (i+1 == max) || (next == end);
+            }
+
+
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
                 size_t val_usize = valSizes[i];
-
-                keySizes[i] = keyCopy(mode, key_umem, key_usize, key.data(), key.size(), prefix.size);
-
-                if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                }
+                keySizes[i] = keyCopy(mode, key_umem, key_usize,
+                                      key.data(), key.size(),
+                                      prefix.size, is_last);
+                valSizes[i] = valCopy(mode, val_umem, val_usize,
+                                      val.data(), val.size());
                 key_offset += key_usize;
                 val_offset += val_usize;
 
@@ -492,20 +505,23 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 if(key_buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, key_umem, key_usize, key.data(), key.size(), prefix.size);
+                    keySizes[i] = keyCopy(mode, key_umem, key_usize,
+                                          key.data(), key.size(),
+                                          prefix.size, is_last);
                     if(keySizes[i] != RKV_SIZE_TOO_SMALL)
-                        key_offset += key.size();
+                        key_offset += keySizes[i];
                     else
                         key_buf_too_small = true;
                 }
-                if(val_buf_too_small
-                || val_usize < val.size()) {
+                if(val_buf_too_small) {
                     valSizes[i] = RKV_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
+                    valSizes[i] = valCopy(mode, val_umem, val_usize,
+                                          val.data(), val.size());
+                    if(valSizes[i] != RKV_SIZE_TOO_SMALL)
+                        val_offset += valSizes[i];
+                    else
+                        val_buf_too_small = true;
                 }
             }
             i += 1;

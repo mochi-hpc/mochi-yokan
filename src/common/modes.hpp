@@ -32,10 +32,11 @@ static inline bool checkPrefix(int32_t mode,
 
 /**
  * This function will copy a key into a buffer according to the mode
- * provided, i.e. eliminating 
+ * provided, i.e. eliminating prefix or suffix or ignoring the copy
+ * as needed.
  */
 static inline size_t keyCopy(int32_t mode,
-        void* dst, size_t dst_size,
+        void* dst, size_t max_dst_size,
         const void* key, size_t ksize,
         size_t prefix_size,
         bool is_last = false) {
@@ -44,12 +45,12 @@ static inline size_t keyCopy(int32_t mode,
             return 0;
     }
     if(!(mode & RKV_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
-        if(dst_size < ksize) return RKV_SIZE_TOO_SMALL;
+        if(max_dst_size < ksize) return RKV_SIZE_TOO_SMALL;
         std::memcpy(dst, key, ksize);
         return ksize;
     } else { // eliminate prefix/suffix
         auto final_ksize = ksize - prefix_size;
-        if(dst_size < final_ksize)
+        if(max_dst_size < final_ksize)
             return RKV_SIZE_TOO_SMALL;
         if(mode & RKV_MODE_SUFFIX) { // eliminate suffix
             std::memcpy(dst, (const char*)key, final_ksize);
@@ -58,6 +59,19 @@ static inline size_t keyCopy(int32_t mode,
         }
         return final_ksize;
     }
+}
+
+/**
+ * @brief This function is provided for symmetry with keyCopy,
+ * and in case we every need value copies to depend on a mode.
+ */
+static inline size_t valCopy(int32_t mode,
+        void* dst, size_t max_dst_size,
+        const void* val, size_t vsize) {
+    (void)mode;
+    if(max_dst_size < vsize) return RKV_SIZE_TOO_SMALL;
+    std::memcpy(dst, val, vsize);
+    return vsize;
 }
 
 }
