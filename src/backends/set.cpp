@@ -234,7 +234,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                        bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
-                       BasicUserMem<size_t>& vsizes) const override {
+                       BasicUserMem<size_t>& vsizes) override {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         (void)packed;

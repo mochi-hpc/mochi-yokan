@@ -337,7 +337,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
-                       BasicUserMem<size_t>& vsizes) const override {
+                       BasicUserMem<size_t>& vsizes) override {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -416,6 +416,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 key_offset += ksizes[i];
             }
             vals.size = vals.size - val_remaining_size;
+        }
+
+        if(mode & RKV_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
         }
         return Status::OK;
     }

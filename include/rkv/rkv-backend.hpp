@@ -240,7 +240,7 @@ class KeyValueStoreInterface {
     }
 
     /**
-     * @brief This verion of getMulti uses the user-provided memory.
+     * @brief Get values associated of keys.
      * vsizes is used both as input (to know where to place data in vals
      * and how much is available to each value) and as output (to store
      * the actual size of each value).
@@ -262,7 +262,7 @@ class KeyValueStoreInterface {
     virtual Status get(int32_t mode, bool packed, const UserMem& keys,
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
-                       BasicUserMem<size_t>& vsizes) const {
+                       BasicUserMem<size_t>& vsizes) {
         (void)mode;
         (void)packed;
         (void)keys;
