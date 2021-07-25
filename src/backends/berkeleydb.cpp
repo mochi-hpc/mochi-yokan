@@ -229,7 +229,6 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -253,8 +252,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             key.set_ulen(ksizes[i]);
             val.set_flags(DB_DBT_USERMEM);
             val.set_ulen(vsizes[i]);
-            // TODO enable DB_NOOVERWRITE is requested
-            int flag = 0;
+            int flag = (mode & RKV_MODE_NEW_ONLY) ?  DB_NOOVERWRITE : 0;
             int status = m_db->put(nullptr, &key, &val, flag);
             if(status != 0)
                 return convertStatus(status);
