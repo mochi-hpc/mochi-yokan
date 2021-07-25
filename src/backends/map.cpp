@@ -318,12 +318,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                     vsizes[i] = KeyNotFound;
                 } else {
                     auto& v = it->second;
-                    if(v.size() > vsizes[i]) {
-                        vsizes[i] = BufTooSmall;
-                    } else {
-                        std::memcpy(vals.data + val_offset, v.data(), v.size());
-                        vsizes[i] = v.size();
-                    }
+                    vsizes[i] = valCopy(mode, vals.data + val_offset,
+                                        original_vsize,
+                                        v.data(), v.size());
                 }
                 key_offset += ksizes[i];
                 val_offset += original_vsize;
@@ -332,22 +329,26 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         } else { // if packed
 
             size_t val_remaining_size = vals.size;
+            bool buf_too_small = false;
 
             for(size_t i = 0; i < ksizes.size; i++) {
                 auto key = UserMem{ keys.data + key_offset, ksizes[i] };
                 auto it = m_db->find(key);
                 if(it == m_db->end()) {
                     vsizes[i] = KeyNotFound;
-                } else if(it->second.size() > val_remaining_size) {
-                    for(; i < ksizes.size; i++) {
-                        vsizes[i] = BufTooSmall;
-                    }
+                } else if(buf_too_small) {
+                    vsizes[i] = BufTooSmall;
                 } else {
                     auto& v = it->second;
-                    std::memcpy(vals.data + val_offset, v.data(), v.size());
-                    vsizes[i] = v.size();
-                    val_remaining_size -= vsizes[i];
-                    val_offset += vsizes[i];
+                    vsizes[i] = valCopy(mode, vals.data + val_offset,
+                                        val_remaining_size,
+                                        v.data(), v.size());
+                    if(vsizes[i] == BufTooSmall) {
+                        buf_too_small = true;
+                    } else {
+                        val_remaining_size -= vsizes[i];
+                        val_offset += vsizes[i];
+                    }
                 }
                 key_offset += ksizes[i];
             }
