@@ -254,7 +254,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             val.set_ulen(vsizes[i]);
             int flag = (mode & RKV_MODE_NEW_ONLY) ?  DB_NOOVERWRITE : 0;
             int status = m_db->put(nullptr, &key, &val, flag);
-            if(status != 0)
+            if(status != 0 && status != DB_KEYEXIST)
                 return convertStatus(status);
             key_offset += ksizes[i];
             val_offset += vsizes[i];
