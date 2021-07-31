@@ -20,6 +20,35 @@ using json = nlohmann::json;
 
 class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
+    static Status convertStatus(int ret) {
+        switch(ret) {
+        case UNQLITE_NOMEM: return Status::SizeError;
+        case UNQLITE_ABORT: return Status::Aborted;
+        case UNQLITE_IOERR: return Status::Other;
+        case UNQLITE_CORRUPT: return Status::Corruption;
+        case UNQLITE_LOCKED: return Status::TryAgain;
+        case UNQLITE_BUSY: return Status::Busy;
+        case UNQLITE_DONE: return Status::Other;
+        case UNQLITE_PERM: return Status::Permission;
+        case UNQLITE_NOTIMPLEMENTED: return Status::NotSupported;
+        case UNQLITE_NOTFOUND: return Status::NotFound;
+        case UNQLITE_NOOP: return Status::Other;
+        case UNQLITE_INVALID: return Status::InvalidArg;
+        case UNQLITE_EOF: return Status::Other;
+        case UNQLITE_UNKNOWN: return Status::Other;
+        case UNQLITE_LIMIT: return Status::Other;
+        case UNQLITE_EXISTS: return Status::KeyExists;
+        case UNQLITE_EMPTY: return Status::Other;
+        case UNQLITE_COMPILE_ERR: return Status::Other;
+        case UNQLITE_VM_ERR: return Status::Other;
+        case UNQLITE_FULL: return Status::Other;
+        case UNQLITE_CANTOPEN: return Status::Other;
+        case UNQLITE_READ_ONLY: return Status::Other;
+        case UNQLITE_LOCKERR: return Status::Other;
+        }
+        return Status::Other;
+    }
+
     public:
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
@@ -81,12 +110,16 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         unqlite* db = nullptr;
         int ret = unqlite_open(&db, path.c_str(), mode);
         if(ret != UNQLITE_OK)
-            return Status::Other; // TODO
+            return convertStatus(ret);
 
-        if(cfg["max_page_cache"].get<int>() >= 0)
-            unqlite_config(db, UNQLITE_CONFIG_MAX_PAGE_CACHE, cfg["max_page_cache"].get<int>());
-        if(cfg["disable_auto_commit"].get<bool>())
-            unqlite_config(db, UNQLITE_CONFIG_DISABLE_AUTO_COMMIT);
+        if(cfg["max_page_cache"].get<int>() >= 0) {
+            ret = unqlite_config(db, UNQLITE_CONFIG_MAX_PAGE_CACHE, cfg["max_page_cache"].get<int>());
+            if(ret != UNQLITE_OK) return convertStatus(ret);
+        }
+        if(cfg["disable_auto_commit"].get<bool>()) {
+            ret = unqlite_config(db, UNQLITE_CONFIG_DISABLE_AUTO_COMMIT);
+            if(ret != UNQLITE_OK) return convertStatus(ret);
+        }
 
         *kvs = new UnQLiteKeyValueStore(std::move(cfg), use_lock, db);
         return Status::OK;
@@ -150,7 +183,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             else if(ret == UNQLITE_NOTFOUND)
                 flags[i] = false;
             else {
-                return Status::Other; // TODO convert status
+                return convertStatus(ret);
             }
             offset += ksizes[i];
         }
@@ -175,7 +208,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             else if(ret == UNQLITE_NOTFOUND)
                 vsizes[i] = KeyNotFound;
             else {
-                return Status::Other; // TODO convert status
+                return convertStatus(ret);
             }
             offset += ksizes[i];
         }
@@ -215,8 +248,8 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
                 ret = unqlite_kv_store(m_db, key_umem, ksizes[i],
                                              val_umem, vsizes[i]);
             }
-            if(ret != UNQLITE_OK) // TODO convert status
-                return Status::Other;
+            if(ret != UNQLITE_OK)
+                return convertStatus(ret);
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }
@@ -270,7 +303,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
                     if(ret == UNQLITE_NOTFOUND) {
                         vsizes[i] = KeyNotFound;
                     } else {
-                        return Status::Other; // TODO convert status;
+                        return convertStatus(ret);
                     }
                 }
 
@@ -299,7 +332,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
                     if(ret == UNQLITE_NOTFOUND) {
                         vsizes[i] = KeyNotFound;
                     } else {
-                        return Status::Other; // TODO convert status;
+                        return convertStatus(ret);
                     }
                 } else {
                     if(vsizes[i] == BufTooSmall)
@@ -333,7 +366,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             auto key_size = ksizes[i];
             int ret = unqlite_kv_delete(m_db, key_umem, (int)key_size);
             if(ret != UNQLITE_OK && ret != UNQLITE_NOTFOUND)
-                return Status::Other; // TODO convert status
+                return convertStatus(ret);
             offset += ksizes[i];
         }
         return Status::OK;
@@ -381,16 +414,28 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
         // initialize cursor
         int ret = unqlite_kv_cursor_init(m_db, &cursor);
-        // TODO convert ret
+        if(ret != UNQLITE_OK) return convertStatus(ret);
 
         // position cursor to the right start key
         if(fromKey.size == 0) {
-            unqlite_kv_cursor_first_entry(cursor);
+            ret = unqlite_kv_cursor_first_entry(cursor);
+            if(ret != UNQLITE_OK) {
+                unqlite_kv_cursor_release(m_db, cursor);
+                return convertStatus(ret);
+            }
         } else {
-            unqlite_kv_cursor_seek(cursor, fromKey.data, fromKey.size, UNQLITE_CURSOR_MATCH_GE);
+            ret = unqlite_kv_cursor_seek(cursor, fromKey.data, fromKey.size, UNQLITE_CURSOR_MATCH_GE);
+            if(ret != UNQLITE_OK) {
+                unqlite_kv_cursor_release(m_db, cursor);
+                return convertStatus(ret);
+            }
             if(unqlite_kv_cursor_valid_entry(cursor) && !inclusive) {
                 auto args = check_from_key_args{ fromKey.data, fromKey.size };
-                unqlite_kv_cursor_key_callback(cursor, check_from_key_callback, &args);
+                ret = unqlite_kv_cursor_key_callback(cursor, check_from_key_callback, &args);
+                if(ret != UNQLITE_OK) {
+                    unqlite_kv_cursor_release(m_db, cursor);
+                    return convertStatus(ret);
+                }
                 if(args.key_matches) {
                     unqlite_kv_cursor_next_entry(cursor);
                 }
@@ -488,16 +533,24 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
         // initialize cursor
         int ret = unqlite_kv_cursor_init(m_db, &cursor);
-        // TODO convert ret
+        if(ret != UNQLITE_OK) return convertStatus(ret);
 
         // position cursor to the right start key
         if(fromKey.size == 0) {
-            unqlite_kv_cursor_first_entry(cursor);
+            ret = unqlite_kv_cursor_first_entry(cursor);
+            if(ret != UNQLITE_OK) {
+                unqlite_kv_cursor_release(m_db, cursor);
+                return convertStatus(ret);
+            }
         } else {
             unqlite_kv_cursor_seek(cursor, fromKey.data, fromKey.size, UNQLITE_CURSOR_MATCH_GE);
             if(unqlite_kv_cursor_valid_entry(cursor) && !inclusive) {
                 auto args = check_from_key_args{ fromKey.data, fromKey.size };
-                unqlite_kv_cursor_key_callback(cursor, check_from_key_callback, &args);
+                ret = unqlite_kv_cursor_key_callback(cursor, check_from_key_callback, &args);
+                if(ret != UNQLITE_OK) {
+                    unqlite_kv_cursor_release(m_db, cursor);
+                    return convertStatus(ret);
+                }
                 if(args.key_matches) {
                     unqlite_kv_cursor_next_entry(cursor);
                 }
@@ -597,7 +650,6 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
             unqlite_kv_cursor_key_callback(cursor, read_key, &ctx);
             unqlite_kv_cursor_data_callback(cursor, read_val, &ctx);
-            // TODO check return value
             ctx.i += 1;
         }
 
