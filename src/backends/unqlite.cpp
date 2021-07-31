@@ -5,6 +5,7 @@
  */
 #include "rkv/rkv-backend.hpp"
 #include "../common/locks.hpp"
+#include "../common/modes.hpp"
 #include <unqlite.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
@@ -108,7 +109,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             (mode & (
                      RKV_MODE_INCLUSIVE
                     |RKV_MODE_APPEND
-        //            |RKV_MODE_CONSUME
+                    |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
         //            |RKV_MODE_NEW_ONLY
         //            |RKV_MODE_EXIST_ONLY
@@ -134,6 +135,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -158,6 +160,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
     virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
@@ -312,11 +315,16 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
             vals.size = vals.size - val_remaining_size;
         }
+
+        if(mode & RKV_MODE_CONSUME)
+            return erase(mode, keys, ksizes);
+
         return Status::OK;
     }
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -334,15 +342,131 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const UserMem& prefix,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
-#if 0
-        (void)packed;
-        (void)fromKey;
-        (void)inclusive;
-        (void)prefix;
-        (void)keys;
-        (void)keySizes;
-#endif
-        return Status::NotSupported;
+        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        ScopedReadLock lock(m_lock);
+
+        unqlite_kv_cursor* cursor = nullptr;
+
+        struct check_from_key_args {
+            const void* from_key_umem;
+            size_t      from_key_size;
+            bool        key_matches = false;
+        };
+
+        auto check_from_key = [](const void* key, unsigned int ksize, void* uargs) -> int {
+            auto args = static_cast<check_from_key_args*>(uargs);
+            if(ksize != args->from_key_size) return UNQLITE_OK;
+            if(std::memcmp(args->from_key_umem, key, ksize) == 0)
+                args->key_matches = true;
+            return UNQLITE_OK;
+        };
+
+        // initialize cursor
+        int ret = unqlite_kv_cursor_init(m_db, &cursor);
+        // TODO convert ret
+
+        // position cursor to the right start key
+        if(fromKey.size == 0) {
+            unqlite_kv_cursor_first_entry(cursor);
+        } else {
+            unqlite_kv_cursor_seek(cursor, fromKey.data, fromKey.size, UNQLITE_CURSOR_MATCH_GE);
+            if(unqlite_kv_cursor_valid_entry(cursor) && !inclusive) {
+                auto args = check_from_key_args{ fromKey.data, fromKey.size };
+                unqlite_kv_cursor_key_callback(cursor, check_from_key, &args);
+                if(args.key_matches) {
+                    unqlite_kv_cursor_next_entry(cursor);
+                }
+            }
+        }
+
+        struct prefix_check_args {
+            int32_t     mode;
+            const void* prefix_umem;
+            size_t      prefix_size;
+            bool        prefix_matches = false;
+        };
+
+        auto prefix_check = [](const void* key, unsigned int ksize, void* uargs) -> int {
+            auto args = static_cast<prefix_check_args*>(uargs);
+            args->prefix_matches =
+                checkPrefix(args->mode, key, ksize, args->prefix_umem, args->prefix_size);
+            return UNQLITE_OK;
+        };
+
+        struct read_key_args {
+            int32_t               mode;
+            bool                  packed;
+            UserMem&              keys;
+            BasicUserMem<size_t>& keySizes;
+            const UserMem&        prefix;
+            size_t                key_offset = 0;
+            size_t                i = 0;
+            bool                  key_buf_too_small = false;
+            bool                  is_last = false;
+        };
+
+        auto read_key = [](const void* key, unsigned int ksize, void* uargs) -> int {
+            auto ctx = static_cast<read_key_args*>(uargs);
+
+            size_t key_usize = ctx->packed ? (ctx->keys.size - ctx->key_offset) : ctx->keySizes[ctx->i];
+            auto key_umem = ctx->keys.data + ctx->key_offset;
+
+            if(!ctx->packed) {
+                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
+                                               ksize, ctx->prefix.size, ctx->is_last);
+                ctx->key_offset += key_usize;
+            } else {
+                if(ctx->key_buf_too_small) {
+                    ctx->keySizes[ctx->i] = RKV_SIZE_TOO_SMALL;
+                } else {
+                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
+                                                    ksize, ctx->prefix.size, ctx->is_last);
+                    if(ctx->keySizes[ctx->i] == RKV_SIZE_TOO_SMALL) {
+                        ctx->key_buf_too_small = true;
+                    } else {
+                        ctx->key_offset += ctx->keySizes[ctx->i];
+                    }
+                }
+            }
+
+            return UNQLITE_OK;
+        };
+
+        auto max = keySizes.size;
+        auto ctx = read_key_args{ mode, packed, keys, keySizes, prefix };
+
+        for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
+
+            if(prefix.size != 0) {
+                auto args = prefix_check_args{ mode, prefix.data, prefix.size };
+                unqlite_kv_cursor_key_callback(cursor, prefix_check, &args);
+                if(!args.prefix_matches)
+                    continue;
+            }
+
+            if(mode & RKV_MODE_KEEP_LAST) {
+                if(ctx.i + 1 == max) {
+                    ctx.is_last = true;
+                } else {
+                    unqlite_kv_cursor_next_entry(cursor);
+                    ctx.is_last = !unqlite_kv_cursor_valid_entry(cursor);
+                    unqlite_kv_cursor_prev_entry(cursor);
+                }
+            }
+
+            unqlite_kv_cursor_key_callback(cursor, read_key, &ctx);
+            // TODO check return value
+            ctx.i += 1;
+        }
+
+        keys.size = ctx.key_offset;
+        for(; ctx.i < max; ctx.i++) {
+            keySizes[ctx.i] = RKV_NO_MORE_KEYS;
+        }
+
+        unqlite_kv_cursor_release(m_db, cursor);
+
+        return Status::OK;
     }
 
     virtual Status listKeyValues(int32_t mode, bool packed,
@@ -375,8 +499,8 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
     private:
 
     UnQLiteKeyValueStore(json cfg, bool use_lock, unqlite* db)
-    : m_config(std::move(cfg))
-    , m_db(db)
+    : m_db(db)
+    , m_config(std::move(cfg))
     {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
