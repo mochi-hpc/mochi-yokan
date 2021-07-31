@@ -67,7 +67,8 @@ static const char* backend_configs[] = {
     " \"type\":\"tree\"}",
 #endif
 #ifdef HAS_UNQLITE
-    "{}",
+    "{\"path\":\":mem:\","
+    "\"mode\":\"memory\"}",
 #endif
     NULL
 };
