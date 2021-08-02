@@ -206,7 +206,6 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         if(vals.size != 0) return Status::InvalidArg;
 
@@ -221,6 +220,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                                               vsizes.data + vsizes.size,
                                               0);
         if(total_vsizes != 0) return Status::InvalidArg;
+
+        if(mode & RKV_MODE_EXIST_ONLY)
+            return Status::OK;
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {

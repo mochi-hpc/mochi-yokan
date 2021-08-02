@@ -189,7 +189,6 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         (void)vals;
         size_t key_offset = 0;
@@ -203,6 +202,9 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
                                               vsizes.data + vsizes.size,
                                               0);
         if(total_vsizes > 0) return Status::InvalidArg;
+
+        if(mode & RKV_MODE_EXIST_ONLY)
+            return Status::OK;
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
