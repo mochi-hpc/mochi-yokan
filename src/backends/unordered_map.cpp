@@ -290,9 +290,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                 auto it = m_db->find(key_type{ keys.data + key_offset, ksizes[i], m_key_allocator });
                 if(it != m_db->end()) {
                     if(mode_append) {
-                        it->second.append(keys.data + key_offset, ksizes[i]);
+                        it->second.append(vals.data + val_offset, vsizes[i]);
                     } else {
-                        it->second.assign(keys.data + key_offset, ksizes[i]);
+                        it->second.assign(vals.data + val_offset, vsizes[i]);
                     }
                     if(mode_notify)
                         m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
@@ -304,7 +304,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                 // auto it = m_db->find(UserMem{ keys.data + key_offset, ksizes[i] });
                 auto it = m_db->find(key_type{ keys.data + key_offset, ksizes[i], m_key_allocator });
                 if(it != m_db->end()) {
-                    it->second.assign(keys.data + key_offset, ksizes[i]);
+                    it->second.append(vals.data + val_offset, vsizes[i]);
                 } else {
                     m_db->emplace(std::piecewise_construct,
                             std::forward_as_tuple(keys.data + key_offset,

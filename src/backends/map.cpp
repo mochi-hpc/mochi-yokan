@@ -295,19 +295,18 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 auto it = m_db->find(key_umem);
                 if(it != m_db->end()) {
                     if(mode_append) {
-                        it->second.append(keys.data + key_offset, ksizes[i]);
+                        it->second.append(vals.data + val_offset, vsizes[i]);
                     } else {
-                        it->second.assign(keys.data + key_offset, ksizes[i]);
+                        it->second.assign(vals.data + val_offset, vsizes[i]);
                     }
                     if(mode_notify)
                         m_watcher.notifyKey(key_umem);
                 }
 
             } else if(mode_append) { // but not mode_exist_only
-
                 auto it = m_db->find(key_umem);
                 if(it != m_db->end()) {
-                    it->second.assign(keys.data + key_offset, ksizes[i]);
+                    it->second.append(vals.data + val_offset, vsizes[i]);
                 } else {
                     m_db->emplace(std::piecewise_construct,
                             std::forward_as_tuple(keys.data + key_offset,
