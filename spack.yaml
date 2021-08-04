@@ -13,6 +13,7 @@ spack:
   - gdbm
   - lmdb
   - unqlite@master
+  - lua-sol2
 #  - pmemkv
 #  - upscaledb
   concretization: together
