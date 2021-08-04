@@ -25,6 +25,7 @@ option (ENABLE_TKRZW      "Build with tkrzw support" OFF)
 option (ENABLE_LMDB       "Build with lmdb support" OFF)
 option (ENABLE_GDBM       "Build with gdbm support" OFF)
 option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
+option (ENABLE_LUA        "Build with Lua support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -93,8 +94,8 @@ if (ENABLE_TKRZW)
 endif ()
 
 if (ENABLE_GDBM)
-   find_package (GDBM REQUIRED)
-   set (HAS_GDBM ON)
+    find_package (GDBM REQUIRED)
+    set (HAS_GDBM ON)
 endif ()
 
 if (ENABLE_LMDB)
@@ -103,8 +104,15 @@ if (ENABLE_LMDB)
 endif ()
 
 if (ENABLE_UNQLITE)
-   find_package (UnQLite REQUIRED)
-   set (HAS_UNQLITE ON)
+    find_package (UnQLite REQUIRED)
+    set (HAS_UNQLITE ON)
+endif ()
+
+if (ENABLE_LUA)
+    find_package (sol2 REQUIRED)
+    find_package (Lua REQUIRED)
+    set (HAS_LUA ON)
+    set (CMAKE_CXX_STANDARD 17)
 endif ()
 
 # library version set here (e.g. for shared libs).

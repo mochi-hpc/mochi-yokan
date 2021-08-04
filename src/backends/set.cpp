@@ -158,6 +158,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                     |RKV_MODE_IGNORE_KEYS
                     |RKV_MODE_KEEP_LAST
                     |RKV_MODE_SUFFIX
+#ifdef HAS_LUA
+                    |RKV_MODE_LUA_FILTER
+#endif
                     )
             );
     }

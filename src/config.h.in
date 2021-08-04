@@ -19,6 +19,7 @@
 #cmakedefine HAS_PMEMKV
 #cmakedefine HAS_TKRZW
 #cmakedefine HAS_UNQLITE
+#cmakedefine HAS_LUA
 
 #ifdef ENABLE_LOG_DEBUG
 #define ENABLE_LOG_ERROR

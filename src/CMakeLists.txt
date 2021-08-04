@@ -64,6 +64,11 @@ if (ENABLE_UNQLITE)
     include_directories (${UNQLITE_INCLUDE_DIRS})
 endif ()
 
+if (ENABLE_LUA)
+    list (APPEND DB_DEPENDENCIES sol2::sol2 ${LUA_LIBRARIES})
+    include_directories (${LUA_INCLUDE_DIRS})
+endif ()
+
 set (client-src-files
      client/client.c
      client/put.cpp

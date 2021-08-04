@@ -89,21 +89,23 @@ typedef enum rkv_return_t {
  *   and "list_keyvals" as a suffix instead of a prefix.
  *   RKV_MODE_NO_PREFIX, if provided, will be re-interpreted
  *   accordingly, removing the suffix from the resulting keys.
+ * - RKV_MODE_LUA_FILTER: interpret the filter as Lua code.
  *
  * Important: not all backends support all modes.
  */
-#define RKV_MODE_DEFAULT      0b0000000000
-#define RKV_MODE_INCLUSIVE    0b0000000001
-#define RKV_MODE_APPEND       0b0000000010
-#define RKV_MODE_CONSUME      0b0000000100
-#define RKV_MODE_WAIT         0b0000001000
-#define RKV_MODE_NOTIFY       0b0000001000
-#define RKV_MODE_NEW_ONLY     0b0000010000
-#define RKV_MODE_EXIST_ONLY   0b0000100000
-#define RKV_MODE_NO_PREFIX    0b0001000000
-#define RKV_MODE_IGNORE_KEYS  0b0010000000
-#define RKV_MODE_KEEP_LAST    0b0110000000
-#define RKV_MODE_SUFFIX       0b1000000000
+#define RKV_MODE_DEFAULT      0b00000000000
+#define RKV_MODE_INCLUSIVE    0b00000000001
+#define RKV_MODE_APPEND       0b00000000010
+#define RKV_MODE_CONSUME      0b00000000100
+#define RKV_MODE_WAIT         0b00000001000
+#define RKV_MODE_NOTIFY       0b00000001000
+#define RKV_MODE_NEW_ONLY     0b00000010000
+#define RKV_MODE_EXIST_ONLY   0b00000100000
+#define RKV_MODE_NO_PREFIX    0b00001000000
+#define RKV_MODE_IGNORE_KEYS  0b00010000000
+#define RKV_MODE_KEEP_LAST    0b00110000000
+#define RKV_MODE_SUFFIX       0b01000000000
+#define RKV_MODE_LUA_FILTER   0b10000000000
 
 /**
  * @brief Identifier for a database.
