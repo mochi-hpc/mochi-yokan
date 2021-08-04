@@ -48,7 +48,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    size_t buffer_size = in.from_ksize + in.prefix_size
+    size_t buffer_size = in.from_ksize + in.filter_size
                        + in.count*sizeof(size_t)
                        + in.keys_buf_size;
 
@@ -57,11 +57,11 @@ void rkv_list_keys_ult(hg_handle_t h)
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
-    const size_t ksizes_offset = in.from_ksize + in.prefix_size;
+    const size_t ksizes_offset = in.from_ksize + in.filter_size;
     const size_t keys_offset   = ksizes_offset + in.count*sizeof(size_t);;
 
     // transfer ksizes only if in.packed is false
-    size_t size_to_transfer = in.from_ksize + in.prefix_size;
+    size_t size_to_transfer = in.from_ksize + in.filter_size;
     if(!in.packed) size_to_transfer += in.count*sizeof(size_t);
 
     if(size_to_transfer > 0) {
@@ -73,7 +73,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     // build buffer wrappers
     auto ptr      = buffer->data;
     auto from_key = rkv::UserMem{ ptr, in.from_ksize };
-    auto prefix   = rkv::UserMem{ ptr + in.from_ksize, in.prefix_size };
+    auto filter   = rkv::UserMem{ ptr + in.from_ksize, in.filter_size };
     auto ksizes   = rkv::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
@@ -81,7 +81,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     auto keys = rkv::UserMem{ ptr + keys_offset, in.keys_buf_size };
 
     out.ret = static_cast<rkv_return_t>(
-            database->listKeys(in.mode, in.packed, from_key, prefix, keys, ksizes));
+            database->listKeys(in.mode, in.packed, from_key, filter, keys, ksizes));
 
     if(out.ret == RKV_SUCCESS) {
         size_to_transfer = in.count*sizeof(size_t)

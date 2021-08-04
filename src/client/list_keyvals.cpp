@@ -16,7 +16,7 @@
 /**
  * The list operations use a single bulk handle exposing data as follows:
  * - The first from_ksize bytes represent the start key.
- * - The next prefix_size byres represent the prefix.
+ * - The next filter_size byres represent the filter.
  * - The next count * sizeof(size_t) bytes represent the key sizes.
  * - The next count * sizeof(size_t) bytes represent the value sizes.
  * - The next keys_buf_size bytes store keys back to back
@@ -29,7 +29,7 @@
 extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
                                               int32_t mode,
                                               size_t from_ksize,
-                                              size_t prefix_size,
+                                              size_t filter_size,
                                               const char* origin,
                                               hg_bulk_t data,
                                               size_t offset,
@@ -55,7 +55,7 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     in.packed        = packed;
     in.count         = count;
     in.from_ksize    = from_ksize;
-    in.prefix_size   = prefix_size;
+    in.filter_size   = filter_size;
     in.offset        = offset;
     in.keys_buf_size = keys_buf_size;
     in.vals_buf_size = vals_buf_size;
@@ -83,8 +83,8 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
                                          int32_t mode,
                                          const void* from_key,
                                          size_t from_ksize,
-                                         const void* prefix,
-                                         size_t prefix_size,
+                                         const void* filter,
+                                         size_t filter_size,
                                          size_t count,
                                          void* const* keys,
                                          size_t* ksizes,
@@ -95,7 +95,7 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
         return RKV_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
         return RKV_ERR_INVALID_ARGS;
-    if(prefix == nullptr && prefix_size > 0)
+    if(filter == nullptr && filter_size > 0)
         return RKV_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -108,10 +108,10 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
         ptrs.push_back(const_cast<void*>(from_key));
         sizes.push_back(from_ksize);
     }
-    // prefix
-    if(prefix && prefix_size) {
-        ptrs.push_back(const_cast<void*>(prefix));
-        sizes.push_back(prefix_size);
+    // filter
+    if(filter && filter_size) {
+        ptrs.push_back(const_cast<void*>(filter));
+        sizes.push_back(filter_size);
     }
     // ksizes
     ptrs.push_back(ksizes);
@@ -144,7 +144,7 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, prefix_size,
+    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
                                  nullptr, bulk, 0, keys_buf_size,
                                  vals_buf_size, false, count);
 }
@@ -153,8 +153,8 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                                 int32_t mode,
                                                 const void* from_key,
                                                 size_t from_ksize,
-                                                const void* prefix,
-                                                size_t prefix_size,
+                                                const void* filter,
+                                                size_t filter_size,
                                                 size_t count,
                                                 void* keys,
                                                 size_t keys_buf_size,
@@ -167,7 +167,7 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
         return RKV_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
         return RKV_ERR_INVALID_ARGS;
-    if(prefix == nullptr && prefix_size > 0)
+    if(filter == nullptr && filter_size > 0)
         return RKV_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -181,9 +181,9 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
         sizes[i] = from_ksize;
         i += 1;
     }
-    if(prefix && prefix_size) {
-        ptrs[i]  = const_cast<void*>(prefix);
-        sizes[i] = prefix_size;
+    if(filter && filter_size) {
+        ptrs[i]  = const_cast<void*>(filter);
+        sizes[i] = filter_size;
         i += 1;
     }
     ptrs[i]  = ksizes;
@@ -207,7 +207,7 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, prefix_size,
+    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
                                  nullptr, bulk, 0, keys_buf_size, vals_buf_size,
                                  true, count);
 }

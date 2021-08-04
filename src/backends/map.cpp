@@ -458,7 +458,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
 
@@ -475,14 +475,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = it->first;
-            if(prefix.size != 0) {
-                if(!checkPrefix(mode, key.data(), key.size(),
-                            prefix.data, prefix.size))
-                    continue;
-            }
+            if(!key_filter.check(key.data(), key.size()))
+                continue;
 
             size_t usize = packed ? (keys.size - offset) : keySizes[i];
             auto umem = static_cast<char*>(keys.data) + offset;
@@ -496,14 +494,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
             if(!packed) {
                 keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                      key.size(), prefix.size, is_last);
+                                      key.size(), filter.size, is_last);
                 offset += usize;
             } else {
                 if(buf_too_small) {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                 } else {
                     keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                          key.size(), prefix.size, is_last);
+                                          key.size(), filter.size, is_last);
                     if(keySizes[i] == RKV_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
@@ -525,7 +523,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -548,15 +546,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = it->first;
             auto& val = it->second;
-            if(prefix.size != 0) {
-                if(!checkPrefix(mode, key.data(), key.size(),
-                            prefix.data, prefix.size))
-                    continue;
-            }
+            if(!key_filter.check(key.data(), key.size()))
+                continue;
 
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
@@ -575,7 +571,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 size_t val_usize = valSizes[i];
                 keySizes[i] = keyCopy(mode, key_umem, key_usize,
                                       key.data(), key.size(),
-                                      prefix.size, is_last);
+                                      filter.size, is_last);
                 valSizes[i] = valCopy(mode, val_umem, val_usize,
                                       val.data(), val.size());
                 key_offset += key_usize;
@@ -591,7 +587,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 } else {
                     keySizes[i] = keyCopy(mode, key_umem, key_usize,
                                           key.data(), key.size(),
-                                          prefix.size, is_last);
+                                          filter.size, is_last);
                     if(keySizes[i] != RKV_SIZE_TOO_SMALL)
                         key_offset += keySizes[i];
                     else

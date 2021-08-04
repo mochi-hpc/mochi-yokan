@@ -388,24 +388,22 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         return UNQLITE_OK;
     }
 
-    struct check_prefix_args {
-        int32_t     mode;
-        const void* prefix_umem;
-        size_t      prefix_size;
-        bool        prefix_matches = false;
+    struct check_filter_args {
+        Filter filter_checker;
+        bool          filter_matches = false;
     };
 
-    static int check_prefix_callback(const void* key, unsigned int ksize, void* uargs) {
-        auto args = static_cast<check_prefix_args*>(uargs);
-        args->prefix_matches =
-            checkPrefix(args->mode, key, ksize, args->prefix_umem, args->prefix_size);
+    static int check_filter_callback(const void* key, unsigned int ksize, void* uargs) {
+        auto args = static_cast<check_filter_args*>(uargs);
+        args->filter_matches =
+            args->filter_checker.check(key, ksize);
         return UNQLITE_OK;
     }
 
     public:
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
         ScopedReadLock lock(m_lock);
@@ -447,7 +445,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             bool                  packed;
             UserMem&              keys;
             BasicUserMem<size_t>& keySizes;
-            const UserMem&        prefix;
+            const UserMem&        filter;
             size_t                key_offset = 0;
             size_t                i = 0;
             bool                  key_buf_too_small = false;
@@ -462,14 +460,14 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
             if(!ctx->packed) {
                 ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->prefix.size, ctx->is_last);
+                                               ksize, ctx->filter.size, ctx->is_last);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = RKV_SIZE_TOO_SMALL;
                 } else {
                     ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->prefix.size, ctx->is_last);
+                                                    ksize, ctx->filter.size, ctx->is_last);
                     if(ctx->keySizes[ctx->i] == RKV_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -482,15 +480,15 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         };
 
         auto max = keySizes.size;
-        auto ctx = read_key_args{ mode, packed, keys, keySizes, prefix };
+        auto ctx = read_key_args{ mode, packed, keys, keySizes, filter };
 
-        auto prefix_args = check_prefix_args{ mode, prefix.data, prefix.size };
+        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(prefix.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_prefix_callback, &prefix_args);
-                if(!prefix_args.prefix_matches)
+            if(filter.size != 0) {
+                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
+                if(!filter_args.filter_matches)
                     continue;
             }
 
@@ -521,7 +519,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -564,7 +562,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             BasicUserMem<size_t>& keySizes;
             UserMem&              vals;
             BasicUserMem<size_t>& valSizes;
-            const UserMem&        prefix;
+            const UserMem&        filter;
             size_t                key_offset = 0;
             size_t                val_offset = 0;
             size_t                i = 0;
@@ -581,14 +579,14 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
             if(!ctx->packed) {
                 ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->prefix.size, ctx->is_last);
+                                               ksize, ctx->filter.size, ctx->is_last);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = RKV_SIZE_TOO_SMALL;
                 } else {
                     ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->prefix.size, ctx->is_last);
+                                                    ksize, ctx->filter.size, ctx->is_last);
                     if(ctx->keySizes[ctx->i] == RKV_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -626,15 +624,15 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         };
 
         auto max = keySizes.size;
-        auto ctx = read_keyval_args{ mode, packed, keys, keySizes, vals, valSizes, prefix };
+        auto ctx = read_keyval_args{ mode, packed, keys, keySizes, vals, valSizes, filter };
 
-        auto prefix_args = check_prefix_args{ mode, prefix.data, prefix.size };
+        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(prefix.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_prefix_callback, &prefix_args);
-                if(!prefix_args.prefix_matches)
+            if(filter.size != 0) {
+                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
+                if(!filter_args.filter_matches)
                     continue;
             }
 

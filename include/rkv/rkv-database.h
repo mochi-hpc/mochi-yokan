@@ -590,8 +590,10 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
 
 /**
  * @brief Lists up to count keys from from_key (included if
- * inclusive is set to true), filtering by prefix if the prefix
- * is provided.
+ * inclusive is set to true), filtering keys if a filter is provided.
+ *
+ * Unless a specific mode is used to change it, the filter is
+ * considered as a prefix that the keys must start with.
  *
  * If a key size is too small to hold the key, the size will be
  * set to RKV_SIZE_TOO_SMALL.
@@ -600,8 +602,8 @@ rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix Key prefix.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
  * @param[in] count Max keys to read (in) / number actually read (out).
  * @param[out] keys Array of buffers to hold keys.
  * @param[inout] ksizes Array of key sizes.
@@ -612,8 +614,8 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
                            int32_t mode,
                            const void* from_key,
                            size_t from_ksize,
-                           const void* prefix,
-                           size_t prefix_size,
+                           const void* filter,
+                           size_t filter_size,
                            size_t count,
                            void* const* keys,
                            size_t* ksizes);
@@ -625,8 +627,8 @@ rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix Key prefix.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
  * @param[in] count Max keys to read.
  * @param[out] keys Buffer to hold keys.
  * @param[in] keys_buf_size Size of the buffer to hold keys.
@@ -638,8 +640,8 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
                                   int32_t mode,
                                   const void* from_key,
                                   size_t from_ksize,
-                                  const void* prefix,
-                                  size_t prefix_size,
+                                  const void* filter,
+                                  size_t filter_size,
                                   size_t count,
                                   void* keys,
                                   size_t keys_buf_size,
@@ -650,7 +652,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
  * This function will take the data in [offset, offset+size[
  * from the bulk handle and interpret it as follows:
  * - The first from_ksize bytes represent the start key.
- * - The next prefix_size byres represent the prefix.
+ * - The next filter_size byres represent the filter.
  * - The next count * sizeof(size_t) bytes represent the key sizes.
  * - The next N bytes store keys back to back, where
  *   N = sum of key sizes
@@ -667,7 +669,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
  * @param[in] dbh Database handle.
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter_size Filter size.
  * @param[in] origin Origin address.
  * @param[in] data Bulk handle containing the data.
  * @param[in] offset Offset at which the payload starts in the bulk handle.
@@ -680,7 +682,7 @@ rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
 rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
                                 int32_t mode,
                                 size_t from_ksize,
-                                size_t prefix_size,
+                                size_t filter_size,
                                 const char* origin,
                                 hg_bulk_t data,
                                 size_t offset,
@@ -691,8 +693,10 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
 
 /**
  * @brief Lists up to count key/value pairs from from_key (included if
- * inclusive is set to true), filtering keys by prefix if the prefix
- * is provided.
+ * inclusive is set to true), filtering keys if a filter is provided.
+ *
+ * Unless a specific mode is used to change it, the filter is
+ * considered as a prefix that the keys must start with.
  *
  * If a key size is too small to hold the key, the size will be
  * set to RKV_SIZE_TOO_SMALL.
@@ -703,8 +707,8 @@ rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix Key prefix.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
  * @param[in] count Max keys to read.
  * @param[out] keys Array of buffers to hold keys.
  * @param[inout] ksizes Array of key sizes.
@@ -717,8 +721,8 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
                               int32_t mode,
                               const void* from_key,
                               size_t from_ksize,
-                              const void* prefix,
-                              size_t prefix_size,
+                              const void* filter,
+                              size_t filter_size,
                               size_t count,
                               void* const* keys,
                               size_t* ksizes,
@@ -733,8 +737,8 @@ rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_key Starting key.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix Key prefix.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
  * @param[in] count Max keys to read.
  * @param[out] keys Buffer to hold keys.
  * @param[in] keys_buf_size Size of the buffer to hold keys.
@@ -749,8 +753,8 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                      int32_t mode,
                                      const void* from_key,
                                      size_t from_ksize,
-                                     const void* prefix,
-                                     size_t prefix_size,
+                                     const void* filter,
+                                     size_t filter_size,
                                      size_t count,
                                      void* keys,
                                      size_t keys_buf_size,
@@ -764,7 +768,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
  * This function will take the data in [offset, offset+size[
  * from the bulk handle and interpret it as follows:
  * - The first from_ksize bytes represent the start key.
- * - The next prefix_size byres represent the prefix.
+ * - The next filter_size byres represent the filter.
  * - The next count * sizeof(size_t) bytes represent the key sizes.
  * - The next count * sizeof(size_t) bytes represent the value sizes.
  * - The next key_buf_size bytes will store keys back to back
@@ -782,7 +786,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
  * @param[in] dbh Database handle.
  * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
  * @param[in] from_ksize Starting key size.
- * @param[in] prefix_size Prefix size.
+ * @param[in] filter_size Filter size.
  * @param[in] origin Origin address.
  * @param[in] data Bulk handle containing the data.
  * @param[in] offset Offset at which the payload starts in the bulk handle.
@@ -796,7 +800,7 @@ rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
 rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
                                    int32_t mode,
                                    size_t from_ksize,
-                                   size_t prefix_size,
+                                   size_t filter_size,
                                    const char* origin,
                                    hg_bulk_t data,
                                    size_t offset,

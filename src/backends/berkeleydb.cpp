@@ -350,7 +350,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         if(m_db_type != DB_BTREE)
             return Status::NotSupported;
@@ -363,10 +363,12 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         bool key_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
 
+        auto key_filter = Filter{ mode, filter.data, filter.size };
+
         auto ret = Status::OK;
 
-        // this buffer is used in dummy_key so we can at least load the prefix
-        std::vector<char> prefix_check_buffer(prefix.size);
+        // this buffer is used in dummy_key so we can at least load the filter
+        std::vector<char> filter_check_buffer(filter.size);
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
@@ -374,9 +376,9 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
         // dummy_key is a 0-sized key from user memory that expects
         // a partial write hence it is used to move the cursor
-        auto dummy_key = Dbt{ prefix_check_buffer.data(), (u_int32_t)prefix.size };
-        dummy_key.set_ulen(prefix.size);
-        dummy_key.set_dlen(prefix.size);
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter.size };
+        dummy_key.set_ulen(filter.size);
+        dummy_key.set_dlen(filter.size);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         // same a dummy_key
@@ -425,7 +427,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
         for(i = 0; i < max; i++) {
 
-            // find the next key that matches the prefix
+            // find the next key that matches the filter
             while(true) {
                 status = cursor->get(&dummy_key, &dummy_val, flag);
                 flag = DB_NEXT;
@@ -436,11 +438,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                if(prefix.size == 0)
-                    break;
-                else if((dummy_key.get_size() >= prefix.size) &&
-                        checkPrefix(mode, dummy_key.get_data(), dummy_key.get_size(),
-                                    prefix.data, prefix.size))
+                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size()))
                     break;
             }
 
@@ -497,7 +495,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -515,17 +513,18 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         bool val_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
         auto ret = Status::OK;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
-        // this buffer is used in dummy_key so we can at least load the prefix
-        std::vector<char> prefix_check_buffer(prefix.size);
+        // this buffer is used in dummy_key so we can at least load the filter
+        std::vector<char> filter_check_buffer(filter.size);
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
         fromKeySlice.set_ulen(fromKey.size);
 
-        auto dummy_key = Dbt{ prefix_check_buffer.data(), (u_int32_t)prefix.size };
-        dummy_key.set_ulen(prefix.size);
-        dummy_key.set_dlen(prefix.size);
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter.size };
+        dummy_key.set_ulen(filter.size);
+        dummy_key.set_dlen(filter.size);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         auto dummy_val = Dbt{ nullptr, 0 };
@@ -578,7 +577,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
         for(i = 0; i < max; i++) {
 
-            // find the next key that matches the prefix
+            // find the next key that matches the filter
             while(true) {
                 status = cursor->get(&dummy_key, &dummy_val, flag);
                 flag = DB_NEXT;
@@ -589,11 +588,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                if(prefix.size == 0)
-                    break;
-                else if((dummy_key.get_size() >= prefix.size) &&
-                  checkPrefix(mode, dummy_key.get_data(), dummy_key.get_size(),
-                              prefix.data, prefix.size))
+                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size()))
                     break;
             }
 

@@ -85,10 +85,10 @@ typedef enum rkv_return_t {
  * - RKV_MODE_KEEP_LAST: implies RKV_MODE_IGNORE_KEYS but "list_keyvals"
  *   will still return the last key found. The rest of the keys will
  *   be set as empty.
- * - RKV_MODE_SUFFIX: consider the "prefix" argument of "list_keys"
- *   and "list_keyvals" as a suffix instead. RKV_MODE_NO_PREFIX, if
- *   provided, will be re-interpreted accordingly, removing the suffix
- *   from the resulting keys.
+ * - RKV_MODE_SUFFIX: consider the "filter" argument of "list_keys"
+ *   and "list_keyvals" as a suffix instead of a prefix.
+ *   RKV_MODE_NO_PREFIX, if provided, will be re-interpreted
+ *   accordingly, removing the suffix from the resulting keys.
  *
  * Important: not all backends support all modes.
  */

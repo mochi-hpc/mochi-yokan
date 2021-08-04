@@ -367,7 +367,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
 
@@ -414,6 +414,8 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         bool key_buf_too_small = false;
 
+        auto key_filter = Filter{ mode, filter.data, filter.size };
+
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
@@ -425,9 +427,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
                 return convertStatus(ret);
             }
 
-            if((key.mv_size < prefix.size)
-            || !checkPrefix(mode, key.mv_data, key.mv_size,
-                           prefix.data, prefix.size)) {
+            if(!key_filter.check(key.mv_data, key.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -484,7 +484,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -536,6 +536,8 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
 
+        auto key_filter = Filter{ mode, filter.data, filter.size };
+
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
@@ -547,9 +549,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
                 return convertStatus(ret);
             }
 
-            if(key.mv_size < prefix.size
-            || !checkPrefix(mode, key.mv_data, key.mv_size,
-                            prefix.data, prefix.size)) {
+            if(!key_filter.check(key.mv_data, key.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

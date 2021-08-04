@@ -311,7 +311,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
         auto inclusive = mode & RKV_MODE_INCLUSIVE;
@@ -333,11 +333,11 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!checkPrefix(mode, key.data(), key.size(),
-                                  prefix.data, prefix.size)) {
+            if(!key_filter.check(key.data(), key.size())) {
                 iterator->Next();
                 continue;
             }
@@ -376,7 +376,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -403,11 +403,11 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!checkPrefix(mode, key.data(), key.size(),
-                                  prefix.data, prefix.size)) {
+            if(!key_filter.check(key.data(), key.size())) {
                 iterator->Next();
                 continue;
             }

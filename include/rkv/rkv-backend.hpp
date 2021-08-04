@@ -303,19 +303,19 @@ class KeyValueStoreInterface {
      * @param [in] mode Mode.
      * @param [in] packed Whether data is packed.
      * @param [in] fromKey Starting key.
-     * @param [in] prefix Prefix to filter with.
+     * @param [in] filter Key filter.
      * @param [out] keys Resulting keys.
      * @param [inout] keySizes Resulting key sizes.
      *
      * @return Status.
      */
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const {
         (void)mode;
         (void)packed;
         (void)fromKey;
-        (void)prefix;
+        (void)filter;
         (void)keys;
         (void)keySizes;
         return Status::NotSupported;
@@ -326,7 +326,7 @@ class KeyValueStoreInterface {
      */
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -334,7 +334,7 @@ class KeyValueStoreInterface {
         (void)mode;
         (void)packed;
         (void)fromKey;
-        (void)prefix;
+        (void)filter;
         (void)keys;
         (void)keySizes;
         (void)vals;

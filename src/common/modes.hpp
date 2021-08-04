@@ -12,23 +12,34 @@
 namespace rkv {
 
 /**
- * This function checks the mode. If the mode does not match
+ * This class uses the provided mode to validate a key
+ * against a prefix. If the mode does not match
  * RKV_MODE_SUFFIX, it considers "prefix" as a prefix and
  * checks if the key starts with that prefix. Otherwise it
  * considers "prefix" as a suffix and checks if the key ends
  * with that suffix.
  */
-static inline bool checkPrefix(int32_t mode,
-                               const void* key, size_t ksize,
-                               const void* prefix, size_t psize) {
-    if(psize > ksize)
-        return false;
-    if(!(mode & RKV_MODE_SUFFIX)) {
-        return std::memcmp(key, prefix, psize) == 0;
-    } else {
-        return std::memcmp(((const char*)key)+ksize-psize, prefix, psize) == 0;
+struct Filter {
+
+    int32_t     m_mode;
+    const void* m_filter;
+    size_t      m_fsize;
+
+    Filter(int32_t mode, const void* filter, size_t fsize)
+    : m_mode(mode)
+    , m_filter(filter)
+    , m_fsize(fsize) {}
+
+    bool check(const void* key, size_t ksize) const {
+        if(m_fsize > ksize)
+            return false;
+        if(!(m_mode & RKV_MODE_SUFFIX)) {
+            return std::memcmp(key, m_filter, m_fsize) == 0;
+        } else {
+            return std::memcmp(((const char*)key)+ksize-m_fsize, m_filter, m_fsize) == 0;
+        }
     }
-}
+};
 
 /**
  * This function will copy a key into a buffer according to the mode
@@ -38,7 +49,7 @@ static inline bool checkPrefix(int32_t mode,
 static inline size_t keyCopy(int32_t mode,
         void* dst, size_t max_dst_size,
         const void* key, size_t ksize,
-        size_t prefix_size,
+        size_t filter_size,
         bool is_last = false) {
     if(mode & RKV_MODE_IGNORE_KEYS) {
         if(!(is_last && (mode & RKV_MODE_KEEP_LAST)))
@@ -49,13 +60,13 @@ static inline size_t keyCopy(int32_t mode,
         std::memcpy(dst, key, ksize);
         return ksize;
     } else { // eliminate prefix/suffix
-        auto final_ksize = ksize - prefix_size;
+        auto final_ksize = ksize - filter_size;
         if(max_dst_size < final_ksize)
             return RKV_SIZE_TOO_SMALL;
         if(mode & RKV_MODE_SUFFIX) { // eliminate suffix
             std::memcpy(dst, (const char*)key, final_ksize);
         } else { // eliminate prefix
-            std::memcpy(dst, (const char*)key + prefix_size, final_ksize);
+            std::memcpy(dst, (const char*)key + filter_size, final_ksize);
         }
         return final_ksize;
     }

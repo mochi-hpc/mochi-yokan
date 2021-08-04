@@ -148,7 +148,7 @@ MERCURY_GEN_PROC(list_keys_in_t,
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
         ((uint64_t)(from_ksize))\
-        ((uint64_t)(prefix_size))\
+        ((uint64_t)(filter_size))\
         ((uint64_t)(offset))\
         ((uint64_t)(keys_buf_size))\
         ((hg_string_t)(origin))\
@@ -163,7 +163,7 @@ MERCURY_GEN_PROC(list_keyvals_in_t,
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
         ((uint64_t)(from_ksize))\
-        ((uint64_t)(prefix_size))\
+        ((uint64_t)(filter_size))\
         ((uint64_t)(offset))\
         ((uint64_t)(keys_buf_size))\
         ((uint64_t)(vals_buf_size))\

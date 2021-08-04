@@ -280,7 +280,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& prefix,
+                            const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
@@ -300,14 +300,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = *it;
-            if(prefix.size != 0) {
-                if(!checkPrefix(mode, key.data(), key.size(),
-                            prefix.data, prefix.size))
-                    continue;
-            }
+            if(!key_filter.check(key.data(), key.size()))
+                continue;
             auto umem = static_cast<char*>(keys.data) + offset;
 
             bool is_last = false;
@@ -322,7 +320,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                 size_t usize = keySizes[i];
                 keySizes[i] = keyCopy(mode, umem, usize,
                                       key.data(), key.size(),
-                                      prefix.size, is_last);
+                                      filter.size, is_last);
                 offset += usize;
 
             } else { // if packed
@@ -331,7 +329,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                     keySizes[i] = RKV_SIZE_TOO_SMALL;
                 else {
                     keySizes[i] = keyCopy(mode, umem, keys.size - offset,
-                                          key.data(), key.size(), prefix.size,
+                                          key.data(), key.size(), filter.size,
                                           is_last);
                     if(keySizes[i] == RKV_SIZE_TOO_SMALL)
                         buf_too_small = true;
@@ -354,7 +352,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& prefix,
+                                 const UserMem& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -375,14 +373,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t key_offset = 0;
         bool key_buf_too_small = false;
+        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
-            if(prefix.size != 0) {
-                if(!checkPrefix(mode, key.data(), key.size(),
-                            prefix.data, prefix.size))
-                    continue;
-            }
+            if(!key_filter.check(key.data(), key.size()))
+                continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
 
             bool is_last = false;
@@ -397,7 +393,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                 size_t key_usize = keySizes[i];
                 keySizes[i] = keyCopy(mode, key_umem, key_usize,
                                       key.data(), key.size(),
-                                      prefix.size, is_last);
+                                      filter.size, is_last);
                 key_offset += key_usize;
 
             } else { // not packed
@@ -407,7 +403,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                 else {
                     keySizes[i] = keyCopy(mode, key_umem, keys.size - key_offset,
                                           key.data(), key.size(),
-                                          prefix.size, is_last);
+                                          filter.size, is_last);
                     if(keySizes[i] == RKV_SIZE_TOO_SMALL)
                         key_buf_too_small = true;
                     else
