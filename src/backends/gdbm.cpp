@@ -167,8 +167,10 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
                 auto flag = mode_new_only ? GDBM_INSERT : GDBM_REPLACE;
                 ret = gdbm_store(m_db, key, val, flag);
             }
-            if(ret != 0) // TODO convert status ?
+            if(ret != 0 && gdbm_errno != GDBM_CANNOT_REPLACE) { // TODO convert status ?
+                std::cerr << "errno = " << gdbm_errno << std::endl;
                 return Status::Other;
+            }
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }

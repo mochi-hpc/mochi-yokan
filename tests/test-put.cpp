@@ -885,6 +885,91 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
     return MUNIT_OK;
 }
 
+static MunitResult test_put_new_only(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    rkv_database_handle_t dbh = context->dbh;
+    rkv_return_t ret;
+
+    // start by putting half of the keys
+    size_t i = 0;
+    for(auto& p : context->reference) {
+        if(i % 2 == 1) {
+            auto key   = p.first.data();
+            auto ksize = p.first.size();
+            auto val   = p.second.data();
+            auto vsize = p.second.size();
+            ret = rkv_put(dbh, 0, key, ksize, val, vsize);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
+            munit_assert_int(ret, ==, RKV_SUCCESS);
+        }
+        i += 1;
+    }
+
+    // check that the key/values were correctly stored
+    i = 0;
+    for(auto& p : context->reference) {
+        if(i % 2 == 1) {
+            auto key = p.first.data();
+            auto ksize = p.first.size();
+            std::vector<char> val(g_max_val_size);
+            size_t vsize = g_max_val_size;
+            ret = rkv_get(dbh, 0,key, ksize, val.data(), &vsize);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
+            munit_assert_int(ret, ==, RKV_SUCCESS);
+            munit_assert_int(vsize, ==, p.second.size());
+            munit_assert_memory_equal(vsize, val.data(), p.second.data());
+        }
+        i += 1;
+    }
+
+    // put all the value this time, with RKV_MODE_NEW_ONLY, and reverse
+    // the ones we initially put
+    i = 0;
+    for(auto& p : context->reference)
+    {
+        if(i % 2 == 0) {
+            auto key   = p.first.data();
+            auto ksize = p.first.size();
+            auto val   = p.second.data();
+            auto vsize = p.second.size();
+            ret = rkv_put(dbh, RKV_MODE_NEW_ONLY, key, ksize, val, vsize);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
+            munit_assert_int(ret, ==, RKV_SUCCESS);
+        } else {
+            auto rev_val = p.second;
+            std::reverse(rev_val.begin(), rev_val.end());
+            auto key   = p.first.data();
+            auto ksize = p.first.size();
+            auto val   = rev_val.data();
+            auto vsize = rev_val.size();
+            ret = rkv_put(dbh, RKV_MODE_NEW_ONLY, key, ksize, val, vsize);
+            SKIP_IF_NOT_IMPLEMENTED(ret);
+            munit_assert_int(ret, ==, RKV_SUCCESS);
+        }
+    }
+
+    // check that only the keys that previously did not exist were added
+    // and the ones that did exist were not modified
+    for(auto& p : context->reference) {
+        auto key = p.first.data();
+        auto ksize = p.first.size();
+        auto val = p.second.data();
+        auto vsize = p.second.size();
+        std::vector<char> out_val(g_max_val_size);
+        size_t out_vsize = g_max_val_size;
+        ret = rkv_get(dbh, 0, key, ksize, out_val.data(), &out_vsize);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
+        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(out_vsize, ==, vsize);
+        munit_assert_memory_equal(out_vsize, val, out_val.data());
+    }
+
+    return MUNIT_OK;
+}
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
   { (char*)"min-key-size", NULL },
@@ -927,8 +1012,8 @@ static MunitTest test_suite_tests[] = {
         test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put/exist_only", test_put_exist_only,
         test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-//    { (char*) "/put/new_only", test_put_new_only,
-//        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/put/new_only", test_put_new_only,
+        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 
