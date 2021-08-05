@@ -282,9 +282,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return mode ==
             (mode & (
                      RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
+                    |RKV_MODE_APPEND
                     |RKV_MODE_CONSUME
         //            |RKV_MODE_WAIT
+        //            |RKV_MODE_NOTIFY
                     |RKV_MODE_NEW_ONLY
         //            |RKV_MODE_EXIST_ONLY
         //            |RKV_MODE_NO_PREFIX
@@ -369,8 +370,10 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
+
+        auto mode_append = mode & RKV_MODE_APPEND;
+        auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -385,12 +388,18 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
-        bool overwrite = !(mode & RKV_MODE_NEW_ONLY);
+        bool overwrite = !mode_new_only;
 
         for(size_t i = 0; i < ksizes.size; i++) {
-            auto status = m_db->Set({ keys.data + key_offset, ksizes[i] },
-                                    { vals.data + val_offset, vsizes[i] },
+            tkrzw::Status status;
+            if(!mode_append) {
+                status = m_db->Set({ keys.data + key_offset, ksizes[i] },
+                                   { vals.data + val_offset, vsizes[i] },
                                     overwrite);
+            } else {
+                status = m_db->Append({ keys.data + key_offset, ksizes[i] },
+                                      { vals.data + val_offset, vsizes[i] });
+            }
             if(!status.IsOK() && (status != tkrzw::Status::DUPLICATION_ERROR)) {
                 return convertStatus(status);
             }

@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "rkv/rkv-backend.hpp"
+#include "rkv/rkv-watcher.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/locks.hpp"
@@ -150,8 +151,8 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                      RKV_MODE_INCLUSIVE
                     |RKV_MODE_APPEND
                     |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
+                    |RKV_MODE_WAIT
+                    |RKV_MODE_NOTIFY
                     |RKV_MODE_NEW_ONLY
                     |RKV_MODE_EXIST_ONLY
                     |RKV_MODE_NO_PREFIX
@@ -176,11 +177,27 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
+        auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            flags[i] = m_db->count(key) > 0;
+            retry:
+            auto it = m_db->find(key);
+            if(it != m_db->end()) {
+                flags[i] = true;
+            } else if(mode_wait) {
+                m_watcher.addKey(key);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
+            } else {
+                flags[i] = false;
+            }
             offset += ksizes[i];
         }
         return Status::OK;
@@ -192,13 +209,27 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
+        auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
-            const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
+            const UserMem key{ keys.data + offset, ksizes[i] };
+            retry:
             auto it = m_db->find(key);
-            if(it == m_db->end()) vsizes[i] = KeyNotFound;
-            else vsizes[i] = 0;
+            if(it != m_db->end()) {
+                vsizes[i] = 0;
+            } else if(mode_wait) {
+                m_watcher.addKey(key);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
+            } else {
+                vsizes[i] = KeyNotFound;
+            }
             offset += ksizes[i];
         }
         return Status::OK;
@@ -212,6 +243,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         if(vals.size != 0) return Status::InvalidArg;
 
+        const auto mode_notify     = mode & RKV_MODE_NOTIFY;
+        const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+
         size_t key_offset = 0;
 
         size_t total_ksizes = std::accumulate(ksizes.data,
@@ -224,7 +258,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes != 0) return Status::InvalidArg;
 
-        if(mode & RKV_MODE_EXIST_ONLY)
+        if(mode_exist_only)
             return Status::OK;
 
         ScopedWriteLock lock(m_lock);
@@ -232,6 +266,8 @@ class SetKeyValueStore : public KeyValueStoreInterface {
             m_db->emplace(keys.data + key_offset,
                           ksizes[i], m_key_allocator);
             key_offset += ksizes[i];
+            if(mode_notify)
+                m_watcher.notifyKey({ keys.data + key_offset, ksizes[i] });
         }
         return Status::OK;
     }
@@ -247,13 +283,25 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         ScopedReadLock lock(m_lock);
 
+        auto mode_wait = mode & RKV_MODE_WAIT;
+
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + key_offset, ksizes[i] };
+            retry:
             auto it = m_db->find(key);
-            if(it == m_db->end()) {
-                vsizes[i] = KeyNotFound;
-            } else {
+            if(it != m_db->end()) {
                 vsizes[i] = 0;
+            } else if(mode_wait) {
+                m_watcher.addKey(key);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
+            } else {
+                vsizes[i] = KeyNotFound;
             }
             key_offset += ksizes[i];
         }
@@ -267,15 +315,25 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
-        (void)mode;
         size_t offset = 0;
+        auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
+            retry:
             auto it = m_db->find(key);
             if(it != m_db->end()) {
                 m_db->erase(it);
+            } else if(mode_wait) {
+                m_watcher.addKey(key);
+                lock.unlock();
+                auto ret = m_watcher.waitKey(key);
+                lock.lock();
+                if(ret == KeyWatcher::KeyPresent)
+                    goto retry;
+                else
+                    return Status::TimedOut;
             }
             offset += ksizes[i];
         }
@@ -457,11 +515,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         m_db = new set_type(cmp_fun, allocator(m_node_allocator));
     }
 
-    set_type*       m_db;
-    json            m_config;
-    ABT_rwlock      m_lock = ABT_RWLOCK_NULL;
-    rkv_allocator_t m_node_allocator;
-    rkv_allocator_t m_key_allocator;
+    set_type*          m_db;
+    json               m_config;
+    ABT_rwlock         m_lock = ABT_RWLOCK_NULL;
+    rkv_allocator_t    m_node_allocator;
+    rkv_allocator_t    m_key_allocator;
+    mutable KeyWatcher m_watcher;
 };
 
 }

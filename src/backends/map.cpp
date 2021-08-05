@@ -434,7 +434,6 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
-        (void)mode;
         size_t offset = 0;
         auto mode_wait = mode & RKV_MODE_WAIT;
         ScopedReadLock lock(m_lock);
