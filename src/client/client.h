@@ -11,7 +11,8 @@
 
 typedef struct rkv_client {
    margo_instance_id mid;
-   /* exists */
+
+   hg_id_t           count_id;
    hg_id_t           exists_id;
    hg_id_t           length_id;
    hg_id_t           put_id;

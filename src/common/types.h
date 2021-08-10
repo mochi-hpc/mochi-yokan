@@ -79,6 +79,14 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 
 /* Client RPC types */
 
+/* count */
+MERCURY_GEN_PROC(count_in_t,
+        ((rkv_database_id_t)(db_id))\
+        ((int32_t)(mode)))
+MERCURY_GEN_PROC(count_out_t,
+        ((int32_t)(ret))\
+        ((uint64_t)(count)))
+
 /* exists */
 MERCURY_GEN_PROC(exists_in_t,
         ((rkv_database_id_t)(db_id))\

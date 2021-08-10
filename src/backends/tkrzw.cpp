@@ -308,6 +308,16 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         std::filesystem::remove(path);
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        int64_t count = 0;
+        auto status = m_db->Count(&count);
+        if(!status.IsOK())
+            return convertStatus(status);
+        *c = count;
+        return Status::OK;
+    }
+
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {

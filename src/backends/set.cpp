@@ -171,6 +171,13 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         m_db->clear();
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        ScopedReadLock lock(m_lock);
+        *c = m_db->size();
+        return Status::OK;
+    }
+
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {

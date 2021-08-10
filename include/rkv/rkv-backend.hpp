@@ -165,6 +165,20 @@ class KeyValueStoreInterface {
     }
 
     /**
+     * @brief Get the number of key/value pairs stored.
+     *
+     * @param mode Mode.
+     * @param c Result.
+     *
+     * @return Status.
+     */
+    virtual Status count(int32_t mode, uint64_t* c) const {
+        (void)mode;
+        (void)c;
+        return Status::NotSupported;
+    }
+
+    /**
      * @brief Check if the provided keys exist. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory
      * holding the key sizes. The number of keys is conveyed by

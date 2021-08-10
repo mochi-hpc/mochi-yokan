@@ -183,6 +183,15 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         // TODO log error if necessary
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        (void)c;
+        // we don't support it because the function that allows getting
+        // this number only gives an estimate, and only of the keys
+        // that were committed to disk, which generally isn't useful.
+        return Status::NotSupported;
+    }
+
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {

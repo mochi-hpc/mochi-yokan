@@ -168,6 +168,12 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         }
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        (void)c;
+        return Status::NotSupported;
+    }
+
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {

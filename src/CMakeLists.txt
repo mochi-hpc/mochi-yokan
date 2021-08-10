@@ -1,6 +1,7 @@
 # set source files
 set (server-src-files
      server/provider.cpp
+     server/count.cpp
      server/put.cpp
      server/erase.cpp
      server/get.cpp
@@ -71,6 +72,7 @@ endif ()
 
 set (client-src-files
      client/client.c
+     client/count.cpp
      client/put.cpp
      client/erase.cpp
      client/get.cpp

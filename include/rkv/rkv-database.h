@@ -57,6 +57,19 @@ rkv_return_t rkv_database_handle_ref_incr(
 rkv_return_t rkv_database_handle_release(rkv_database_handle_t handle);
 
 /**
+ * @brief Get the number of key/val pairs stored in the database.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of RKV_MODE_* flags.
+ * @param[out] count Number of pairs stored.
+ *
+ * @return RKV_SUCCESS or corresponding error code.
+ */
+rkv_return_t rkv_count(rkv_database_handle_t dbh,
+                       int32_t mode,
+                       size_t* count);
+
+/**
  * @brief Put a single key/value pair into the database.
  *
  * @param[in] dbh Database handle.

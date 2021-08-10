@@ -21,6 +21,7 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 
     if(flag == HG_TRUE) {
 
+        margo_registered_name(mid, "rkv_count",        &c->count_id,        &flag);
         margo_registered_name(mid, "rkv_exists",       &c->exists_id,       &flag);
         margo_registered_name(mid, "rkv_length",       &c->length_id,       &flag);
         margo_registered_name(mid, "rkv_put",          &c->put_id,          &flag);
@@ -31,6 +32,9 @@ rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)
 
     } else {
 
+        c->count_id =
+            MARGO_REGISTER(mid, "rkv_count",
+                           count_in_t, count_out_t, NULL);
         c->exists_id =
             MARGO_REGISTER(mid, "rkv_exists",
                            exists_in_t, exists_out_t, NULL);

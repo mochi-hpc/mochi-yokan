@@ -106,6 +106,12 @@ rkv_return_t rkv_provider_register(
 
     /* Client RPCs */
 
+    id = MARGO_REGISTER_PROVIDER(mid, "rkv_count",
+            count_in_t, count_out_t,
+            rkv_count_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->count_id = id;
+
     id = MARGO_REGISTER_PROVIDER(mid, "rkv_put",
             put_in_t, put_out_t,
             rkv_put_ult, provider_id, p->pool);

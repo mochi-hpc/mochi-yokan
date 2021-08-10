@@ -239,6 +239,12 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         fs::remove_all(path);
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        (void)c;
+        return Status::NotSupported;
+    }
+
     virtual Status exists(int32_t mode,
                           const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,

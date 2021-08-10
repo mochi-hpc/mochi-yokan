@@ -52,6 +52,7 @@ typedef struct rkv_provider {
     hg_id_t destroy_database_id;
     hg_id_t list_databases_id;
     /* RPC identifiers for clients */
+    hg_id_t count_id;
     hg_id_t exists_id;
     hg_id_t length_id;
     hg_id_t put_id;
@@ -74,6 +75,8 @@ DECLARE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
 void rkv_list_databases_ult(hg_handle_t h);
 
 /* Client RPCs */
+DECLARE_MARGO_RPC_HANDLER(rkv_count_ult)
+void rkv_count_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(rkv_put_ult)
 void rkv_put_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(rkv_erase_ult)

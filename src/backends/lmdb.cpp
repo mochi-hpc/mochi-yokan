@@ -173,6 +173,18 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         fs::remove_all(path);
     }
 
+    virtual Status count(int32_t mode, uint64_t* c) const override {
+        (void)mode;
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+        MDB_stat stats;
+        ret = mdb_stat(txn, m_db, &stats);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+        *c = stats.ms_entries;
+        return Status::OK;
+    }
+
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
