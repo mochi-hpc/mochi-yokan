@@ -762,8 +762,8 @@ static MunitResult test_put_append(const MunitParameter params[], void* data)
     }
 
     // use values at i % 2 == 0 to append to existing values
-    const char* val;
-    size_t vsize;
+    const char* val = nullptr;
+    size_t vsize = 0;
     i = 0;
     for(auto& p : context->reference) {
         if(i % 2 == 0) {
