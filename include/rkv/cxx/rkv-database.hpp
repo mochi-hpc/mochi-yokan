@@ -182,173 +182,222 @@ class Database {
         RKV_CONVERT_AND_THROW(err);
     }
 
+    size_t length(const void* key,
+                  size_t ksize,
+                  int32_t mode = RKV_MODE_DEFAULT) const {
+        size_t vsize;
+        auto err = rkv_length(m_db, mode, key, ksize, &vsize);
+        RKV_CONVERT_AND_THROW(err);
+        return vsize;
+    }
+
+    void lengthMulti(size_t count,
+                     const void* const* keys,
+                     const size_t* ksizes,
+                     size_t* vsizes,
+                     int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_length_multi(m_db, mode, count, keys, ksizes, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void lengthPacked(size_t count,
+                      const void* keys,
+                      const size_t* ksizes,
+                      size_t* vsizes,
+                      int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_length_packed(m_db, mode, count, keys, ksizes, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void lengthBulk(size_t count,
+                    const char* origin,
+                    hg_bulk_t data,
+                    size_t offset,
+                    size_t size,
+                    int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_length_bulk(m_db, mode, count, origin, data, offset, size);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void get(const void* key,
+             size_t ksize,
+             void* value,
+             size_t* vsize,
+             int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_get(m_db, mode, key, ksize, value, vsize);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void getMulti(size_t count,
+                  const void* const* keys,
+                  const size_t* ksizes,
+                  void* const* values,
+                  size_t* vsizes,
+                  int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_get_multi(m_db, mode, count,
+            keys, ksizes, values, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void getPacked(size_t count,
+                   const void* keys,
+                   const size_t* ksizes,
+                   size_t vbufsize,
+                   void* values,
+                   size_t* vsizes,
+                   int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_get_packed(m_db, mode, count,
+            keys, ksizes, vbufsize, values, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void getBulk(size_t count,
+                 const char* origin,
+                 hg_bulk_t data,
+                 size_t offset,
+                 size_t size,
+                 bool packed,
+                 int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_get_bulk(m_db, mode, count, origin,
+            data, offset, size, packed);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void erase(const void* key,
+               size_t ksize,
+               int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_erase(m_db, mode, key, ksize);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void eraseMulti(size_t count,
+                    const void* const* keys,
+                    const size_t* ksizes,
+                    int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_erase_multi(m_db, mode, count, keys, ksizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void erasePacked(size_t count,
+                     const void* keys,
+                     const size_t* ksizes,
+                     int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_erase_packed(m_db, mode, count, keys, ksizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void eraseBulk(size_t count,
+                   const char* origin,
+                   hg_bulk_t data,
+                   size_t offset,
+                   size_t size,
+                   int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_erase_bulk(m_db, mode, count,
+            origin, data, offset, size);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeys(const void* from_key,
+                  size_t from_ksize,
+                  const void* filter,
+                  size_t filter_size,
+                  size_t count,
+                  void* const* keys,
+                  size_t* ksizes,
+                  int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keys(m_db, mode, from_key,
+            from_ksize, filter, filter_size, count, keys, ksizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeysPacked(
+            const void* from_key,
+            size_t from_ksize,
+            const void* filter,
+            size_t filter_size,
+            size_t count,
+            void* keys,
+            size_t keys_buf_size,
+            size_t* ksizes,
+            int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keys_packed(m_db, mode, from_key,
+            from_ksize, filter, filter_size, count, keys,
+            keys_buf_size, ksizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeysBulk(
+            size_t from_ksize,
+            size_t filter_size,
+            const char* origin,
+            hg_bulk_t data,
+            size_t offset,
+            size_t keys_buf_size,
+            bool packed,
+            size_t count,
+            int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keys_bulk(m_db, mode, from_ksize,
+            filter_size, origin, data, offset, keys_buf_size,
+            packed, count);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeyVals(const void* from_key,
+                     size_t from_ksize,
+                     const void* filter,
+                     size_t filter_size,
+                     size_t count,
+                     void* const* keys,
+                     size_t* ksizes,
+                     void* const* values,
+                     size_t* vsizes,
+                     int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keyvals(m_db, mode, from_key,
+            from_ksize, filter, filter_size, count, keys, ksizes, values, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeyValsPacked(
+            const void* from_key,
+            size_t from_ksize,
+            const void* filter,
+            size_t filter_size,
+            size_t count,
+            void* keys,
+            size_t keys_buf_size,
+            size_t* ksizes,
+            void* vals,
+            size_t vals_buf_size,
+            size_t* vsizes,
+            int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keyvals_packed(m_db, mode, from_key,
+            from_ksize, filter, filter_size, count, keys,
+            keys_buf_size, ksizes, vals, vals_buf_size, vsizes);
+        RKV_CONVERT_AND_THROW(err);
+    }
+
+    void listKeyValsBulk(
+            size_t from_ksize,
+            size_t filter_size,
+            const char* origin,
+            hg_bulk_t data,
+            size_t offset,
+            size_t keys_buf_size,
+            size_t vals_buf_size,
+            bool packed,
+            size_t count,
+            int32_t mode = RKV_MODE_DEFAULT) const {
+        auto err = rkv_list_keyvals_bulk(m_db, mode, from_ksize,
+            filter_size, origin, data, offset, keys_buf_size,
+            vals_buf_size, packed, count);
+        RKV_CONVERT_AND_THROW(err);
+    }
     private:
 
     rkv_database_handle_t m_db = RKV_DATABASE_HANDLE_NULL;
 
 };
 
-#if 0
-
-rkv_return_t rkv_length(rkv_database_handle_t dbh,
-                        int32_t mode,
-                        const void* key,
-                        size_t ksize,
-                        size_t* vsize);
-
-rkv_return_t rkv_length_multi(rkv_database_handle_t dbh,
-                              int32_t mode,
-                              size_t count,
-                              const void* const* keys,
-                              const size_t* ksizes,
-                              size_t* vsizes);
-
-rkv_return_t rkv_length_packed(rkv_database_handle_t dbh,
-                               int32_t mode,
-                               size_t count,
-                               const void* keys,
-                               const size_t* ksizes,
-                               size_t* vsizes);
-
-rkv_return_t rkv_length_bulk(rkv_database_handle_t dbh,
-                             int32_t mode,
-                             size_t count,
-                             const char* origin,
-                             hg_bulk_t data,
-                             size_t offset,
-                             size_t size);
-
-rkv_return_t rkv_get(rkv_database_handle_t dbh,
-                     int32_t mode,
-                     const void* key,
-                     size_t ksize,
-                     void* value,
-                     size_t* vsize);
-
-rkv_return_t rkv_get_multi(rkv_database_handle_t dbh,
-                           int32_t mode,
-                           size_t count,
-                           const void* const* keys,
-                           const size_t* ksizes,
-                           void* const* values,
-                           size_t* vsizes);
-
-rkv_return_t rkv_get_packed(rkv_database_handle_t dbh,
-                            int32_t mode,
-                            size_t count,
-                            const void* keys,
-                            const size_t* ksizes,
-                            size_t vbufsize,
-                            void* values,
-                            size_t* vsizes);
-
-rkv_return_t rkv_get_bulk(rkv_database_handle_t dbh,
-                          int32_t mode,
-                          size_t count,
-                          const char* origin,
-                          hg_bulk_t data,
-                          size_t offset,
-                          size_t size,
-                          bool packed);
-
-rkv_return_t rkv_erase(rkv_database_handle_t dbh,
-                       int32_t mode,
-                       const void* key,
-                       size_t ksize);
-
-rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
-                             int32_t mode,
-                             size_t count,
-                             const void* const* keys,
-                             const size_t* ksizes);
-
-rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
-                              int32_t mode,
-                              size_t count,
-                              const void* keys,
-                              const size_t* ksizes);
-
-rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
-                            int32_t mode,
-                            size_t count,
-                            const char* origin,
-                            hg_bulk_t data,
-                            size_t offset,
-                            size_t size);
-
-
-rkv_return_t rkv_list_keys(rkv_database_handle_t dbh,
-                           int32_t mode,
-                           const void* from_key,
-                           size_t from_ksize,
-                           const void* filter,
-                           size_t filter_size,
-                           size_t count,
-                           void* const* keys,
-                           size_t* ksizes);
-
-rkv_return_t rkv_list_keys_packed(rkv_database_handle_t dbh,
-                                  int32_t mode,
-                                  const void* from_key,
-                                  size_t from_ksize,
-                                  const void* filter,
-                                  size_t filter_size,
-                                  size_t count,
-                                  void* keys,
-                                  size_t keys_buf_size,
-                                  size_t* ksizes);
-
-rkv_return_t rkv_list_keys_bulk(rkv_database_handle_t dbh,
-                                int32_t mode,
-                                size_t from_ksize,
-                                size_t filter_size,
-                                const char* origin,
-                                hg_bulk_t data,
-                                size_t offset,
-                                size_t keys_buf_size,
-                                bool packed,
-                                size_t count);
-
-
-rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
-                              int32_t mode,
-                              const void* from_key,
-                              size_t from_ksize,
-                              const void* filter,
-                              size_t filter_size,
-                              size_t count,
-                              void* const* keys,
-                              size_t* ksizes,
-                              void* const* values,
-                              size_t* vsizes);
-
-rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
-                                     int32_t mode,
-                                     const void* from_key,
-                                     size_t from_ksize,
-                                     const void* filter,
-                                     size_t filter_size,
-                                     size_t count,
-                                     void* keys,
-                                     size_t keys_buf_size,
-                                     size_t* ksizes,
-                                     void* values,
-                                     size_t vals_buf_size,
-                                     size_t* vsizes);
-
-rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
-                                   int32_t mode,
-                                   size_t from_ksize,
-                                   size_t filter_size,
-                                   const char* origin,
-                                   hg_bulk_t data,
-                                   size_t offset,
-                                   size_t key_buf_size,
-                                   size_t val_buf_size,
-                                   bool packed,
-                                   size_t count);
-
-#endif
 }
 
 #endif
