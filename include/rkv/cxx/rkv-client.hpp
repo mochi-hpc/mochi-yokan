@@ -8,6 +8,7 @@
 
 #include <rkv/rkv-client.h>
 #include <rkv/cxx/rkv-exception.hpp>
+#include <rkv/cxx/rkv-database.hpp>
 
 namespace rkv {
 
@@ -36,6 +37,17 @@ class Client {
     Client& operator=(const Client&) = delete;
 
     Client& operator=(Client&&) = delete;
+
+    Database makeDatabaseHandle(
+        hg_addr_t addr,
+        uint16_t provider_id,
+        rkv_database_id_t database_id) const {
+        rkv_database_handle_t db;
+        auto err = rkv_database_handle_create(
+            m_client, addr, provider_id, database_id, &db);
+        RKV_CONVERT_AND_THROW(err);
+        return Database(db);
+    }
 
     private:
 
