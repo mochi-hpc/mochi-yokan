@@ -26,8 +26,8 @@ class TestPutGet(unittest.TestCase):
             address=self.hg_addr,
             provider_id=self.provider_id,
             token='', type='map', config='{}')
-        client = Client(mid=self.mid)
-        self.db = client.make_database_handle(
+        self.client = Client(mid=self.mid)
+        self.db = self.client.make_database_handle(
             address=self.hg_addr,
             provider_id=self.provider_id,
             database_id=db_id)
@@ -36,6 +36,7 @@ class TestPutGet(unittest.TestCase):
         del self.db
         del self.addr
         del self.hg_addr
+        del self.client
         del self.mid
         del self.provider
         self.engine.finalize()

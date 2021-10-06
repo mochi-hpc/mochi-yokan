@@ -46,7 +46,7 @@ class Client {
         auto err = rkv_database_handle_create(
             m_client, addr, provider_id, database_id, &db);
         RKV_CONVERT_AND_THROW(err);
-        return Database(db);
+        return Database(db, false);
     }
 
     auto handle() const {

@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <rkv/cxx/rkv-client.hpp>
 #include <rkv/cxx/rkv-database.hpp>
+#include <iostream>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -56,8 +57,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 rkv_database_id_t database_id) {
                 return client.makeDatabaseHandle(addr, provider_id, database_id);
              },
-             "address"_a, "provider_id"_a, "database_id"_a,
-             py::keep_alive<0,1>());
+             "address"_a, "provider_id"_a, "database_id"_a);
 
     py::class_<rkv::Database>(m, "Database")
 
@@ -130,6 +130,21 @@ PYBIND11_MODULE(pyrkv_client, m) {
                        &vsize,
                        mode);
                 return vsize;
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT);
+             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+
+        .def("exists",
+             [](const rkv::Database& db, const std::string& key,
+                int32_t mode) {
+                return db.exists(key.data(), key.size(), mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+        .def("exists",
+             [](const rkv::Database& db, const py::buffer& key,
+                int32_t mode) {
+                auto key_info = key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                size_t ksize = key_info.itemsize*key_info.size;
+                return db.exists(key_info.ptr, ksize, mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+        ;
 }
 
