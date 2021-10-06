@@ -94,6 +94,10 @@ class Admin {
         return ids;
     }
 
+    auto handle() const {
+        return m_admin;
+    }
+
     private:
 
     rkv_admin_t m_admin = RKV_ADMIN_NULL;

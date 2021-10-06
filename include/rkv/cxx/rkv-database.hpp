@@ -87,6 +87,7 @@ class Database {
         size_t c;
         auto err = rkv_count(m_db, mode, &c);
         RKV_CONVERT_AND_THROW(err);
+        return c;
     }
 
     void put(const void* key,
@@ -392,6 +393,11 @@ class Database {
             vals_buf_size, packed, count);
         RKV_CONVERT_AND_THROW(err);
     }
+
+    auto handle() const {
+        return m_db;
+    }
+
     private:
 
     rkv_database_handle_t m_db = RKV_DATABASE_HANDLE_NULL;

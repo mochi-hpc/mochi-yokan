@@ -15,6 +15,7 @@ spack:
   - unqlite@master
   - lua-sol2
   - py-pybind11
+  - py-mochi-margo
 #  - pmemkv
 #  - upscaledb
   concretization: together

@@ -46,6 +46,8 @@ extern "C" {
     X(RKV_ERR_CANCELED, "Canceled")                    \
     X(RKV_ERR_PERMISSION, "Permission error")          \
     X(RKV_ERR_MODE, "Invalid mode")                    \
+    X(RKV_ERR_NONCONTIG, "Non-contiguous buffer")      \
+    X(RKV_ERR_READONLY, "Read-only buffer")            \
     X(RKV_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,

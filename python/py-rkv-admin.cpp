@@ -14,10 +14,11 @@ typedef py::capsule py_hg_addr_t;
 PYBIND11_MODULE(pyrkv_admin, m) {
     m.doc() = "Python binding for the RKV admin library";
 
-    py::register_exception<rkv::Exception>(m, "AdminException");
+    py::module::import("pyrkv_common");
 
     py::class_<rkv::Admin>(m, "Admin")
-        .def(py::init<py_margo_instance_id>())
+        .def(py::init<py_margo_instance_id>(),
+             "mid"_a)
         .def("open_database",
              [](const rkv::Admin& admin,
                 py_hg_addr_t address,

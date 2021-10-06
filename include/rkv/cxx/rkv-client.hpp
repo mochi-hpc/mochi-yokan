@@ -49,6 +49,10 @@ class Client {
         return Database(db);
     }
 
+    auto handle() const {
+        return m_client;
+    }
+
     private:
 
     rkv_client_t m_client = RKV_CLIENT_NULL;
