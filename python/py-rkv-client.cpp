@@ -67,8 +67,8 @@ PYBIND11_MODULE(pyrkv_client, m) {
              }, "mode"_a=RKV_MODE_DEFAULT)
 
         .def("put",
-             [](const rkv::Database& db, py::buffer key,
-                py::buffer val, int32_t mode) {
+             [](const rkv::Database& db, const py::buffer& key,
+                const py::buffer& val, int32_t mode) {
                 auto key_info = key.request();
                 auto val_info = val.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -79,6 +79,27 @@ PYBIND11_MODULE(pyrkv_client, m) {
                        val_info.itemsize*val_info.size,
                        mode);
              }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+        .def("put",
+             [](const rkv::Database& db, const std::string& key,
+                const py::buffer& val, int32_t mode) {
+                auto val_info = val.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+                db.put(key.data(),
+                       key.size(),
+                       val_info.ptr,
+                       val_info.itemsize*val_info.size,
+                       mode);
+             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+        .def("put",
+             [](const rkv::Database& db, const std::string& key,
+                const std::string& val, int32_t mode) {
+                db.put(key.data(),
+                       key.size(),
+                       val.data(),
+                       val.size(),
+                       mode);
+             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+
 
         .def("get",
              [](const rkv::Database& db, py::buffer key,
