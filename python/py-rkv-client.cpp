@@ -145,6 +145,34 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 size_t ksize = key_info.itemsize*key_info.size;
                 return db.exists(key_info.ptr, ksize, mode);
              }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+
+        .def("length",
+             [](const rkv::Database& db, const std::string& key,
+                int32_t mode) {
+                return db.length(key.data(), key.size(), mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+        .def("length",
+             [](const rkv::Database& db, const py::buffer& key,
+                int32_t mode) {
+                auto key_info = key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                size_t ksize = key_info.itemsize*key_info.size;
+                return db.length(key_info.ptr, ksize, mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+
+        .def("erase",
+             [](const rkv::Database& db, const std::string& key,
+                int32_t mode) {
+                db.erase(key.data(), key.size(), mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+        .def("erase",
+             [](const rkv::Database& db, const py::buffer& key,
+                int32_t mode) {
+                auto key_info = key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                size_t ksize = key_info.itemsize*key_info.size;
+                db.erase(key_info.ptr, ksize, mode);
+             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
         ;
 }
 
