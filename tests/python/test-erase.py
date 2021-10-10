@@ -54,8 +54,8 @@ class TestErase(unittest.TestCase):
         del self.reference
         self.engine.finalize()
 
-    def test_erase(self):
-        """Test that we can erase some keys."""
+    def test_erase_string(self):
+        """Test that we can erase some string keys."""
         for key in self.reference:
             self.assertTrue(self.db.exists(key))
         for i, key in enumerate(self.reference):
@@ -66,6 +66,68 @@ class TestErase(unittest.TestCase):
                 self.assertFalse(self.db.exists(key))
             else:
                 self.assertTrue(self.db.exists(key))
+
+    def test_erase_buffer(self):
+        """Test that we can erase some buffer keys."""
+        for key in self.reference:
+            self.assertTrue(self.db.exists(key))
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                key_buf = key.encode('ascii')
+                self.db.erase(key_buf)
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                self.assertFalse(self.db.exists(key))
+            else:
+                self.assertTrue(self.db.exists(key))
+
+    def test_erase_multi_string(self):
+        """Test that we can use erase_multi with string keys."""
+        for key in self.reference:
+            self.assertTrue(self.db.exists(key))
+        keys = []
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                keys.append(key)
+        self.db.erase_multi(keys)
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                self.assertFalse(self.db.exists(key))
+            else:
+                self.assertTrue(self.db.exists(key))
+
+    def test_erase_multi_buffer(self):
+        """Test that we can use erase_multi with string keys."""
+        for key in self.reference:
+            self.assertTrue(self.db.exists(key))
+        keys = []
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                keys.append(key.encode('ascii'))
+        self.db.erase_multi(keys)
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                self.assertFalse(self.db.exists(key))
+            else:
+                self.assertTrue(self.db.exists(key))
+
+    def test_erase_packed(self):
+        """Test that we can use erase_multi with string keys."""
+        for key in self.reference:
+            self.assertTrue(self.db.exists(key))
+        keys = bytearray()
+        ksizes = []
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                keys += key.encode('ascii')
+                ksizes.append(len(key))
+        self.db.erase_packed(keys, ksizes)
+        for i, key in enumerate(self.reference):
+            if i % 2 == 0:
+                self.assertFalse(self.db.exists(key))
+            else:
+                self.assertTrue(self.db.exists(key))
+
 
 if __name__ == '__main__':
     unittest.main()
