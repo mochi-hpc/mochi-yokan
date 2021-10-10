@@ -563,6 +563,358 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 }
                 db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
              }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
-        ;
+        // --------------------------------------------------------------
+        // LIST_KEYS
+        // --------------------------------------------------------------
+        .def("list_keys",
+             [](const rkv::Database& db,
+                std::vector<py::buffer>& keys,
+                const py::buffer& from_key,
+                const py::buffer& filter,
+                int32_t mode) {
+                auto count = keys.size();
+                std::vector<void*>  keys_data(count);
+                std::vector<size_t> keys_size(count);
+                auto from_key_info = from_key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
+                auto filter_info = filter.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+                for(size_t i = 0; i < count; i++) {
+                    auto key_info = keys[i].request();
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    CHECK_BUFFER_IS_WRITABLE(key_info);
+                    keys_data[i] = key_info.ptr;
+                    keys_size[i] = key_info.itemsize*key_info.size;
+                }
+                db.listKeys(from_key_info.ptr,
+                            from_key_info.itemsize*from_key_info.size,
+                            filter_info.ptr,
+                            filter_info.itemsize*filter_info.size,
+                            count,
+                            keys_data.data(),
+                            keys_size.data(),
+                            mode);
+                py::list result;
+                for(size_t i=0; i < count; i++) {
+                    if(keys_size[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    else if(keys_size[i] == RKV_SIZE_TOO_SMALL)
+                        result.append(-1);
+                    else
+                        result.append(keys_size[i]);
+                }
+                return result;
+             }, "keys"_a, "from_key"_a,
+                "filter"_a,
+                "mode"_a=RKV_MODE_DEFAULT)
+        .def("list_keys",
+             [](const rkv::Database& db,
+                std::vector<py::buffer>& keys,
+                const std::string& from_key,
+                const std::string& filter,
+                int32_t mode) {
+                auto count = keys.size();
+                std::vector<void*>  keys_data(count);
+                std::vector<size_t> keys_size(count);
+                for(size_t i = 0; i < count; i++) {
+                    auto key_info = keys[i].request();
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    CHECK_BUFFER_IS_WRITABLE(key_info);
+                    keys_data[i] = key_info.ptr;
+                    keys_size[i] = key_info.itemsize*key_info.size;
+                }
+                db.listKeys(from_key.data(),
+                            from_key.size(),
+                            filter.data(),
+                            filter.size(),
+                            count,
+                            keys_data.data(),
+                            keys_size.data(),
+                            mode);
+                py::list result;
+                for(size_t i=0; i < count; i++) {
+                    if(keys_size[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    else if(keys_size[i] == RKV_SIZE_TOO_SMALL)
+                        result.append(-1);
+                    else
+                        result.append(keys_size[i]);
+                }
+                return result;
+             }, "keys"_a, "from_key"_a=std::string(),
+                "filter"_a=std::string(),
+                "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // LIST_KEYS_PACKED
+        // --------------------------------------------------------------
+        .def("list_keys_packed",
+             [](const rkv::Database& db,
+                py::buffer& keys,
+                size_t count,
+                const py::buffer& from_key,
+                const py::buffer& filter,
+                int32_t mode) {
+                auto from_key_info = from_key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
+                auto filter_info = filter.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+                auto keys_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(keys_info);
+                CHECK_BUFFER_IS_WRITABLE(keys_info);
+                size_t keys_buf_size = (size_t)keys_info.itemsize*keys_info.size;
+                std::vector<size_t> key_sizes(count);
+                db.listKeysPacked(from_key_info.ptr,
+                                  from_key_info.itemsize*from_key_info.size,
+                                  filter_info.ptr,
+                                  filter_info.itemsize*filter_info.size,
+                                  count,
+                                  keys_info.ptr,
+                                  keys_buf_size,
+                                  key_sizes.data(),
+                                  mode);
+                py::list result;
+                for(size_t i=0; i < count; i++) {
+                    if(key_sizes[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    else if(key_sizes[i] == RKV_SIZE_TOO_SMALL)
+                        result.append(-1);
+                    else
+                        result.append(key_sizes[i]);
+                }
+                return result;
+             }, "keys"_a, "count"_a,
+                "from_key"_a,
+                "filter"_a,
+                "mode"_a=RKV_MODE_DEFAULT)
+        .def("list_keys_packed",
+             [](const rkv::Database& db,
+                py::buffer& keys,
+                size_t count,
+                const std::string& from_key,
+                const std::string& filter,
+                int32_t mode) {
+                auto keys_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(keys_info);
+                CHECK_BUFFER_IS_WRITABLE(keys_info);
+                size_t keys_buf_size = (size_t)keys_info.itemsize*keys_info.size;
+                std::vector<size_t> key_sizes(count);
+                db.listKeysPacked(from_key.data(),
+                                  from_key.size(),
+                                  filter.data(),
+                                  filter.size(),
+                                  count,
+                                  keys_info.ptr,
+                                  keys_buf_size,
+                                  key_sizes.data(),
+                                  mode);
+                py::list result;
+                for(size_t i=0; i < count; i++) {
+                    if(key_sizes[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    else if(key_sizes[i] == RKV_SIZE_TOO_SMALL)
+                        result.append(-1);
+                    else
+                        result.append(key_sizes[i]);
+                }
+                return result;
+             }, "keys"_a, "count"_a,
+                "from_key"_a=std::string(),
+                "filter"_a=std::string(),
+                "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // LIST_KEYVALS
+        // --------------------------------------------------------------
+        .def("list_keyvals",
+             [](const rkv::Database& db,
+                std::vector<std::pair<py::buffer, py::buffer>>& pairs,
+                const py::buffer& from_key,
+                const py::buffer& filter,
+                int32_t mode) {
+                auto count = pairs.size();
+                std::vector<void*>  keys_data(count);
+                std::vector<size_t> keys_size(count);
+                std::vector<void*>  vals_data(count);
+                std::vector<size_t> vals_size(count);
+                auto from_key_info = from_key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
+                auto filter_info = filter.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+                for(size_t i = 0; i < count; i++) {
+                    auto key_info = pairs[i].first.request();
+                    auto val_info = pairs[i].second.request();
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    CHECK_BUFFER_IS_WRITABLE(key_info);
+                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+                    CHECK_BUFFER_IS_WRITABLE(val_info);
+                    keys_data[i] = key_info.ptr;
+                    keys_size[i] = key_info.itemsize*key_info.size;
+                    vals_data[i] = val_info.ptr;
+                    vals_size[i] = val_info.itemsize*val_info.size;
+                }
+                db.listKeyVals(from_key_info.ptr,
+                               from_key_info.itemsize*from_key_info.size,
+                               filter_info.ptr,
+                               filter_info.itemsize*filter_info.size,
+                               count,
+                               keys_data.data(),
+                               keys_size.data(),
+                               vals_data.data(),
+                               vals_size.data(),
+                               mode);
+                std::vector<std::pair<ssize_t, ssize_t>> result;
+                result.reserve(count);
+                for(size_t i=0; i < count; i++) {
+                    if(keys_size[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    result.emplace_back(
+                        keys_size[i] != RKV_SIZE_TOO_SMALL ? keys_size[i] : -1,
+                        vals_size[i] != RKV_SIZE_TOO_SMALL ? vals_size[i] : -1);
+                }
+                return result;
+             }, "pairs"_a, "from_key"_a,
+                "filter"_a,
+                "mode"_a=RKV_MODE_DEFAULT)
+        .def("list_keyvals",
+             [](const rkv::Database& db,
+                std::vector<std::pair<py::buffer, py::buffer>>& pairs,
+                const std::string& from_key,
+                const std::string& filter,
+                int32_t mode) {
+                auto count = pairs.size();
+                std::vector<void*>  keys_data(count);
+                std::vector<size_t> keys_size(count);
+                std::vector<void*>  vals_data(count);
+                std::vector<size_t> vals_size(count);
+                for(size_t i = 0; i < count; i++) {
+                    auto key_info = pairs[i].first.request();
+                    auto val_info = pairs[i].second.request();
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    CHECK_BUFFER_IS_WRITABLE(key_info);
+                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+                    CHECK_BUFFER_IS_WRITABLE(val_info);
+                    keys_data[i] = key_info.ptr;
+                    keys_size[i] = key_info.itemsize*key_info.size;
+                    vals_data[i] = val_info.ptr;
+                    vals_size[i] = val_info.itemsize*val_info.size;
+                }
+                db.listKeyVals(from_key.data(),
+                               from_key.size(),
+                               filter.data(),
+                               filter.size(),
+                               count,
+                               keys_data.data(),
+                               keys_size.data(),
+                               vals_data.data(),
+                               vals_size.data(),
+                               mode);
+                std::vector<std::pair<ssize_t, ssize_t>> result;
+                result.reserve(count);
+                for(size_t i=0; i < count; i++) {
+                    if(keys_size[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    result.emplace_back(
+                        keys_size[i] != RKV_SIZE_TOO_SMALL ? keys_size[i] : -1,
+                        vals_size[i] != RKV_SIZE_TOO_SMALL ? vals_size[i] : -1);
+                }
+                return result;
+             }, "pairs"_a, "from_key"_a=std::string(),
+                "filter"_a=std::string(),
+                "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // LIST_KEYVALS_PACKED
+        // --------------------------------------------------------------
+        .def("list_keyvals_packed",
+             [](const rkv::Database& db,
+                py::buffer& keys,
+                py::buffer& vals,
+                size_t count,
+                const py::buffer& from_key,
+                const py::buffer& filter,
+                int32_t mode) {
+                auto from_key_info = from_key.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
+                auto filter_info = filter.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+                auto keys_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(keys_info);
+                CHECK_BUFFER_IS_WRITABLE(keys_info);
+                auto vals_info = vals.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(vals_info);
+                CHECK_BUFFER_IS_WRITABLE(vals_info);
+                size_t kbuf_size = (size_t)keys_info.itemsize*keys_info.size;
+                size_t vbuf_size = (size_t)vals_info.itemsize*vals_info.size;
+                std::vector<size_t> key_sizes(count);
+                std::vector<size_t> val_sizes(count);
+                db.listKeyValsPacked(from_key_info.ptr,
+                               from_key_info.itemsize*from_key_info.size,
+                               filter_info.ptr,
+                               filter_info.itemsize*filter_info.size,
+                               count,
+                               keys_info.ptr,
+                               kbuf_size,
+                               key_sizes.data(),
+                               vals_info.ptr,
+                               vbuf_size,
+                               val_sizes.data(),
+                               mode);
+                std::vector<std::pair<ssize_t, ssize_t>> result;
+                result.reserve(count);
+                for(size_t i=0; i < count; i++) {
+                    if(key_sizes[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    result.emplace_back(
+                        key_sizes[i] != RKV_SIZE_TOO_SMALL ? key_sizes[i] : -1,
+                        val_sizes[i] != RKV_SIZE_TOO_SMALL ? val_sizes[i] : -1);
+                }
+                return result;
+             }, "keys"_a, "values"_a, "count"_a,
+                "from_key"_a,
+                "filter"_a,
+                "mode"_a=RKV_MODE_DEFAULT)
+        .def("list_keyvals_packed",
+             [](const rkv::Database& db,
+                py::buffer& keys,
+                py::buffer& vals,
+                size_t count,
+                const std::string& from_key,
+                const std::string& filter,
+                int32_t mode) {
+                auto keys_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(keys_info);
+                CHECK_BUFFER_IS_WRITABLE(keys_info);
+                auto vals_info = vals.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(vals_info);
+                CHECK_BUFFER_IS_WRITABLE(vals_info);
+                size_t kbuf_size = (size_t)keys_info.itemsize*keys_info.size;
+                size_t vbuf_size = (size_t)vals_info.itemsize*vals_info.size;
+                std::vector<size_t> key_sizes(count);
+                std::vector<size_t> val_sizes(count);
+                db.listKeyValsPacked(from_key.data(),
+                                     from_key.size(),
+                                     filter.data(),
+                                     filter.size(),
+                                     count,
+                                     keys_info.ptr,
+                                     kbuf_size,
+                                     key_sizes.data(),
+                                     vals_info.ptr,
+                                     vbuf_size,
+                                     val_sizes.data(),
+                                     mode);
+                std::vector<std::pair<ssize_t, ssize_t>> result;
+                result.reserve(count);
+                for(size_t i=0; i < count; i++) {
+                    if(key_sizes[i] == RKV_NO_MORE_KEYS)
+                        break;
+                    result.emplace_back(
+                        key_sizes[i] != RKV_SIZE_TOO_SMALL ? key_sizes[i] : -1,
+                        val_sizes[i] != RKV_SIZE_TOO_SMALL ? val_sizes[i] : -1);
+                }
+                return result;
+             }, "keys"_a, "values"_a, "count"_a,
+                "from_key"_a=std::string(),
+                "filter"_a=std::string(),
+                "mode"_a=RKV_MODE_DEFAULT)
+    ;
 }
 
