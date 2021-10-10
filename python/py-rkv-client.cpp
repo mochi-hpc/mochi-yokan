@@ -279,7 +279,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 py::list result;
                 for(size_t i=0; i < count; i++) {
                     if(val_sizes[i] == RKV_KEY_NOT_FOUND)
-                        result.append(py::object());
+                        result.append(py::none());
                     else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
                         result.append(-1);
                     else
@@ -315,7 +315,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 py::list result;
                 for(size_t i=0; i < count; i++) {
                     if(val_sizes[i] == RKV_KEY_NOT_FOUND)
-                        result.append(py::object());
+                        result.append(py::none());
                     else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
                         result.append(-1);
                     else
@@ -349,7 +349,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                     if(val_sizes[i] != RKV_KEY_NOT_FOUND)
                         result.append(val_sizes[i]);
                     else
-                        result.append(py::object());
+                        result.append(py::none());
                 }
                 return result;
              }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=RKV_MODE_DEFAULT)
@@ -449,8 +449,9 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 for(size_t i = 0; i < count; i++) {
                     if(val_size[i] != RKV_KEY_NOT_FOUND)
                         result.append(val_size[i]);
-                    else
-                        result.append(py::object());
+                    else {
+                        result.append(py::none());
+                    }
                 }
                 return result;
              }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
@@ -473,7 +474,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                     if(val_size[i] != RKV_KEY_NOT_FOUND)
                         result.append(val_size[i]);
                     else
-                        result.append(py::object());
+                        result.append(py::none());
                 }
                 return result;
              }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
@@ -498,7 +499,7 @@ PYBIND11_MODULE(pyrkv_client, m) {
                     if(val_sizes[i] != RKV_KEY_NOT_FOUND)
                         result.append(val_sizes[i]);
                     else
-                        result.append(py::object());
+                        result.append(py::none());
                 }
                 return result;
              }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
