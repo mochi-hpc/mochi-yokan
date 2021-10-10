@@ -14,7 +14,7 @@ spack:
   - lmdb
   - unqlite@master
   - lua-sol2
-  - py-pybind11
+  - py-pybind11@2.7.0 # any version above 2.6.0 should work
   - py-mochi-margo
 #  - pmemkv
 #  - upscaledb
