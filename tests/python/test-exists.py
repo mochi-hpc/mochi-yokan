@@ -62,15 +62,67 @@ class TestExists(unittest.TestCase):
         del self.reference_false
         self.engine.finalize()
 
-    def test_exists(self):
+    def test_exists_string(self):
         """Test that we can check that the keys put do exist."""
         for key in self.reference_true:
             self.assertTrue(self.db.exists(key))
 
-    def test_no_exists(self):
+    def test_no_exists_string(self):
         """Test that we can check that the keys not put do not exist."""
         for key in self.reference_false:
             self.assertFalse(self.db.exists(key))
+
+    def test_exists_buffer(self):
+        """Test that we can check that the keys put do exist."""
+        for key in self.reference_true:
+            key_buf = key.encode('ascii')
+            self.assertTrue(self.db.exists(key_buf))
+
+    def test_no_exists_buffer(self):
+        """Test that we can check that the keys not put do not exist."""
+        for key in self.reference_false:
+            key_buf = key.encode('ascii')
+            self.assertFalse(self.db.exists(key_buf))
+
+    def test_exists_multi_string(self):
+        """Test that we can use exists_multi with string keys."""
+        keys = list(self.reference_false.keys()) + list(self.reference_true.keys())
+        random.shuffle(keys)
+        exists = self.db.exists_multi(keys)
+        for i, key in enumerate(keys):
+            if key in self.reference_true:
+                self.assertTrue(exists[i])
+            else:
+                self.assertFalse(exists[i])
+
+    def test_exist_multi_buffer(self):
+        """Test that we can use exists_multi with buffer keys."""
+        keys = list(self.reference_false.keys()) + list(self.reference_true.keys())
+        random.shuffle(keys)
+        keys_buf = [ bytearray(k.encode('ascii')) for k in keys ]
+        exists = self.db.exists_multi(keys_buf)
+        for i, key in enumerate(keys):
+            if key in self.reference_true:
+                self.assertTrue(exists[i])
+            else:
+                self.assertFalse(exists[i])
+
+    def test_exist_packed(self):
+        """Test that we can use exists_packed."""
+        keys = list(self.reference_false.keys()) + list(self.reference_true.keys())
+        random.shuffle(keys)
+        keys_buf = bytearray()
+        key_sizes = []
+        for k in keys:
+            keys_buf += k.encode('ascii')
+            key_sizes.append(len(k))
+        exists = self.db.exists_packed(keys_buf, key_sizes)
+        for i, key in enumerate(keys):
+            if key in self.reference_true:
+                self.assertTrue(exists[i])
+            else:
+                self.assertFalse(exists[i])
+
 
 if __name__ == '__main__':
     unittest.main()
