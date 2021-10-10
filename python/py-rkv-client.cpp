@@ -3,6 +3,7 @@
 #include <rkv/cxx/rkv-client.hpp>
 #include <rkv/cxx/rkv-database.hpp>
 #include <iostream>
+#include <numeric>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -182,6 +183,38 @@ PYBIND11_MODULE(pyrkv_client, m) {
                             mode);
              }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // PUT_PACKED
+        // --------------------------------------------------------------
+        .def("put_packed",
+             [](const rkv::Database& db, const py::buffer& keys,
+                const std::vector<size_t> key_sizes,
+                const py::buffer& vals,
+                const std::vector<size_t>& val_sizes,
+                int32_t mode) {
+                size_t count = key_sizes.size();
+                if(count != val_sizes.size()) {
+                    throw std::length_error("key_sizes and value_sizes should have the same length");
+                }
+                auto key_info = keys.request();
+                auto val_info = vals.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+                auto total_key_size = std::accumulate(key_sizes.begin(), key_sizes.end(), (size_t)0);
+                auto total_val_size = std::accumulate(val_sizes.begin(), val_sizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer is smaller than accumulated key_sizes");
+                }
+                if((ssize_t)total_val_size > val_info.itemsize*val_info.size) {
+                    throw std::length_error("values buffer is smaller than accumulated value_sizes");
+                }
+                db.putPacked(count,
+                       key_info.ptr,
+                       key_sizes.data(),
+                       val_info.ptr,
+                       val_sizes.data(),
+                       mode);
+             }, "keys"_a, "key_sizes"_a, "values"_a, "value_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
         // GET
         // --------------------------------------------------------------
         .def("get",
@@ -291,6 +324,36 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 return result;
              }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // GET_PACKED
+        // --------------------------------------------------------------
+        .def("get_packed",
+             [](const rkv::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& key_sizes,
+                py::buffer& vals,
+                int32_t mode) {
+                auto count = key_sizes.size();
+                auto key_info = keys.request();
+                auto val_info = vals.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+                auto total_key_size = std::accumulate(key_sizes.begin(), key_sizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                size_t vbuf_size = (size_t)(val_info.itemsize*val_info.size);
+                std::vector<size_t> val_sizes(count);
+                db.getPacked(count, key_info.ptr, key_sizes.data(),
+                             vbuf_size, val_info.ptr, val_sizes.data(), mode);
+                py::list result;
+                for(size_t i = 0; i < count; i++) {
+                    if(val_sizes[i] != RKV_KEY_NOT_FOUND)
+                        result.append(val_sizes[i]);
+                    else
+                        result.append(py::object());
+                }
+                return result;
+             }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
@@ -335,6 +398,22 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 }
                 return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
              }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // EXISTS_PACKED
+        // --------------------------------------------------------------
+        .def("exists_packed",
+             [](const rkv::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& key_sizes,
+                int32_t mode) {
+                auto count = key_sizes.size();
+                auto key_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto total_key_size = std::accumulate(key_sizes.begin(), key_sizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                return db.existsPacked(count, key_info.ptr, key_sizes.data(), mode);
+             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LENGTH
         // --------------------------------------------------------------
@@ -399,6 +478,31 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 return result;
              }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // LENGTH_PACKED
+        // --------------------------------------------------------------
+        .def("length_packed",
+             [](const rkv::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& key_sizes,
+                int32_t mode) {
+                auto count = key_sizes.size();
+                auto key_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto total_key_size = std::accumulate(key_sizes.begin(), key_sizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                std::vector<size_t> val_sizes(count);
+                db.lengthPacked(count, key_info.ptr, key_sizes.data(), val_sizes.data(), mode);
+                py::list result;
+                for(size_t i = 0; i < count; i++) {
+                    if(val_sizes[i] != RKV_KEY_NOT_FOUND)
+                        result.append(val_sizes[i]);
+                    else
+                        result.append(py::object());
+                }
+                return result;
+             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
         // ERASE
         // --------------------------------------------------------------
         .def("erase",
@@ -443,6 +547,22 @@ PYBIND11_MODULE(pyrkv_client, m) {
                 }
                 return db.eraseMulti(count, key_ptrs.data(), key_size.data(), mode);
              }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // ERASE_PACKED
+        // --------------------------------------------------------------
+        .def("erase_packed",
+             [](const rkv::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& key_sizes,
+                int32_t mode) {
+                auto count = key_sizes.size();
+                auto key_info = keys.request();
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto total_key_size = std::accumulate(key_sizes.begin(), key_sizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
+             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
         ;
 }
 
