@@ -2,7 +2,6 @@ include_directories (${CMAKE_CURRENT_SOURCE_DIR}/munit)
 
 file (GLOB test-sources ${CMAKE_CURRENT_SOURCE_DIR}/test-*.cpp)
 
-if( OFF )
 foreach (test-source ${test-sources})
     get_filename_component (test-target ${test-source} NAME_WE)
     add_executable (${test-target} ${test-source} munit/munit.c)
@@ -17,7 +16,6 @@ foreach (test-source ${test-sources})
         rkv-client)
     add_test (NAME ${test-target} COMMAND timeout 200 ./${test-target})
 endforeach ()
-endif ()
 
 if (ENABLE_PYTHON)
     file (GLOB test-python-sources ${CMAKE_CURRENT_SOURCE_DIR}/python/test-*.py)
