@@ -84,4 +84,4 @@ inline static const char* find_backend_config_for(const char* backend) {
 }
 
 #define SKIP_IF_NOT_IMPLEMENTED(__ret__) \
-    do { if(__ret__ == RKV_ERR_OP_UNSUPPORTED || __ret__ == RKV_ERR_MODE) return MUNIT_SKIP; } while(0)
+    do { if(__ret__ == YOKAN_ERR_OP_UNSUPPORTED || __ret__ == YOKAN_ERR_MODE) return MUNIT_SKIP; } while(0)

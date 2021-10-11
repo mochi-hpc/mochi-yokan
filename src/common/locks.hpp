@@ -3,12 +3,12 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_LOCKS_HPP
-#define __RKV_LOCKS_HPP
+#ifndef __YOKAN_LOCKS_HPP
+#define __YOKAN_LOCKS_HPP
 
 #include <abt.h>
 
-namespace rkv {
+namespace yokan {
 
 struct ScopedWriteLock {
 

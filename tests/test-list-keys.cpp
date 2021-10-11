@@ -23,7 +23,7 @@ inline bool to_bool(const char* v) {
 inline bool check_filter(int32_t mode, const std::string& s, const std::string& filter) {
     if(s.size() < filter.size()) return false;
     if(filter.size() == 0) return true;
-    if(mode & RKV_MODE_SUFFIX) {
+    if(mode & YOKAN_MODE_SUFFIX) {
         return std::memcmp(s.data()+s.size()-filter.size(), filter.data(), filter.size()) == 0;
     } else {
         return std::memcmp(s.data(), filter.data(), filter.size()) == 0;
@@ -47,13 +47,13 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     auto context = new list_keys_context;
     context->base = base_context;
 
-    context->mode = to_bool(munit_parameters_get(params, "inclusive")) ? RKV_MODE_INCLUSIVE : 0;
+    context->mode = to_bool(munit_parameters_get(params, "inclusive")) ? YOKAN_MODE_INCLUSIVE : 0;
     context->filter = munit_parameters_get(params, "filter");
     if(context->filter.find("prefix:") == 0) {
         context->filter = context->filter.substr(7);
     } else if(context->filter.find("suffix:") == 0) {
         context->filter = context->filter.substr(7);
-        context->mode |= RKV_MODE_SUFFIX;
+        context->mode |= YOKAN_MODE_SUFFIX;
     }
     g_max_key_size += context->filter.size(); // important!
     const char* keys_per_op_str = munit_parameters_get(params, "keys-per-op");
@@ -63,7 +63,7 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     unsigned i = 0;
     for(auto& p : base_context->reference) {
         if(i % 2 == 0) {
-            if(context->mode & RKV_MODE_SUFFIX) {
+            if(context->mode & YOKAN_MODE_SUFFIX) {
                 context->ordered_ref[p.first + context->filter] = p.second;
             } else {
                 context->ordered_ref[context->filter + p.first] = p.second;
@@ -97,7 +97,7 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
         vsizes.push_back(vsize);
     }
 
-    rkv_put_multi(base_context->dbh, 0, count,
+    yk_put_multi(base_context->dbh, 0, count,
                   kptrs.data(), ksizes.data(),
                   vptrs.data(), vsizes.data());
 
@@ -116,8 +116,8 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
     (void)params;
     (void)data;
     auto context = static_cast<list_keys_context*>(data);
-    rkv_database_handle_t dbh = context->base->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
 
     auto count = context->keys_per_op;
     std::vector<size_t> ksizes(count, g_max_key_size);
@@ -143,7 +143,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
 
         // failing calls
         if(from_key.size() > 0) {
-            ret = rkv_list_keys(dbh,
+            ret = yk_list_keys(dbh,
                 context->mode,
                 nullptr,
                 from_key.size(),
@@ -153,10 +153,10 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 kptrs.data(),
                 ksizes.data());
             SKIP_IF_NOT_IMPLEMENTED(ret);
-            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+            munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
         }
         if(filter.size() > 0) {
-            ret = rkv_list_keys(dbh,
+            ret = yk_list_keys(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -166,11 +166,11 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 kptrs.data(),
                 ksizes.data());
             SKIP_IF_NOT_IMPLEMENTED(ret);
-            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+            munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
         }
 
         // successful call
-        ret = rkv_list_keys(dbh,
+        ret = yk_list_keys(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -180,7 +180,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 kptrs.data(),
                 ksizes.data());
         SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
         for(unsigned j = 0; j < count; j++) {
             if(i+j < expected_keys.size()) {
@@ -189,19 +189,19 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
                 munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
                 from_key = exp_key;
             } else {
-                munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
+                munit_assert_long(ksizes[j], ==, YOKAN_NO_MORE_KEYS);
                 done_listing = true;
             }
         }
         i += count;
-        if(context->mode & RKV_MODE_INCLUSIVE)
+        if(context->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         ksizes.clear();
         ksizes.resize(count, g_max_key_size);
     }
 
-    ret = rkv_list_keys(dbh,
+    ret = yk_list_keys(dbh,
             context->mode,
             from_key.data(),
             from_key.size(),
@@ -211,7 +211,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
             nullptr,
             nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     return MUNIT_OK;
 }
@@ -221,8 +221,8 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
     (void)params;
     (void)data;
     auto context = static_cast<list_keys_context*>(data);
-    rkv_database_handle_t dbh = context->base->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
 
     auto count = context->keys_per_op;
     std::vector<size_t> ksizes(count, g_max_key_size);
@@ -252,7 +252,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
     std::string from_key;
     std::string filter = context->filter;
 
-    ret = rkv_list_keys(dbh,
+    ret = yk_list_keys(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -262,7 +262,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
                 kptrs.data(),
                 ksizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     for(unsigned j = 0; j < count; j++) {
         if(j < expected_keys.size()) {
@@ -271,16 +271,16 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
                 munit_assert_long(ksizes[j], ==, exp_key.size());
                 munit_assert_memory_equal(ksizes[j], kptrs[j], exp_key.data());
             } else {
-                munit_assert_long(ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+                munit_assert_long(ksizes[j], ==, YOKAN_SIZE_TOO_SMALL);
             }
         } else {
-            munit_assert_long(ksizes[j], ==, RKV_NO_MORE_KEYS);
+            munit_assert_long(ksizes[j], ==, YOKAN_NO_MORE_KEYS);
         }
     }
 
     // test with a ksize set to 0
     ksizes[ksizes.size()/2] = 0;
-    ret = rkv_list_keys(dbh,
+    ret = yk_list_keys(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -290,7 +290,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
                 kptrs.data(),
                 ksizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     return MUNIT_OK;
 }
@@ -300,8 +300,8 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
     (void)params;
     (void)data;
     auto context = static_cast<list_keys_context*>(data);
-    rkv_database_handle_t dbh = context->base->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
@@ -324,7 +324,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
 
         // failing calls
         if(from_key.size() > 0) {
-            ret = rkv_list_keys_packed(dbh,
+            ret = yk_list_keys_packed(dbh,
                 context->mode,
                 nullptr,
                 from_key.size(),
@@ -335,10 +335,10 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 count*g_max_key_size,
                 packed_ksizes.data());
             SKIP_IF_NOT_IMPLEMENTED(ret);
-            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+            munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
         }
         if(filter.size() > 0) {
-            ret = rkv_list_keys_packed(dbh,
+            ret = yk_list_keys_packed(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -349,11 +349,11 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 count*g_max_key_size,
                 packed_ksizes.data());
             SKIP_IF_NOT_IMPLEMENTED(ret);
-            munit_assert_int(ret, ==, RKV_ERR_INVALID_ARGS);
+            munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
         }
 
         // successful call
-        ret = rkv_list_keys_packed(dbh,
+        ret = yk_list_keys_packed(dbh,
                 context->mode,
                 from_key.data(),
                 from_key.size(),
@@ -364,7 +364,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 count*g_max_key_size,
                 packed_ksizes.data());
         SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
         size_t offset = 0;
         for(unsigned j = 0; j < count; j++) {
@@ -376,12 +376,12 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
                 offset += exp_key.size();
                 from_key = exp_key;
             } else {
-                munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                munit_assert_long(packed_ksizes[j], ==, YOKAN_NO_MORE_KEYS);
                 done_listing = true;
             }
         }
         i += count;
-        if(context->mode & RKV_MODE_INCLUSIVE)
+        if(context->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -396,8 +396,8 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     (void)params;
     (void)data;
     auto context = static_cast<list_keys_context*>(data);
-    rkv_database_handle_t dbh = context->base->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
@@ -423,7 +423,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     std::string from_key;
     std::string filter = context->filter;
 
-    ret = rkv_list_keys_packed(dbh,
+    ret = yk_list_keys_packed(dbh,
             context->mode,
             from_key.data(),
             from_key.size(),
@@ -434,7 +434,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
             buf_size,
             packed_ksizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     size_t offset = 0;
     bool buf_size_reached = false;
@@ -443,7 +443,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
             auto& exp_key = expected_keys[j];
             auto recv_key = packed_keys.data()+offset;
             if(offset + exp_key.size() > buf_size || buf_size_reached) {
-                munit_assert_long(packed_ksizes[j], ==, RKV_SIZE_TOO_SMALL);
+                munit_assert_long(packed_ksizes[j], ==, YOKAN_SIZE_TOO_SMALL);
                 buf_size_reached = true;
             } else {
                 munit_assert_long(packed_ksizes[j], ==, exp_key.size());
@@ -451,7 +451,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
                 offset += exp_key.size();
             }
         } else {
-            munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+            munit_assert_long(packed_ksizes[j], ==, YOKAN_NO_MORE_KEYS);
         }
     }
     return MUNIT_OK;
@@ -462,8 +462,8 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
     (void)params;
     (void)data;
     auto context = static_cast<list_keys_context*>(data);
-    rkv_database_handle_t dbh = context->base->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
     hg_return_t hret;
 
     auto count = context->keys_per_op;
@@ -523,7 +523,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
         }
 
         // test with count = 0
-        ret = rkv_list_keys_bulk(dbh,
+        ret = yk_list_keys_bulk(dbh,
                 context->mode,
                 from_key.size(),
                 filter.size(),
@@ -532,10 +532,10 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                 packed_keys.size(),
                 true, 0);
         SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
         // test with actual count
-        ret = rkv_list_keys_bulk(dbh,
+        ret = yk_list_keys_bulk(dbh,
                 context->mode,
                 from_key.size(),
                 filter.size(),
@@ -544,7 +544,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                 packed_keys.size(),
                 true, count);
         SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, RKV_SUCCESS);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
         hret = margo_bulk_free(data);
         munit_assert_int(hret, ==, HG_SUCCESS);
@@ -559,12 +559,12 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
                 offset += exp_key.size();
                 from_key = exp_key;
             } else {
-                munit_assert_long(packed_ksizes[j], ==, RKV_NO_MORE_KEYS);
+                munit_assert_long(packed_ksizes[j], ==, YOKAN_NO_MORE_KEYS);
                 done_listing = true;
             }
         }
         i += count;
-        if(context->mode & RKV_MODE_INCLUSIVE)
+        if(context->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -610,9 +610,9 @@ static MunitTest test_suite_tests[] = {
 };
 
 static const MunitSuite test_suite = {
-    (char*) "/rkv/database", test_suite_tests, NULL, 1, MUNIT_SUITE_OPTION_NONE
+    (char*) "/yk/database", test_suite_tests, NULL, 1, MUNIT_SUITE_OPTION_NONE
 };
 
 int main(int argc, char* argv[MUNIT_ARRAY_PARAM(argc + 1)]) {
-    return munit_suite_main(&test_suite, (void*) "rkv", argc, argv);
+    return munit_suite_main(&test_suite, (void*) "yk", argc, argv);
 }

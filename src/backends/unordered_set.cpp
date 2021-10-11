@@ -19,7 +19,7 @@
 #include <experimental/string_view>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -44,8 +44,8 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
-        rkv_allocator_init_fn key_alloc_init, node_alloc_init;
-        rkv_allocator_t key_alloc, node_alloc;
+        yk_allocator_init_fn key_alloc_init, node_alloc_init;
+        yk_allocator_t key_alloc, node_alloc;
         std::string key_alloc_conf, node_alloc_conf;
 
         try {
@@ -121,27 +121,27 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
-        // note: RKV_MODE_APPEND, NEW_ONLY, and EXIST_ONLY
+        // note: YOKAN_MODE_APPEND, NEW_ONLY, and EXIST_ONLY
         // are marked as supported but they don't really do
         // anything because this backend doesn't store values.
-        // RKV_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX are
+        // YOKAN_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX are
         // marked as supported but listKeys and listKeyvals
         // are not supported anyway.
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-                    |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
-                    |RKV_MODE_NEW_ONLY
-                    |RKV_MODE_EXIST_ONLY
-                    |RKV_MODE_NO_PREFIX
-                    |RKV_MODE_IGNORE_KEYS
-                    |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+                    |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+        //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
+                    |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_EXIST_ONLY
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -213,7 +213,7 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > 0) return Status::InvalidArg;
 
-        if(mode & RKV_MODE_EXIST_ONLY)
+        if(mode & YOKAN_MODE_EXIST_ONLY)
             return Status::OK;
 
         ScopedWriteLock lock(m_lock);
@@ -247,7 +247,7 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
             key_offset += ksizes[i];
         }
         vals.size = 0;
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
         }
@@ -290,8 +290,8 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
     using unordered_set_type = std::unordered_set<key_type, hash_type, equal_type, allocator>;
 
     UnorderedSetKeyValueStore(json cfg,
-                     const rkv_allocator_t& node_allocator,
-                     const rkv_allocator_t& key_allocator)
+                     const yk_allocator_t& node_allocator,
+                     const yk_allocator_t& key_allocator)
     : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
@@ -308,10 +308,10 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
     unordered_set_type* m_db;
     json                m_config;
     ABT_rwlock          m_lock = ABT_RWLOCK_NULL;
-    mutable rkv_allocator_t     m_node_allocator;
-    mutable rkv_allocator_t     m_key_allocator;
+    mutable yk_allocator_t     m_node_allocator;
+    mutable yk_allocator_t     m_key_allocator;
 };
 
 }
 
-RKV_REGISTER_BACKEND(unordered_set, rkv::UnorderedSetKeyValueStore);
+YOKAN_REGISTER_BACKEND(unordered_set, yokan::UnorderedSetKeyValueStore);

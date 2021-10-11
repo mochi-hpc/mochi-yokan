@@ -23,11 +23,11 @@ static size_t g_num_keyvals  = 64;
 struct test_context {
     margo_instance_id                           mid;
     hg_addr_t                                   addr;
-    rkv_admin_t                                 admin;
-    rkv_client_t                                client;
-    rkv_provider_t                              provider;
-    rkv_database_id_t                           id;
-    rkv_database_handle_t                       dbh;
+    yk_admin_t                                 admin;
+    yk_client_t                                client;
+    yk_provider_t                              provider;
+    yk_database_id_t                           id;
+    yk_database_handle_t                       dbh;
     std::unordered_map<std::string,std::string> reference;
     bool                                        empty_values = false;
 };
@@ -38,14 +38,14 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
 {
     (void) params;
     (void) user_data;
-    rkv_return_t      ret;
+    yk_return_t      ret;
     margo_instance_id mid;
     hg_addr_t         addr;
-    rkv_admin_t       admin;
-    rkv_client_t      client;
-    rkv_provider_t    provider;
-    rkv_database_id_t id;
-    rkv_database_handle_t dbh;
+    yk_admin_t       admin;
+    yk_client_t      client;
+    yk_provider_t    provider;
+    yk_database_id_t id;
+    yk_database_handle_t dbh;
 
     // read parameters
     const char* min_key_size = munit_parameters_get(params, "min-key-size");
@@ -78,25 +78,25 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     // get address of current process
     hg_return_t hret = margo_addr_self(mid, &addr);
     munit_assert_int(hret, ==, HG_SUCCESS);
-    // register rkv provider
-    struct rkv_provider_args args = RKV_PROVIDER_ARGS_INIT;
+    // register yk provider
+    struct yk_provider_args args = YOKAN_PROVIDER_ARGS_INIT;
     args.token = NULL;
-    ret = rkv_provider_register(
+    ret = yk_provider_register(
             mid, provider_id, &args,
             &provider);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create an admin
-    ret = rkv_admin_init(mid, &admin);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_admin_init(mid, &admin);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // open a database using the admin
-    ret = rkv_open_database(admin, addr,
+    ret = yk_open_database(admin, addr,
             provider_id, NULL, backend_type, backend_config, &id);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create a client
-    ret = rkv_client_init(mid, &client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_client_init(mid, &client);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create a database handle
-    ret = rkv_database_handle_create(client,
+    ret = yk_database_handle_create(client,
             addr, provider_id, id, &dbh);
     // create test context
     struct test_context* context = new test_context;
@@ -142,27 +142,27 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
 
 static void test_common_context_tear_down(void* fixture)
 {
-    rkv_return_t ret;
+    yk_return_t ret;
     struct test_context* context = (struct test_context*)fixture;
     // destroy the database
-    ret = rkv_destroy_database(context->admin,
+    ret = yk_destroy_database(context->admin,
             context->addr, provider_id, NULL, context->id);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // free the admin
-    ret = rkv_admin_finalize(context->admin);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_admin_finalize(context->admin);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // free the database handle
-    ret = rkv_database_handle_release(context->dbh);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_database_handle_release(context->dbh);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // free the client
-    ret = rkv_client_finalize(context->client);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_client_finalize(context->client);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // free address
     margo_addr_free(context->mid, context->addr);
     // destroy provider (we could let margo finalize it but
     // by calling this function we increase code coverage
-    ret = rkv_provider_destroy(context->provider);
-    munit_assert_int(ret, ==, RKV_SUCCESS);
+    ret = yk_provider_destroy(context->provider);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // we are not checking the return value of the above function with
     // munit because we need margo_finalize to be called no matter what.
     margo_finalize(context->mid);

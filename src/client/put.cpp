@@ -12,7 +12,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_put_bulk(yk_database_handle_t dbh,
                                      int32_t mode,
                                      size_t count,
                                      const char* origin,
@@ -21,12 +21,12 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
                                      size_t size)
 {
     if(count != 0 && size == 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
-    rkv_return_t ret = RKV_SUCCESS;
+    yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     put_in_t in;
     put_out_t out;
@@ -50,14 +50,14 @@ extern "C" rkv_return_t rkv_put_bulk(rkv_database_handle_t dbh,
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
 
-    ret = static_cast<rkv_return_t>(out.ret);
+    ret = static_cast<yk_return_t>(out.ret);
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
     return ret;
 }
 
-extern "C" rkv_return_t rkv_put(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_put(yk_database_handle_t dbh,
                                 int32_t mode,
                                 const void* key,
                                 size_t ksize,
@@ -65,11 +65,11 @@ extern "C" rkv_return_t rkv_put(rkv_database_handle_t dbh,
                                 size_t vsize)
 {
     if(ksize == 0)
-        return RKV_ERR_INVALID_ARGS;
-    return rkv_put_packed(dbh, mode, 1, key, &ksize, value, &vsize);
+        return YOKAN_ERR_INVALID_ARGS;
+    return yk_put_packed(dbh, mode, 1, key, &ksize, value, &vsize);
 }
 
-extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
                                       int32_t mode,
                                       size_t count,
                                       const void* const* keys,
@@ -78,9 +78,9 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
                                       const size_t* vsizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !values || !vsizes)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -98,7 +98,7 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
 
     for(unsigned i = 0; i < count; i++) {
         if(ksizes[i] == 0)
-            return RKV_ERR_INVALID_ARGS;
+            return YOKAN_ERR_INVALID_ARGS;
         ptrs.push_back(const_cast<void*>(keys[i]));
         sizes.push_back(ksizes[i]);
     }
@@ -116,10 +116,10 @@ extern "C" rkv_return_t rkv_put_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }
 
-extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
                                        int32_t mode,
                                        size_t count,
                                        const void* keys,
@@ -128,9 +128,9 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
                                        const size_t* vsizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !vsizes)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -147,10 +147,10 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
 
     if(sizes[2] == 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     if(sizes[3] != 0 && values == nullptr)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     if(sizes[3] != 0)
         hret = margo_bulk_create(mid, 4, ptrs.data(), sizes.data(),
@@ -162,5 +162,5 @@ extern "C" rkv_return_t rkv_put_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }

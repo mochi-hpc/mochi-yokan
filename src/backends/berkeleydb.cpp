@@ -20,7 +20,7 @@
 #include <experimental/filesystem>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -91,7 +91,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         auto db_file = cfg["file"].get<std::string>();
         auto db_name = cfg["name"].get<std::string>();
         auto db_home = cfg["home"].get<std::string>();
-        if(!db_home.empty()) db_home += "/rkv";
+        if(!db_home.empty()) db_home += "/yokan";
 
         uint32_t db_env_flags =
                 DB_CREATE     |
@@ -144,19 +144,19 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     virtual bool supportsMode(int32_t mode) const override {
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
-                    |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
-        //            |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+        //            |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+        //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
+                    |YOKAN_MODE_NEW_ONLY
+        //            |YOKAN_MODE_EXIST_ONLY
+        //            |YOKAN_MODE_NO_PREFIX
+        //            |YOKAN_MODE_IGNORE_KEYS
+        //            |YOKAN_MODE_KEEP_LAST
+        //            |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-        //            |RKV_MODE_LUA_FILTER
+        //            |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -166,7 +166,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         auto db_file = m_config["file"].get<std::string>();
         auto db_home = m_config["home"].get<std::string>();
         auto db_name = m_config["name"].get<std::string>();
-        if(!db_home.empty()) db_home += "/rkv";
+        if(!db_home.empty()) db_home += "/yokan";
 
         m_db->close(0);
         m_db->remove(db_file.empty() ? nullptr : db_file.c_str(),
@@ -264,7 +264,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             key.set_ulen(ksizes[i]);
             val.set_flags(DB_DBT_USERMEM);
             val.set_ulen(vsizes[i]);
-            int flag = (mode & RKV_MODE_NEW_ONLY) ?  DB_NOOVERWRITE : 0;
+            int flag = (mode & YOKAN_MODE_NEW_ONLY) ?  DB_NOOVERWRITE : 0;
             int status = m_db->put(nullptr, &key, &val, flag);
             if(status != 0 && status != DB_KEYEXIST)
                 return convertStatus(status);
@@ -338,7 +338,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             }
             vals.size = vals.size - val_remaining_size;
         }
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }
         return Status::OK;
@@ -367,7 +367,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(m_db_type != DB_BTREE)
             return Status::NotSupported;
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         auto max = keySizes.size;
         size_t i = 0;
@@ -455,7 +455,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             }
 
             if(packed && key_buf_too_small) {
-                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 continue;
             }
 
@@ -468,7 +468,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             // se we can get it in key, this time
 
             if(key_ulen < dummy_key.get_size()) { // early easy check
-                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 key_buf_too_small = true;
                 continue;
             }
@@ -483,7 +483,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             } else if(status == DB_BUFFER_SMALL) {
 
                 if(!packed) key_offset += keySizes[i];
-                keySizes[i] = RKV_SIZE_TOO_SMALL;
+                keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 key_buf_too_small = true;
 
             } else {
@@ -496,7 +496,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(ret == Status::OK) {
             keys.size = key_offset;
             for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
+                keySizes[i] = YOKAN_NO_MORE_KEYS;
             }
         }
         cursor->close();
@@ -515,7 +515,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         if(m_db_type != DB_BTREE)
             return Status::NotSupported;
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         auto max = keySizes.size;
         size_t i = 0;
@@ -640,7 +640,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
                 if(packed) {
                     if(key_buf_too_small) {
-                        keySizes[i] = RKV_SIZE_TOO_SMALL;
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     } else {
                         key_offset += key.get_size();
                         keySizes[i] = key.get_size();
@@ -648,7 +648,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 } else {
                     key_offset += keySizes[i];
                     if(key_was_too_small) {
-                        keySizes[i] = RKV_SIZE_TOO_SMALL;
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     } else {
                         keySizes[i] = key.get_size();
                     }
@@ -656,7 +656,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
                 if(packed) {
                     if(val_buf_too_small) {
-                        valSizes[i] = RKV_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                     } else {
                         val_offset += val.get_size();
                         valSizes[i] = val.get_size();
@@ -664,7 +664,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
                 } else {
                     val_offset += valSizes[i];
                     if(val_was_too_small) {
-                        valSizes[i] = RKV_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                     } else {
                         valSizes[i] = val.get_size();
                     }
@@ -681,8 +681,8 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         vals.size = val_offset;
         if(ret == Status::OK) {
             for(; i < max; i++) {
-                keySizes[i] = RKV_NO_MORE_KEYS;
-                valSizes[i] = RKV_NO_MORE_KEYS;
+                keySizes[i] = YOKAN_NO_MORE_KEYS;
+                valSizes[i] = YOKAN_NO_MORE_KEYS;
             }
         }
         cursor->close();
@@ -717,4 +717,4 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-RKV_REGISTER_BACKEND(berkeleydb, rkv::BerkeleyDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(berkeleydb, yokan::BerkeleyDBKeyValueStore);

@@ -5,7 +5,7 @@
  */
 #include "yokan/backend.hpp"
 
-namespace rkv {
+namespace yokan {
 
 std::unordered_map<std::string,
             std::function<Status(const std::string&,KeyValueStoreInterface**)>>

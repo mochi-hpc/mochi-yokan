@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_MODES_HPP
-#define __RKV_MODES_HPP
+#ifndef __YOKAN_MODES_HPP
+#define __YOKAN_MODES_HPP
 
 #include "yokan/common.h"
 #include "config.h"
@@ -13,12 +13,12 @@
 #include <sol/sol.hpp>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 /**
  * This class uses the provided mode to validate a key
  * against a prefix. If the mode does not match
- * RKV_MODE_SUFFIX, it considers "prefix" as a prefix and
+ * YOKAN_MODE_SUFFIX, it considers "prefix" as a prefix and
  * checks if the key starts with that prefix. Otherwise it
  * considers "prefix" as a suffix and checks if the key ends
  * with that suffix.
@@ -38,7 +38,7 @@ struct Filter {
     , m_filter(filter)
     , m_fsize(fsize) {
 #ifdef HAS_LUA
-        if(m_mode & RKV_MODE_LUA_FILTER) {
+        if(m_mode & YOKAN_MODE_LUA_FILTER) {
             m_lua = new sol::state{};
             m_lua->open_libraries(sol::lib::base);
             m_lua->open_libraries(sol::lib::string);
@@ -70,7 +70,7 @@ struct Filter {
 
     bool check(const void* key, size_t ksize) const {
 #ifdef HAS_LUA
-        if(m_mode & RKV_MODE_LUA_FILTER) {
+        if(m_mode & YOKAN_MODE_LUA_FILTER) {
             (*m_lua)["__key__"] = ksize > 0 ?
                 std::string_view(static_cast<const char*>(key), ksize)
                 : std::string_view();
@@ -81,7 +81,7 @@ struct Filter {
 #endif
         if(m_fsize > ksize)
             return false;
-        if(!(m_mode & RKV_MODE_SUFFIX)) {
+        if(!(m_mode & YOKAN_MODE_SUFFIX)) {
             return std::memcmp(key, m_filter, m_fsize) == 0;
         } else {
             return std::memcmp(((const char*)key)+ksize-m_fsize, m_filter, m_fsize) == 0;
@@ -99,19 +99,19 @@ static inline size_t keyCopy(int32_t mode,
         const void* key, size_t ksize,
         size_t filter_size,
         bool is_last = false) {
-    if(mode & RKV_MODE_IGNORE_KEYS) {
-        if(!(is_last && (mode & RKV_MODE_KEEP_LAST)))
+    if(mode & YOKAN_MODE_IGNORE_KEYS) {
+        if(!(is_last && (mode & YOKAN_MODE_KEEP_LAST)))
             return 0;
     }
-    if(!(mode & RKV_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
-        if(max_dst_size < ksize) return RKV_SIZE_TOO_SMALL;
+    if(!(mode & YOKAN_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
+        if(max_dst_size < ksize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, key, ksize);
         return ksize;
     } else { // eliminate prefix/suffix
         auto final_ksize = ksize - filter_size;
         if(max_dst_size < final_ksize)
-            return RKV_SIZE_TOO_SMALL;
-        if(mode & RKV_MODE_SUFFIX) { // eliminate suffix
+            return YOKAN_SIZE_TOO_SMALL;
+        if(mode & YOKAN_MODE_SUFFIX) { // eliminate suffix
             std::memcpy(dst, (const char*)key, final_ksize);
         } else { // eliminate prefix
             std::memcpy(dst, (const char*)key + filter_size, final_ksize);
@@ -128,7 +128,7 @@ static inline size_t valCopy(int32_t mode,
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) {
     (void)mode;
-    if(max_dst_size < vsize) return RKV_SIZE_TOO_SMALL;
+    if(max_dst_size < vsize) return YOKAN_SIZE_TOO_SMALL;
     std::memcpy(dst, val, vsize);
     return vsize;
 }

@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_WATCHER_H
-#define __RKV_WATCHER_H
+#ifndef __YOKAN_WATCHER_H
+#define __YOKAN_WATCHER_H
 
 #include <map>
 #include <yokan/backend.hpp>
@@ -15,7 +15,7 @@
 #include <experimental/string_view>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 /**
  * @brief The KeyWatcher class is a help class used in backends

@@ -12,13 +12,13 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" rkv_return_t rkv_count(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_count(yk_database_handle_t dbh,
                                   int32_t mode,
                                   size_t* count) {
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
-    rkv_return_t ret = RKV_SUCCESS;
+    yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     count_in_t in;
     count_out_t out;
@@ -37,8 +37,8 @@ extern "C" rkv_return_t rkv_count(rkv_database_handle_t dbh,
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
 
-    ret = static_cast<rkv_return_t>(out.ret);
-    if(ret == RKV_SUCCESS)
+    ret = static_cast<yk_return_t>(out.ret);
+    if(ret == YOKAN_SUCCESS)
         *count = out.count;
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);

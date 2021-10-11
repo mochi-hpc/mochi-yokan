@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_BACKEND_CXX_HPP
-#define __RKV_BACKEND_CXX_HPP
+#ifndef __YOKAN_BACKEND_CXX_HPP
+#define __YOKAN_BACKEND_CXX_HPP
 
 #include <yokan/backend.hpp>
 

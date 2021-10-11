@@ -26,7 +26,7 @@
  * sizes specified by the sender.
  */
 
-extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_list_keyvals_bulk(yk_database_handle_t dbh,
                                               int32_t mode,
                                               size_t from_ksize,
                                               size_t filter_size,
@@ -39,12 +39,12 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
                                               size_t count)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
 
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
-    rkv_return_t ret = RKV_SUCCESS;
+    yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     list_keyvals_in_t in;
     list_keyvals_out_t out;
@@ -72,14 +72,14 @@ extern "C" rkv_return_t rkv_list_keyvals_bulk(rkv_database_handle_t dbh,
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
 
-    ret = static_cast<rkv_return_t>(out.ret);
+    ret = static_cast<yk_return_t>(out.ret);
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
     return ret;
 }
 
-extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_list_keyvals(yk_database_handle_t dbh,
                                          int32_t mode,
                                          const void* from_key,
                                          size_t from_ksize,
@@ -92,11 +92,11 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
                                          size_t* vsizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
     if(filter == nullptr && filter_size > 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -144,12 +144,12 @@ extern "C" rkv_return_t rkv_list_keyvals(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
+    return yk_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
                                  nullptr, bulk, 0, keys_buf_size,
                                  vals_buf_size, false, count);
 }
 
-extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_list_keyvals_packed(yk_database_handle_t dbh,
                                                 int32_t mode,
                                                 const void* from_key,
                                                 size_t from_ksize,
@@ -164,11 +164,11 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
                                                 size_t* vsizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
     if(filter == nullptr && filter_size > 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -207,7 +207,7 @@ extern "C" rkv_return_t rkv_list_keyvals_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
+    return yk_list_keyvals_bulk(dbh, mode, from_ksize, filter_size,
                                  nullptr, bulk, 0, keys_buf_size, vals_buf_size,
                                  true, count);
 }

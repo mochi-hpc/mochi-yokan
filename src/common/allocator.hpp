@@ -3,17 +3,17 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_ALLOCATOR_HPP
-#define __RKV_ALLOCATOR_HPP
+#ifndef __YOKAN_ALLOCATOR_HPP
+#define __YOKAN_ALLOCATOR_HPP
 
 #include "logging.h"
 #include "yokan/allocator.h"
 #include <memory>
 #include <iostream>
 
-namespace rkv {
+namespace yokan {
 
-inline void default_allocator_init(rkv_allocator_t* allocator, const char* config) {
+inline void default_allocator_init(yk_allocator_t* allocator, const char* config) {
     (void)config;
     allocator->context = new std::allocator<char>();
     allocator->allocate = [](void* ctx, size_t item_size, size_t count) {
@@ -37,7 +37,7 @@ struct Allocator {
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
 
-    inline Allocator(rkv_allocator_t& a)
+    inline Allocator(yk_allocator_t& a)
     : m_internal(a) {}
 
     template<typename U>
@@ -60,7 +60,7 @@ struct Allocator {
             m_internal.context, p, sizeof(value_type), n);
     }
 
-    rkv_allocator_t& m_internal;
+    yk_allocator_t& m_internal;
 };
 
 }

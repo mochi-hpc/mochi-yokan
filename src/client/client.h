@@ -9,7 +9,7 @@
 #include "yokan/client.h"
 #include "yokan/database.h"
 
-typedef struct rkv_client {
+typedef struct yk_client {
    margo_instance_id mid;
 
    hg_id_t           count_id;
@@ -22,14 +22,14 @@ typedef struct rkv_client {
    hg_id_t           list_keyvals_id;
 
    uint64_t          num_database_handles;
-} rkv_client;
+} yk_client;
 
-typedef struct rkv_database_handle {
-    rkv_client_t      client;
+typedef struct yk_database_handle {
+    yk_client_t      client;
     hg_addr_t         addr;
     uint16_t          provider_id;
     uint64_t          refcount;
-    rkv_database_id_t database_id;
-} rkv_database_handle;
+    yk_database_id_t database_id;
+} yk_database_handle;
 
 #endif

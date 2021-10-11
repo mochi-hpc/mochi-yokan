@@ -21,7 +21,7 @@
 #include <experimental/string_view>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -47,8 +47,8 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
-        rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
-        rkv_allocator_t key_alloc, val_alloc, node_alloc;
+        yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
+        yk_allocator_t key_alloc, val_alloc, node_alloc;
         std::string key_alloc_conf, val_alloc_conf, node_alloc_conf;
 
         try {
@@ -141,24 +141,24 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     // LCOV_EXCL_STOP
 
     virtual bool supportsMode(int32_t mode) const override {
-        // note we mark RKV_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX
+        // note we mark YOKAN_MODE_IGNORE_KEYS, KEEP_LAST, and SUFFIX
         // as supported, but the listKeys and listKeyvals are not
         // supported anyway.
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-                    |RKV_MODE_APPEND
-        //            |RKV_MODE_CONSUME
-                    |RKV_MODE_WAIT
-                    |RKV_MODE_NOTIFY
-                    |RKV_MODE_NEW_ONLY
-                    |RKV_MODE_EXIST_ONLY
-                    |RKV_MODE_NO_PREFIX
-                    |RKV_MODE_IGNORE_KEYS
-                    |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+                    |YOKAN_MODE_APPEND
+        //            |YOKAN_MODE_CONSUME
+                    |YOKAN_MODE_WAIT
+                    |YOKAN_MODE_NOTIFY
+                    |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_EXIST_ONLY
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -182,7 +182,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                           BitField& flags) const override {
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
-        const auto mode_wait = mode & RKV_MODE_WAIT;
+        const auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -214,7 +214,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
-        const auto mode_wait = mode & RKV_MODE_WAIT;
+        const auto mode_wait = mode & YOKAN_MODE_WAIT;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
@@ -254,10 +254,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         size_t key_offset = 0;
         size_t val_offset = 0;
 
-        const auto mode_append     = mode & RKV_MODE_APPEND;
-        const auto mode_new_only   = mode & RKV_MODE_NEW_ONLY;
-        const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
-        const auto mode_notify     = mode & RKV_MODE_NOTIFY;
+        const auto mode_append     = mode & YOKAN_MODE_APPEND;
+        const auto mode_new_only   = mode & YOKAN_MODE_NEW_ONLY;
+        const auto mode_exist_only = mode & YOKAN_MODE_EXIST_ONLY;
+        const auto mode_notify     = mode & YOKAN_MODE_NOTIFY;
         // note: mode_append and mode_new_only can't be provided
         // at the same time. mode_new_only and mode_exist_only either.
         // mode_append and mode_exists_only can.
@@ -354,7 +354,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
-        const auto mode_wait = mode & RKV_MODE_WAIT;
+        const auto mode_wait = mode & YOKAN_MODE_WAIT;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -435,7 +435,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             vals.size = vals.size - val_remaining_size;
         }
 
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
         }
@@ -446,7 +446,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
         size_t offset = 0;
-        const auto mode_wait = mode & RKV_MODE_WAIT;
+        const auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -493,9 +493,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
     UnorderedMapKeyValueStore(json cfg,
-                     const rkv_allocator_t& node_allocator,
-                     const rkv_allocator_t& key_allocator,
-                     const rkv_allocator_t& val_allocator)
+                     const yk_allocator_t& node_allocator,
+                     const yk_allocator_t& key_allocator,
+                     const yk_allocator_t& val_allocator)
     : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
@@ -513,12 +513,12 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
     unordered_map_type* m_db;
     json                m_config;
     ABT_rwlock          m_lock = ABT_RWLOCK_NULL;
-    mutable rkv_allocator_t     m_node_allocator;
-    mutable rkv_allocator_t     m_key_allocator;
-    mutable rkv_allocator_t     m_val_allocator;
+    mutable yk_allocator_t     m_node_allocator;
+    mutable yk_allocator_t     m_key_allocator;
+    mutable yk_allocator_t     m_val_allocator;
     mutable KeyWatcher m_watcher;
 };
 
 }
 
-RKV_REGISTER_BACKEND(unordered_map, rkv::UnorderedMapKeyValueStore);
+YOKAN_REGISTER_BACKEND(unordered_map, yokan::UnorderedMapKeyValueStore);

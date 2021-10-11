@@ -20,7 +20,7 @@
 #include <experimental/filesystem>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 #if __cplusplus >= 201703L
 namespace fs = std::filesystem;
@@ -122,19 +122,19 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual bool supportsMode(int32_t mode) const override {
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
-        //            |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+        //            |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+        //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
+        //            |YOKAN_MODE_NEW_ONLY
+        //            |YOKAN_MODE_EXIST_ONLY
+        //            |YOKAN_MODE_NO_PREFIX
+        //            |YOKAN_MODE_IGNORE_KEYS
+        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -298,7 +298,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             }
             vals.size = vals.size - val_remaining_size;
         }
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }
         return Status::OK;
@@ -323,7 +323,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                             const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
@@ -354,7 +354,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             auto umem = static_cast<char*>(keys.data) + offset;
             if(packed) {
                 if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     buf_too_small = true;
                 } else {
                     std::memcpy(umem, key.data(), key.size());
@@ -363,7 +363,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                 }
             } else {
                 if(usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     offset += usize;
                 } else {
                     std::memcpy(umem, key.data(), key.size());
@@ -376,7 +376,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         }
         keys.size = offset;
         for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
         }
         delete iterator;
         return Status::OK;
@@ -391,7 +391,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
 
         auto iterator = m_db->NewIterator(m_read_options);
@@ -427,7 +427,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
                 if(keys.size - key_offset < key.size() || key_buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     key_buf_too_small = true;
                 } else {
                     std::memcpy(key_umem, key.data(), key.size());
@@ -435,7 +435,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                     key_offset += key.size();
                 }
                 if(vals.size - val_offset < val.size() || val_buf_too_small) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                     val_buf_too_small = true;
                 } else {
                     std::memcpy(val_umem, val.data(), val.size());
@@ -444,7 +444,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                 }
             } else {
                 if(key_usize < key.size()) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                     key_offset += key_usize;
                 } else {
                     std::memcpy(key_umem, key.data(), key.size());
@@ -452,7 +452,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
                     key_offset += key_usize;
                 }
                 if(val_usize < val.size()) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                     val_offset += val_usize;
                 } else {
                     std::memcpy(val_umem, val.data(), val.size());
@@ -466,8 +466,8 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         keys.size = key_offset;
         vals.size = val_offset;
         for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
-            valSizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
+            valSizes[i] = YOKAN_NO_MORE_KEYS;
         }
         delete iterator;
         return Status::OK;
@@ -497,4 +497,4 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-RKV_REGISTER_BACKEND(leveldb, rkv::LevelDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(leveldb, yokan::LevelDBKeyValueStore);

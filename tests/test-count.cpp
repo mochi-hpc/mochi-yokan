@@ -35,7 +35,7 @@ static void* test_get_context_setup(const MunitParameter params[], void* user_da
         vsizes.push_back(vsize);
     }
 
-    rkv_put_multi(context->dbh, 0,count, kptrs.data(), ksizes.data(),
+    yk_put_multi(context->dbh, 0,count, kptrs.data(), ksizes.data(),
                                 vptrs.data(), vsizes.data());
 
     return context;
@@ -46,11 +46,11 @@ static MunitResult test_count(const MunitParameter params[], void* data)
     (void)params;
     (void)data;
     struct test_context* context = (struct test_context*)data;
-    rkv_database_handle_t dbh = context->dbh;
-    rkv_return_t ret;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
 
     size_t count = 0;
-    ret = rkv_count(dbh, 0, &count);
+    ret = yk_count(dbh, 0, &count);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_long(count, ==, context->reference.size());
 
@@ -74,9 +74,9 @@ static MunitTest test_suite_tests[] = {
 };
 
 static const MunitSuite test_suite = {
-    (char*) "/rkv/database", test_suite_tests, NULL, 1, MUNIT_SUITE_OPTION_NONE
+    (char*) "/yk/database", test_suite_tests, NULL, 1, MUNIT_SUITE_OPTION_NONE
 };
 
 int main(int argc, char* argv[MUNIT_ARRAY_PARAM(argc + 1)]) {
-    return munit_suite_main(&test_suite, (void*) "rkv", argc, argv);
+    return munit_suite_main(&test_suite, (void*) "yk", argc, argv);
 }

@@ -11,14 +11,14 @@
 #include "../common/checks.h"
 #include <numeric>
 
-void rkv_erase_ult(hg_handle_t h)
+void yk_erase_ult(hg_handle_t h)
 {
     hg_return_t hret;
     erase_in_t in;
     erase_out_t out;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
-    out.ret = RKV_SUCCESS;
+    out.ret = YOKAN_SUCCESS;
 
     DEFER(margo_destroy(h));
     DEFER(margo_respond(h, &out));
@@ -27,7 +27,7 @@ void rkv_erase_ult(hg_handle_t h)
     CHECK_MID(mid, margo_hg_handle_get_instance);
 
     const struct hg_info* info = margo_get_info(h);
-    rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
     CHECK_PROVIDER(provider);
 
     hret = margo_get_input(h, &in);
@@ -43,11 +43,11 @@ void rkv_erase_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    rkv_database* database = find_database(provider, &in.db_id);
+    yk_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    rkv_buffer_t buffer = provider->bulk_cache.get(
+    yk_buffer_t buffer = provider->bulk_cache.get(
             provider->bulk_cache_data, in.size, HG_BULK_WRITE_ONLY);
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(
@@ -58,7 +58,7 @@ void rkv_erase_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     auto ptr = buffer->data;
-    auto ksizes = rkv::BasicUserMem<size_t>{
+    auto ksizes = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr),
         in.count
     };
@@ -71,18 +71,18 @@ void rkv_erase_ult(hg_handle_t h)
                                             return std::min(lhs, rhs);
                                         });
     if(min_key_size == 0) {
-        out.ret = RKV_ERR_INVALID_ARGS;
+        out.ret = YOKAN_ERR_INVALID_ARGS;
         return;
     }
 
     if(in.size < in.count*sizeof(size_t) + total_ksize) {
-        out.ret = RKV_ERR_INVALID_ARGS;
+        out.ret = YOKAN_ERR_INVALID_ARGS;
         return;
     }
 
-    auto keys = rkv::UserMem{ ptr, total_ksize };
+    auto keys = yokan::UserMem{ ptr, total_ksize };
 
-    out.ret = static_cast<rkv_return_t>(
+    out.ret = static_cast<yk_return_t>(
             database->erase(in.mode, keys, ksizes));
 }
-DEFINE_MARGO_RPC_HANDLER(rkv_erase_ult)
+DEFINE_MARGO_RPC_HANDLER(yk_erase_ult)

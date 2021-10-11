@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_SERVER_H
-#define __RKV_SERVER_H
+#ifndef __YOKAN_SERVER_H
+#define __YOKAN_SERVER_H
 
 #include <yokan/common.h>
 #include <yokan/bulk-cache.h>
@@ -14,23 +14,23 @@
 extern "C" {
 #endif
 
-#define RKV_ABT_POOL_DEFAULT ABT_POOL_NULL
+#define YOKAN_ABT_POOL_DEFAULT ABT_POOL_NULL
 
-typedef struct rkv_provider* rkv_provider_t;
-#define RKV_PROVIDER_NULL ((rkv_provider_t)NULL)
-#define RKV_PROVIDER_IGNORE ((rkv_provider_t*)NULL)
+typedef struct yk_provider* yk_provider_t;
+#define YOKAN_PROVIDER_NULL ((yk_provider_t)NULL)
+#define YOKAN_PROVIDER_IGNORE ((yk_provider_t*)NULL)
 
-struct rkv_provider_args {
+struct yk_provider_args {
     const char*        token;  // Security token
     const char*        config; // JSON configuration
     ABT_pool           pool;   // Pool used to run RPCs
-    rkv_bulk_cache_t   cache;  // cache implementation for bulk handles
+    yk_bulk_cache_t   cache;  // cache implementation for bulk handles
 };
 
-#define RKV_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL }
+#define YOKAN_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL }
 
 /**
- * @brief Creates a new RKV provider. If RKV_PROVIDER_IGNORE
+ * @brief Creates a new YOKAN provider. If YOKAN_PROVIDER_IGNORE
  * is passed as last argument, the provider will be automatically
  * destroyed when calling margo_finalize.
  *
@@ -39,23 +39,23 @@ struct rkv_provider_args {
  * @param[in] args argument structure
  * @param[out] provider provider
  *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
+ * @return YOKAN_SUCCESS or error code defined in yk-common.h
  */
-rkv_return_t rkv_provider_register(
+yk_return_t yk_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
-        const struct rkv_provider_args* args,
-        rkv_provider_t* provider);
+        const struct yk_provider_args* args,
+        yk_provider_t* provider);
 
 /**
  * @brief Destroys the Alpha provider and deregisters its RPC.
  *
  * @param[in] provider Alpha provider
  *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
+ * @return YOKAN_SUCCESS or error code defined in yk-common.h
  */
-rkv_return_t rkv_provider_destroy(
-        rkv_provider_t provider);
+yk_return_t yk_provider_destroy(
+        yk_provider_t provider);
 
 #ifdef __cplusplus
 }

@@ -3,13 +3,13 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_DL_H
-#define __RKV_DL_H
+#ifndef __YOKAN_DL_H
+#define __YOKAN_DL_H
 
 #include "logging.h"
 #include <dlfcn.h>
 
-namespace rkv {
+namespace yokan {
 
 class Linker {
 
@@ -23,14 +23,14 @@ class Linker {
         else
             handle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
         if(!handle) {
-           RKV_LOG_ERROR(0, "dlopen failed to open file %s (%s)",
+           YOKAN_LOG_ERROR(0, "dlopen failed to open file %s (%s)",
                 file.c_str(), dlerror());
            return (F)(nullptr);
         }
         F fun = (F)(dlsym(handle, function.c_str()));
         char* err = dlerror();
         if(err != nullptr) {
-            RKV_LOG_ERROR(0, "dlsym failed to find symbol %s (%s)",
+            YOKAN_LOG_ERROR(0, "dlsym failed to find symbol %s (%s)",
                 function.c_str(), err);
         }
         return fun;

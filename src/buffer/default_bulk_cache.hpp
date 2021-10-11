@@ -7,6 +7,6 @@
 
 extern "C" {
 
-extern rkv_bulk_cache rkv_default_bulk_cache;
+extern yk_bulk_cache yk_default_bulk_cache;
 
 }

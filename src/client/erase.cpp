@@ -22,7 +22,7 @@
  *   M = sum of value sizes
  */
 
-extern "C" rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_erase_bulk(yk_database_handle_t dbh,
                                        int32_t mode,
                                        size_t count,
                                        const char* origin,
@@ -31,12 +31,12 @@ extern "C" rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
                                        size_t size)
 {
     if(count != 0 && size == 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
-    rkv_return_t ret = RKV_SUCCESS;
+    yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     erase_in_t in;
     erase_out_t out;
@@ -60,33 +60,33 @@ extern "C" rkv_return_t rkv_erase_bulk(rkv_database_handle_t dbh,
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
 
-    ret = static_cast<rkv_return_t>(out.ret);
+    ret = static_cast<yk_return_t>(out.ret);
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
     return ret;
 }
 
-extern "C" rkv_return_t rkv_erase(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_erase(yk_database_handle_t dbh,
                                   int32_t mode,
                                   const void* key,
                                   size_t ksize)
 {
     if(ksize == 0)
-        return RKV_ERR_INVALID_ARGS;
-    return rkv_erase_packed(dbh, mode, 1, key, &ksize);
+        return YOKAN_ERR_INVALID_ARGS;
+    return yk_erase_packed(dbh, mode, 1, key, &ksize);
 }
 
-extern "C" rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_erase_multi(yk_database_handle_t dbh,
                                         int32_t mode,
                                         size_t count,
                                         const void* const* keys,
                                         const size_t* ksizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     else if(!keys || !ksizes)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -102,7 +102,7 @@ extern "C" rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
 
     for(unsigned i = 0; i < count; i++) {
         if(ksizes[i] == 0)
-            return RKV_ERR_INVALID_ARGS;
+            return YOKAN_ERR_INVALID_ARGS;
         ptrs.push_back(const_cast<void*>(keys[i]));
         sizes.push_back(ksizes[i]);
     }
@@ -114,19 +114,19 @@ extern "C" rkv_return_t rkv_erase_multi(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_erase_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_erase_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }
 
-extern "C" rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
+extern "C" yk_return_t yk_erase_packed(yk_database_handle_t dbh,
                                          int32_t mode,
                                          size_t count,
                                          const void* keys,
                                          const size_t* ksizes)
 {
     if(count == 0)
-        return RKV_SUCCESS;
+        return YOKAN_SUCCESS;
     else if(!keys || !ksizes)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -139,7 +139,7 @@ extern "C" rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (hg_size_t)0);
 
     if(sizes[1] == 0)
-        return RKV_ERR_INVALID_ARGS;
+        return YOKAN_ERR_INVALID_ARGS;
 
     hret = margo_bulk_create(mid, 2, ptrs.data(), sizes.data(),
                              HG_BULK_READ_ONLY, &bulk);
@@ -147,5 +147,5 @@ extern "C" rkv_return_t rkv_erase_packed(rkv_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return rkv_erase_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_erase_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
 }

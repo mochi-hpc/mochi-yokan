@@ -19,7 +19,7 @@
 #include <iostream>
 #include <filesystem>
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -281,19 +281,19 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     virtual bool supportsMode(int32_t mode) const override {
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-                    |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
-                    |RKV_MODE_NEW_ONLY
-        //            |RKV_MODE_EXIST_ONLY
-        //            |RKV_MODE_NO_PREFIX
-        //            |RKV_MODE_IGNORE_KEYS
-        //            |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+                    |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+        //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
+                    |YOKAN_MODE_NEW_ONLY
+        //            |YOKAN_MODE_EXIST_ONLY
+        //            |YOKAN_MODE_NO_PREFIX
+        //            |YOKAN_MODE_IGNORE_KEYS
+        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -382,8 +382,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
                        const BasicUserMem<size_t>& vsizes) override {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
-        auto mode_append = mode & RKV_MODE_APPEND;
-        auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
+        auto mode_append = mode & YOKAN_MODE_APPEND;
+        auto mode_new_only = mode & YOKAN_MODE_NEW_ONLY;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -493,7 +493,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         }
 
         vals.size = key_offset;
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }
         return Status::OK;
@@ -584,7 +584,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         tkrzw::Status status;
 
@@ -616,7 +616,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
         keys.size = list_keys.m_key_offset;
         for(; i < (ssize_t)max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
         }
         return Status::OK;
     }
@@ -723,7 +723,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
 
-        bool inclusive = mode & RKV_MODE_INCLUSIVE;
+        bool inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         tkrzw::Status status;
 
@@ -756,8 +756,8 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         keys.size = list_keyvals.m_key_offset;
         vals.size = list_keyvals.m_val_offset;
         for(; i < (ssize_t)max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
-            valSizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
+            valSizes[i] = YOKAN_NO_MORE_KEYS;
         }
         return Status::OK;
     }
@@ -782,4 +782,4 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-RKV_REGISTER_BACKEND(tkrzw, rkv::TkrzwKeyValueStore);
+YOKAN_REGISTER_BACKEND(tkrzw, yokan::TkrzwKeyValueStore);

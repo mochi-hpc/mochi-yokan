@@ -12,11 +12,11 @@ typedef py::capsule py_hg_addr_t;
 #define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t", nullptr)
 
 PYBIND11_MODULE(pyyokan_server, m) {
-    m.doc() = "Python binding for the RKV server library";
+    m.doc() = "Python binding for the YOKAN server library";
 
     py::module::import("pyyokan_common");
 
-    py::class_<rkv::Provider>(m, "Provider")
+    py::class_<yokan::Provider>(m, "Provider")
         .def(py::init<py_margo_instance_id,
                       uint16_t,
                       const char*,

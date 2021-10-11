@@ -14,7 +14,7 @@
 
 // LCOV_EXCL_START
 
-static inline hg_return_t hg_proc_rkv_database_id_t(hg_proc_t proc, rkv_database_id_t *id);
+static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
 
 /* Admin RPC types */
 
@@ -25,18 +25,18 @@ MERCURY_GEN_PROC(open_database_in_t,
 
 MERCURY_GEN_PROC(open_database_out_t,
         ((int32_t)(ret))\
-        ((rkv_database_id_t)(id)))
+        ((yk_database_id_t)(id)))
 
 MERCURY_GEN_PROC(close_database_in_t,
         ((hg_string_t)(token))\
-        ((rkv_database_id_t)(id)))
+        ((yk_database_id_t)(id)))
 
 MERCURY_GEN_PROC(close_database_out_t,
         ((int32_t)(ret)))
 
 MERCURY_GEN_PROC(destroy_database_in_t,
         ((hg_string_t)(token))\
-        ((rkv_database_id_t)(id)))
+        ((yk_database_id_t)(id)))
 
 MERCURY_GEN_PROC(destroy_database_out_t,
         ((int32_t)(ret)))
@@ -48,7 +48,7 @@ MERCURY_GEN_PROC(list_databases_in_t,
 typedef struct list_databases_out_t {
     int32_t ret;
     hg_size_t count;
-    rkv_database_id_t* ids;
+    yk_database_id_t* ids;
 } list_databases_out_t;
 
 static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *data)
@@ -64,7 +64,7 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 
     switch(hg_proc_get_op(proc)) {
     case HG_DECODE:
-        out->ids = (rkv_database_id_t*)calloc(out->count, sizeof(*(out->ids)));
+        out->ids = (yk_database_id_t*)calloc(out->count, sizeof(*(out->ids)));
         /* fall through */
     case HG_ENCODE:
         if(out->ids)
@@ -81,7 +81,7 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 
 /* count */
 MERCURY_GEN_PROC(count_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode)))
 MERCURY_GEN_PROC(count_out_t,
         ((int32_t)(ret))\
@@ -89,7 +89,7 @@ MERCURY_GEN_PROC(count_out_t,
 
 /* exists */
 MERCURY_GEN_PROC(exists_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -101,7 +101,7 @@ MERCURY_GEN_PROC(exists_out_t,
 
 /* length */
 MERCURY_GEN_PROC(length_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -113,7 +113,7 @@ MERCURY_GEN_PROC(length_out_t,
 
 /* put */
 MERCURY_GEN_PROC(put_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -126,7 +126,7 @@ MERCURY_GEN_PROC(put_out_t,
 
 /* get */
 MERCURY_GEN_PROC(get_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -139,7 +139,7 @@ MERCURY_GEN_PROC(get_out_t,
 
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -151,7 +151,7 @@ MERCURY_GEN_PROC(erase_out_t,
 
 /* list_keys */
 MERCURY_GEN_PROC(list_keys_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
@@ -166,7 +166,7 @@ MERCURY_GEN_PROC(list_keys_out_t,
 
 /* list_keyvals */
 MERCURY_GEN_PROC(list_keyvals_in_t,
-        ((rkv_database_id_t)(db_id))\
+        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
@@ -183,8 +183,8 @@ MERCURY_GEN_PROC(list_keyvals_out_t,
 
 /* Extra hand-coded serialization functions */
 
-static inline hg_return_t hg_proc_rkv_database_id_t(
-        hg_proc_t proc, rkv_database_id_t *id)
+static inline hg_return_t hg_proc_yk_database_id_t(
+        hg_proc_t proc, yk_database_id_t *id)
 {
     return hg_proc_memcpy(proc, id, sizeof(*id));
 }

@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_CLIENT_H
-#define __RKV_CLIENT_H
+#ifndef __YOKAN_CLIENT_H
+#define __YOKAN_CLIENT_H
 
 #include <margo.h>
 #include <yokan/common.h>
@@ -13,27 +13,27 @@
 extern "C" {
 #endif
 
-typedef struct rkv_client* rkv_client_t;
-#define RKV_CLIENT_NULL ((rkv_client_t)NULL)
+typedef struct yk_client* yk_client_t;
+#define YOKAN_CLIENT_NULL ((yk_client_t)NULL)
 
 /**
- * @brief Creates a RKV client.
+ * @brief Creates a YOKAN client.
  *
  * @param[in] mid Margo instance
- * @param[out] client RKV client
+ * @param[out] client YOKAN client
  *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
+ * @return YOKAN_SUCCESS or error code defined in common.h
  */
-rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client);
+yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client);
 
 /**
- * @brief Finalizes a RKV client.
+ * @brief Finalizes a YOKAN client.
  *
- * @param[in] client RKV client to finalize
+ * @param[in] client YOKAN client to finalize
  *
- * @return RKV_SUCCESS or error code defined in rkv-common.h
+ * @return YOKAN_SUCCESS or error code defined in common.h
  */
-rkv_return_t rkv_client_finalize(rkv_client_t client);
+yk_return_t yk_client_finalize(yk_client_t client);
 
 #ifdef __cplusplus
 }

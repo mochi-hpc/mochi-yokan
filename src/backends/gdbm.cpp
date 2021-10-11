@@ -17,7 +17,7 @@
 #include <experimental/filesystem>
 #endif
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -70,19 +70,19 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
     virtual bool supportsMode(int32_t mode) const override {
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-        //            |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-        //            |RKV_MODE_WAIT
-        //            |RKV_MODE_NOTIFY
-                    |RKV_MODE_NEW_ONLY
-                    |RKV_MODE_EXIST_ONLY
-                    |RKV_MODE_NO_PREFIX
-                    |RKV_MODE_IGNORE_KEYS
-                    |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+        //            |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+        //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
+                    |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_EXIST_ONLY
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -161,8 +161,8 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
                                               0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
-        auto mode_new_only = mode & RKV_MODE_NEW_ONLY;
-        auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
+        auto mode_new_only = mode & YOKAN_MODE_NEW_ONLY;
+        auto mode_exist_only = mode & YOKAN_MODE_EXIST_ONLY;
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
@@ -243,7 +243,7 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
             }
             vals.size = vals.size - val_remaining_size;
         }
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
         }
@@ -287,4 +287,4 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-RKV_REGISTER_BACKEND(gdbm, rkv::GDBMKeyValueStore);
+YOKAN_REGISTER_BACKEND(gdbm, yokan::GDBMKeyValueStore);

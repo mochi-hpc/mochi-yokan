@@ -12,15 +12,15 @@ typedef py::capsule py_hg_addr_t;
 #define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t", nullptr)
 
 PYBIND11_MODULE(pyyokan_admin, m) {
-    m.doc() = "Python binding for the RKV admin library";
+    m.doc() = "Python binding for the YOKAN admin library";
 
     py::module::import("pyyokan_common");
 
-    py::class_<rkv::Admin>(m, "Admin")
+    py::class_<yokan::Admin>(m, "Admin")
         .def(py::init<py_margo_instance_id>(),
              "mid"_a)
         .def("open_database",
-             [](const rkv::Admin& admin,
+             [](const yokan::Admin& admin,
                 py_hg_addr_t address,
                 uint16_t provider_id,
                 const char* token,
@@ -32,29 +32,29 @@ PYBIND11_MODULE(pyyokan_admin, m) {
              "address"_a, "provider_id"_a, "token"_a,
              "type"_a, "config"_a)
         .def("close_database",
-             [](const rkv::Admin& admin,
+             [](const yokan::Admin& admin,
                 py_hg_addr_t address,
                 uint16_t provider_id,
                 const char* token,
-                rkv_database_id_t id) {
+                yk_database_id_t id) {
                     return admin.closeDatabase(
                         address, provider_id, token, id);
              },
              "address"_a, "provider_id"_a, "token"_a,
              "database_id"_a)
         .def("destroy_database",
-             [](const rkv::Admin& admin,
+             [](const yokan::Admin& admin,
                 py_hg_addr_t address,
                 uint16_t provider_id,
                 const char* token,
-                rkv_database_id_t id) {
+                yk_database_id_t id) {
                     return admin.destroyDatabase(
                         address, provider_id, token, id);
              },
              "address"_a, "provider_id"_a, "token"_a,
              "database_id"_a)
         .def("list_databases",
-             [](const rkv::Admin& admin,
+             [](const yokan::Admin& admin,
                 py_hg_addr_t address,
                 uint16_t provider_id,
                 const char* token) {

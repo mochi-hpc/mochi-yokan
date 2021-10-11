@@ -3,10 +3,10 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_DEFER_HPP
-#define __RKV_DEFER_HPP
+#ifndef __YOKAN_DEFER_HPP
+#define __YOKAN_DEFER_HPP
 
-namespace rkv {
+namespace yokan {
 
 template<typename F>
 class deferred {
@@ -33,7 +33,7 @@ inline auto defer(F&& f) {
 #define _UTILITY_DEFERRED_LINENAME_CAT(name, line) name##line
 #define _UTILITY_DEFERRED_LINENAME(name, line) _UTILITY_DEFERRED_LINENAME_CAT(name, line)
 #define DEFER(f) \
-    const auto& _UTILITY_DEFERRED_LINENAME(EXIT, __LINE__) = ::rkv::defer([&]() { f; }); (void)_UTILITY_DEFERRED_LINENAME(EXIT, __LINE__)
+    const auto& _UTILITY_DEFERRED_LINENAME(EXIT, __LINE__) = ::yokan::defer([&]() { f; }); (void)_UTILITY_DEFERRED_LINENAME(EXIT, __LINE__)
 
 }
 

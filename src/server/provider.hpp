@@ -14,8 +14,8 @@
 #include <cstring>
 
 namespace std {
-    template <> struct hash<rkv_database_id_t> {
-        size_t operator()(const rkv_database_id_t& id) const {
+    template <> struct hash<yk_database_id_t> {
+        size_t operator()(const yk_database_id_t& id) const {
             // since a UUID is already pretty random,
             // this hash just takes the first 8 bytes
             size_t h;
@@ -25,25 +25,25 @@ namespace std {
     };
 }
 
-inline bool operator==(const rkv_database_id_t& lhs, const rkv_database_id_t& rhs) {
+inline bool operator==(const yk_database_id_t& lhs, const yk_database_id_t& rhs) {
     return std::memcmp(&lhs.uuid, &rhs.uuid, sizeof(lhs.uuid)) == 0;
 }
 
-inline bool operator!=(const rkv_database_id_t& lhs, const rkv_database_id_t& rhs) {
+inline bool operator!=(const yk_database_id_t& lhs, const yk_database_id_t& rhs) {
     return std::memcmp(&lhs.uuid, &rhs.uuid, sizeof(lhs.uuid)) != 0;
 }
 
-typedef struct rkv_provider {
+typedef struct yk_provider {
     /* Margo/Argobots/Mercury environment */
     margo_instance_id  mid;                 // Margo instance
     uint16_t           provider_id;         // Provider id
     ABT_pool           pool;                // Pool on which to post RPC requests
     std::string        token;               // Security token
-    rkv_bulk_cache     bulk_cache;          // Bulk cache functions
+    yk_bulk_cache     bulk_cache;          // Bulk cache functions
     void*              bulk_cache_data;     // Bulk cache data
 
     /* Databases */
-    std::unordered_map<rkv_database_id_t, rkv_database_t> dbs;  // Databases
+    std::unordered_map<yk_database_id_t, yk_database_t> dbs;  // Databases
     // Note: in the above map, the std::string keys are actually uuids (32 bytes)
 
     /* RPC identifiers for admins */
@@ -60,40 +60,40 @@ typedef struct rkv_provider {
     hg_id_t erase_id;
     hg_id_t list_keys_id;
     hg_id_t list_keyvals_id;
-} rkv_provider;
+} yk_provider;
 
 /* Admin RPCs */
-DECLARE_MARGO_RPC_HANDLER(rkv_create_database_ult)
-void rkv_create_database_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_open_database_ult)
-void rkv_open_database_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_close_database_ult)
-void rkv_close_database_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_destroy_database_ult)
-void rkv_destroy_database_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_list_databases_ult)
-void rkv_list_databases_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_create_database_ult)
+void yk_create_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_open_database_ult)
+void yk_open_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_close_database_ult)
+void yk_close_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_destroy_database_ult)
+void yk_destroy_database_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_list_databases_ult)
+void yk_list_databases_ult(hg_handle_t h);
 
 /* Client RPCs */
-DECLARE_MARGO_RPC_HANDLER(rkv_count_ult)
-void rkv_count_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_put_ult)
-void rkv_put_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_erase_ult)
-void rkv_erase_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_get_ult)
-void rkv_get_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_length_ult)
-void rkv_length_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_exists_ult)
-void rkv_exists_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_list_keys_ult)
-void rkv_list_keys_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(rkv_list_keyvals_ult)
-void rkv_list_keyvals_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_count_ult)
+void yk_count_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_put_ult)
+void yk_put_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_erase_ult)
+void yk_erase_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_get_ult)
+void yk_get_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_length_ult)
+void yk_length_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_exists_ult)
+void yk_exists_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_list_keys_ult)
+void yk_list_keys_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)
+void yk_list_keyvals_ult(hg_handle_t h);
 
-static inline rkv_database_t find_database(rkv_provider_t provider,
-                                           rkv_database_id_t* db_id)
+static inline yk_database_t find_database(yk_provider_t provider,
+                                           yk_database_id_t* db_id)
 {
     auto it = provider->dbs.find(*db_id);
     if(it == provider->dbs.end()) return nullptr;

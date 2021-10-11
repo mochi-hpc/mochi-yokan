@@ -16,7 +16,7 @@
 #include <cstring>
 #include <iostream>
 
-namespace rkv {
+namespace yokan {
 
 using json = nlohmann::json;
 
@@ -70,8 +70,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
-        rkv_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
-        rkv_allocator_t key_alloc, val_alloc, node_alloc;
+        yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
+        yk_allocator_t key_alloc, val_alloc, node_alloc;
         std::string key_alloc_conf, val_alloc_conf, node_alloc_conf;
 
         try {
@@ -158,18 +158,18 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual bool supportsMode(int32_t mode) const override {
         return mode ==
             (mode & (
-                     RKV_MODE_INCLUSIVE
-                    |RKV_MODE_APPEND
-                    |RKV_MODE_CONSUME
-                    |RKV_MODE_WAIT
-                    |RKV_MODE_NEW_ONLY
-                    |RKV_MODE_EXIST_ONLY
-                    |RKV_MODE_NO_PREFIX
-                    |RKV_MODE_IGNORE_KEYS
-                    |RKV_MODE_KEEP_LAST
-                    |RKV_MODE_SUFFIX
+                     YOKAN_MODE_INCLUSIVE
+                    |YOKAN_MODE_APPEND
+                    |YOKAN_MODE_CONSUME
+                    |YOKAN_MODE_WAIT
+                    |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_EXIST_ONLY
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef HAS_LUA
-                    |RKV_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     )
             );
@@ -194,7 +194,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
-        auto mode_wait = mode & RKV_MODE_WAIT;
+        auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
@@ -227,7 +227,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
-        auto mode_wait = mode & RKV_MODE_WAIT;
+        auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
@@ -261,10 +261,10 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
-        const auto mode_append     = mode & RKV_MODE_APPEND;
-        const auto mode_new_only   = mode & RKV_MODE_NEW_ONLY;
-        const auto mode_exist_only = mode & RKV_MODE_EXIST_ONLY;
-        const auto mode_notify     = mode & RKV_MODE_NOTIFY;
+        const auto mode_append     = mode & YOKAN_MODE_APPEND;
+        const auto mode_new_only   = mode & YOKAN_MODE_NEW_ONLY;
+        const auto mode_exist_only = mode & YOKAN_MODE_EXIST_ONLY;
+        const auto mode_notify     = mode & YOKAN_MODE_NOTIFY;
         // note: mode_append and mode_new_only can't be provided
         // at the same time. mode_new_only and mode_exist_only either.
         // mode_append and mode_exists_only can.
@@ -355,7 +355,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
-        bool mode_wait = mode & RKV_MODE_WAIT;
+        bool mode_wait = mode & YOKAN_MODE_WAIT;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -432,7 +432,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             vals.size = vals.size - val_remaining_size;
         }
 
-        if(mode & RKV_MODE_CONSUME) {
+        if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
         }
@@ -442,7 +442,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         size_t offset = 0;
-        auto mode_wait = mode & RKV_MODE_WAIT;
+        auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
@@ -471,7 +471,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         using iterator = decltype(m_db->begin());
         iterator fromKeyIt;
         if(fromKey.size == 0) {
@@ -495,7 +495,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             auto umem = static_cast<char*>(keys.data) + offset;
 
             bool is_last = false;
-            if(mode & RKV_MODE_KEEP_LAST) {
+            if(mode & YOKAN_MODE_KEEP_LAST) {
                 auto next = it;
                 ++next;
                 is_last = (i+1 == max) || (next == end);
@@ -507,11 +507,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 offset += usize;
             } else {
                 if(buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
                     keySizes[i] = keyCopy(mode, umem, usize, key.data(),
                                           key.size(), filter.size, is_last);
-                    if(keySizes[i] == RKV_SIZE_TOO_SMALL) {
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
                         offset += keySizes[i];
@@ -523,7 +523,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
         keys.size = offset;
         for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
         }
 
         return Status::OK;
@@ -539,7 +539,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                  BasicUserMem<size_t>& valSizes) const override {
         ScopedReadLock lock(m_lock);
 
-        auto inclusive = mode & RKV_MODE_INCLUSIVE;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         using iterator = decltype(m_db->begin());
         iterator fromKeyIt;
@@ -567,7 +567,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
 
             bool is_last = false;
-            if(mode & RKV_MODE_KEEP_LAST) {
+            if(mode & YOKAN_MODE_KEEP_LAST) {
                 auto next = it;
                 ++next;
                 is_last = (i+1 == max) || (next == end);
@@ -592,22 +592,22 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 size_t val_usize = vals.size - val_offset;
 
                 if(key_buf_too_small) {
-                    keySizes[i] = RKV_SIZE_TOO_SMALL;
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
                     keySizes[i] = keyCopy(mode, key_umem, key_usize,
                                           key.data(), key.size(),
                                           filter.size, is_last);
-                    if(keySizes[i] != RKV_SIZE_TOO_SMALL)
+                    if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
                         key_offset += keySizes[i];
                     else
                         key_buf_too_small = true;
                 }
                 if(val_buf_too_small) {
-                    valSizes[i] = RKV_SIZE_TOO_SMALL;
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
                     valSizes[i] = valCopy(mode, val_umem, val_usize,
                                           val.data(), val.size());
-                    if(valSizes[i] != RKV_SIZE_TOO_SMALL)
+                    if(valSizes[i] != YOKAN_SIZE_TOO_SMALL)
                         val_offset += valSizes[i];
                     else
                         val_buf_too_small = true;
@@ -619,8 +619,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         keys.size = key_offset;
         vals.size = val_offset;
         for(; i < max; i++) {
-            keySizes[i] = RKV_NO_MORE_KEYS;
-            valSizes[i] = RKV_NO_MORE_KEYS;
+            keySizes[i] = YOKAN_NO_MORE_KEYS;
+            valSizes[i] = YOKAN_NO_MORE_KEYS;
         }
 
         return Status::OK;
@@ -648,9 +648,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
     MapKeyValueStore(json cfg,
                      cmp_type cmp_fun,
-                     const rkv_allocator_t& node_allocator,
-                     const rkv_allocator_t& key_allocator,
-                     const rkv_allocator_t& val_allocator)
+                     const yk_allocator_t& node_allocator,
+                     const yk_allocator_t& key_allocator,
+                     const yk_allocator_t& val_allocator)
     : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
@@ -664,12 +664,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     map_type*          m_db;
     json               m_config;
     ABT_rwlock         m_lock = ABT_RWLOCK_NULL;
-    rkv_allocator_t    m_node_allocator;
-    rkv_allocator_t    m_key_allocator;
-    rkv_allocator_t    m_val_allocator;
+    yk_allocator_t     m_node_allocator;
+    yk_allocator_t     m_key_allocator;
+    yk_allocator_t     m_val_allocator;
     mutable KeyWatcher m_watcher;
 };
 
 }
 
-RKV_REGISTER_BACKEND(map, rkv::MapKeyValueStore);
+YOKAN_REGISTER_BACKEND(map, yokan::MapKeyValueStore);

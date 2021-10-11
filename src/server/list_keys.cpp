@@ -12,14 +12,14 @@
 #include <iostream>
 #include <numeric>
 
-void rkv_list_keys_ult(hg_handle_t h)
+void yk_list_keys_ult(hg_handle_t h)
 {
     hg_return_t hret;
     list_keys_in_t in;
     list_keys_out_t out;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
-    out.ret = RKV_SUCCESS;
+    out.ret = YOKAN_SUCCESS;
 
     DEFER(margo_destroy(h));
     DEFER(margo_respond(h, &out));
@@ -28,7 +28,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     CHECK_MID(mid, margo_hg_handle_get_instance);
 
     const struct hg_info* info = margo_get_info(h);
-    rkv_provider_t provider = (rkv_provider_t)margo_registered_data(mid, info->id);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
     CHECK_PROVIDER(provider);
 
     hret = margo_get_input(h, &in);
@@ -44,7 +44,7 @@ void rkv_list_keys_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    rkv_database* database = find_database(provider, &in.db_id);
+    yk_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
@@ -52,7 +52,7 @@ void rkv_list_keys_ult(hg_handle_t h)
                        + in.count*sizeof(size_t)
                        + in.keys_buf_size;
 
-    rkv_buffer_t buffer = provider->bulk_cache.get(
+    yk_buffer_t buffer = provider->bulk_cache.get(
         provider->bulk_cache_data, buffer_size, HG_BULK_READWRITE);
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
@@ -72,18 +72,18 @@ void rkv_list_keys_ult(hg_handle_t h)
 
     // build buffer wrappers
     auto ptr      = buffer->data;
-    auto from_key = rkv::UserMem{ ptr, in.from_ksize };
-    auto filter   = rkv::UserMem{ ptr + in.from_ksize, in.filter_size };
-    auto ksizes   = rkv::BasicUserMem<size_t>{
+    auto from_key = yokan::UserMem{ ptr, in.from_ksize };
+    auto filter   = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
+    auto ksizes   = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
     };
-    auto keys = rkv::UserMem{ ptr + keys_offset, in.keys_buf_size };
+    auto keys = yokan::UserMem{ ptr + keys_offset, in.keys_buf_size };
 
-    out.ret = static_cast<rkv_return_t>(
+    out.ret = static_cast<yk_return_t>(
             database->listKeys(in.mode, in.packed, from_key, filter, keys, ksizes));
 
-    if(out.ret == RKV_SUCCESS) {
+    if(out.ret == YOKAN_SUCCESS) {
         size_to_transfer = in.count*sizeof(size_t)
                          + keys.size;
         hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
@@ -92,4 +92,4 @@ void rkv_list_keys_ult(hg_handle_t h)
         CHECK_HRET_OUT(hret, margo_bulk_transfer);
     }
 }
-DEFINE_MARGO_RPC_HANDLER(rkv_list_keys_ult)
+DEFINE_MARGO_RPC_HANDLER(yk_list_keys_ult)

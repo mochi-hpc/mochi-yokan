@@ -27,18 +27,18 @@ static auto get_buffer_info(const std::string& str) {
     ssize_t __stride__ = (__buf_info__).itemsize;     \
     for(ssize_t i=0; i < (__buf_info__).ndim; i++) {  \
         if(__stride__ != (__buf_info__).strides[i])   \
-            throw rkv::Exception(RKV_ERR_NONCONTIG);  \
+            throw yokan::Exception(YOKAN_ERR_NONCONTIG);  \
         __stride__ *= (__buf_info__).shape[i];        \
     }                                                 \
 } while(0)
 
 #define CHECK_BUFFER_IS_WRITABLE(__buf_info__) do { \
     if((__buf_info__).readonly)                     \
-        throw rkv::Exception(RKV_ERR_READONLY);     \
+        throw yokan::Exception(YOKAN_ERR_READONLY);     \
 } while(0)
 
 template <typename KeyType, typename ValueType>
-static void put_helper(const rkv::Database& db, const KeyType& key,
+static void put_helper(const yokan::Database& db, const KeyType& key,
                        const ValueType& val, int32_t mode) {
     auto key_info = get_buffer_info(key);
     auto val_info = get_buffer_info(val);
@@ -52,7 +52,7 @@ static void put_helper(const rkv::Database& db, const KeyType& key,
 }
 
 template <typename KeyType, typename ValueType>
-static void put_multi_helper(const rkv::Database& db,
+static void put_multi_helper(const yokan::Database& db,
                              const std::vector<std::pair<KeyType,ValueType>>& keyvals,
                              int32_t mode) {
     auto count = keyvals.size();
@@ -79,7 +79,7 @@ static void put_multi_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static auto get_helper(const rkv::Database& db, const KeyType& key,
+static auto get_helper(const yokan::Database& db, const KeyType& key,
                        py::buffer& val, int32_t mode) {
     auto key_info = get_buffer_info(key);
     auto val_info = val.request();
@@ -96,7 +96,7 @@ static auto get_helper(const rkv::Database& db, const KeyType& key,
 }
 
 template<typename KeyType>
-static auto get_multi_helper(const rkv::Database& db,
+static auto get_multi_helper(const yokan::Database& db,
                              const std::vector<std::pair<KeyType, py::buffer>>& keyvals,
                              int32_t mode) {
     auto count = keyvals.size();
@@ -123,9 +123,9 @@ static auto get_multi_helper(const rkv::Database& db,
                 mode);
     py::list result;
     for(size_t i=0; i < count; i++) {
-        if(val_sizes[i] == RKV_KEY_NOT_FOUND)
+        if(val_sizes[i] == YOKAN_KEY_NOT_FOUND)
             result.append(py::none());
-        else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
+        else if(val_sizes[i] == YOKAN_SIZE_TOO_SMALL)
             result.append(-1);
         else
             result.append(val_sizes[i]);
@@ -134,7 +134,7 @@ static auto get_multi_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static auto exists_helper(const rkv::Database& db,
+static auto exists_helper(const yokan::Database& db,
                           const KeyType& key, int32_t mode) {
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -143,7 +143,7 @@ static auto exists_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static auto exists_multi_helper(const rkv::Database& db,
+static auto exists_multi_helper(const yokan::Database& db,
                                 const std::vector<KeyType>& keys,
                                 int32_t mode) {
     const auto count = keys.size();
@@ -159,7 +159,7 @@ static auto exists_multi_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static auto length_helper(const rkv::Database& db,
+static auto length_helper(const yokan::Database& db,
                           const KeyType& key,
                           int32_t mode) {
     auto key_info = get_buffer_info(key);
@@ -169,7 +169,7 @@ static auto length_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static auto length_multi_helper(const rkv::Database& db,
+static auto length_multi_helper(const yokan::Database& db,
                                 const std::vector<KeyType>& keys,
                                 int32_t mode) {
     const auto count = keys.size();
@@ -185,7 +185,7 @@ static auto length_multi_helper(const rkv::Database& db,
     db.lengthMulti(count, key_ptrs.data(), key_size.data(), val_size.data(), mode);
     py::list result;
     for(size_t i = 0; i < count; i++) {
-        if(val_size[i] != RKV_KEY_NOT_FOUND)
+        if(val_size[i] != YOKAN_KEY_NOT_FOUND)
             result.append(val_size[i]);
         else
             result.append(py::none());
@@ -194,7 +194,7 @@ static auto length_multi_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static void erase_helper(const rkv::Database& db,
+static void erase_helper(const yokan::Database& db,
                          const KeyType& key,
                          int32_t mode) {
     auto key_info = get_buffer_info(key);
@@ -204,7 +204,7 @@ static void erase_helper(const rkv::Database& db,
 }
 
 template<typename KeyType>
-static void erase_multi_helper(const rkv::Database& db,
+static void erase_multi_helper(const yokan::Database& db,
                                const std::vector<KeyType>& keys,
                                int32_t mode) {
     const auto count = keys.size();
@@ -220,7 +220,7 @@ static void erase_multi_helper(const rkv::Database& db,
 }
 
 template<typename FromKeyType, typename FilterType>
-static auto list_keys_helper(const rkv::Database& db,
+static auto list_keys_helper(const yokan::Database& db,
                              std::vector<py::buffer>& keys,
                              const FromKeyType& from_key,
                              const FilterType& filter,
@@ -249,9 +249,9 @@ static auto list_keys_helper(const rkv::Database& db,
             mode);
     py::list result;
     for(size_t i=0; i < count; i++) {
-        if(keys_size[i] == RKV_NO_MORE_KEYS)
+        if(keys_size[i] == YOKAN_NO_MORE_KEYS)
             break;
-        else if(keys_size[i] == RKV_SIZE_TOO_SMALL)
+        else if(keys_size[i] == YOKAN_SIZE_TOO_SMALL)
             result.append(-1);
         else
             result.append(keys_size[i]);
@@ -260,7 +260,7 @@ static auto list_keys_helper(const rkv::Database& db,
 }
 
 template<typename FromKeyType, typename FilterType>
-static auto list_keys_packed_helper(const rkv::Database& db,
+static auto list_keys_packed_helper(const yokan::Database& db,
                                     py::buffer& keys,
                                     size_t count,
                                     const FromKeyType& from_key,
@@ -286,9 +286,9 @@ static auto list_keys_packed_helper(const rkv::Database& db,
             mode);
     py::list result;
     for(size_t i=0; i < count; i++) {
-        if(key_sizes[i] == RKV_NO_MORE_KEYS)
+        if(key_sizes[i] == YOKAN_NO_MORE_KEYS)
             break;
-        else if(key_sizes[i] == RKV_SIZE_TOO_SMALL)
+        else if(key_sizes[i] == YOKAN_SIZE_TOO_SMALL)
             result.append(-1);
         else
             result.append(key_sizes[i]);
@@ -297,7 +297,7 @@ static auto list_keys_packed_helper(const rkv::Database& db,
 }
 
 template<typename FromKeyType, typename FilterType>
-static auto list_keyvals_helper(const rkv::Database& db,
+static auto list_keyvals_helper(const yokan::Database& db,
                 std::vector<std::pair<py::buffer, py::buffer>>& pairs,
                 const FromKeyType& from_key,
                 const FilterType& filter,
@@ -336,18 +336,18 @@ static auto list_keyvals_helper(const rkv::Database& db,
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
     for(size_t i=0; i < count; i++) {
-        if(keys_size[i] == RKV_NO_MORE_KEYS)
+        if(keys_size[i] == YOKAN_NO_MORE_KEYS)
             break;
         result.emplace_back(
-                keys_size[i] != RKV_SIZE_TOO_SMALL ? keys_size[i] : -1,
-                vals_size[i] != RKV_SIZE_TOO_SMALL ? vals_size[i] : -1);
+                keys_size[i] != YOKAN_SIZE_TOO_SMALL ? keys_size[i] : -1,
+                vals_size[i] != YOKAN_SIZE_TOO_SMALL ? vals_size[i] : -1);
     }
     return result;
 }
 
 template<typename FromKeyType, typename FilterType>
 static auto list_keyvals_packed_helper(
-                const rkv::Database& db,
+                const yokan::Database& db,
                 py::buffer& keys,
                 py::buffer& vals,
                 size_t count,
@@ -383,93 +383,93 @@ static auto list_keyvals_packed_helper(
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
     for(size_t i=0; i < count; i++) {
-        if(key_sizes[i] == RKV_NO_MORE_KEYS)
+        if(key_sizes[i] == YOKAN_NO_MORE_KEYS)
             break;
         result.emplace_back(
-                key_sizes[i] != RKV_SIZE_TOO_SMALL ? key_sizes[i] : -1,
-                val_sizes[i] != RKV_SIZE_TOO_SMALL ? val_sizes[i] : -1);
+                key_sizes[i] != YOKAN_SIZE_TOO_SMALL ? key_sizes[i] : -1,
+                val_sizes[i] != YOKAN_SIZE_TOO_SMALL ? val_sizes[i] : -1);
     }
     return result;
 }
 
 PYBIND11_MODULE(pyyokan_client, m) {
-    m.doc() = "Python binding for the RKV client library";
+    m.doc() = "Python binding for the YOKAN client library";
 
     py::module::import("pyyokan_common");
 
-    m.attr("RKV_MODE_DEFAULT")     = RKV_MODE_DEFAULT;
-    m.attr("RKV_MODE_INCLUSIVE")   = RKV_MODE_INCLUSIVE;
-    m.attr("RKV_MODE_APPEND")      = RKV_MODE_APPEND;
-    m.attr("RKV_MODE_CONSUME")     = RKV_MODE_CONSUME;
-    m.attr("RKV_MODE_WAIT")        = RKV_MODE_WAIT;
-    m.attr("RKV_MODE_NOTIFY")      = RKV_MODE_NOTIFY;
-    m.attr("RKV_MODE_NEW_ONLY")    = RKV_MODE_NEW_ONLY;
-    m.attr("RKV_MODE_EXIST_ONLY")  = RKV_MODE_EXIST_ONLY;
-    m.attr("RKV_MODE_NO_PREFIX")   = RKV_MODE_NO_PREFIX;
-    m.attr("RKV_MODE_IGNORE_KEYS") = RKV_MODE_IGNORE_KEYS;
-    m.attr("RKV_MODE_KEEP_LAST")   = RKV_MODE_KEEP_LAST;
-    m.attr("RKV_MODE_SUFFIX")      = RKV_MODE_SUFFIX;
-    m.attr("RKV_MODE_LUA_FILTER")  = RKV_MODE_LUA_FILTER;
+    m.attr("YOKAN_MODE_DEFAULT")     = YOKAN_MODE_DEFAULT;
+    m.attr("YOKAN_MODE_INCLUSIVE")   = YOKAN_MODE_INCLUSIVE;
+    m.attr("YOKAN_MODE_APPEND")      = YOKAN_MODE_APPEND;
+    m.attr("YOKAN_MODE_CONSUME")     = YOKAN_MODE_CONSUME;
+    m.attr("YOKAN_MODE_WAIT")        = YOKAN_MODE_WAIT;
+    m.attr("YOKAN_MODE_NOTIFY")      = YOKAN_MODE_NOTIFY;
+    m.attr("YOKAN_MODE_NEW_ONLY")    = YOKAN_MODE_NEW_ONLY;
+    m.attr("YOKAN_MODE_EXIST_ONLY")  = YOKAN_MODE_EXIST_ONLY;
+    m.attr("YOKAN_MODE_NO_PREFIX")   = YOKAN_MODE_NO_PREFIX;
+    m.attr("YOKAN_MODE_IGNORE_KEYS") = YOKAN_MODE_IGNORE_KEYS;
+    m.attr("YOKAN_MODE_KEEP_LAST")   = YOKAN_MODE_KEEP_LAST;
+    m.attr("YOKAN_MODE_SUFFIX")      = YOKAN_MODE_SUFFIX;
+    m.attr("YOKAN_MODE_LUA_FILTER")  = YOKAN_MODE_LUA_FILTER;
 
-    py::class_<rkv::Client>(m, "Client")
+    py::class_<yokan::Client>(m, "Client")
 
         .def(py::init<py_margo_instance_id>(), "mid"_a)
 
         .def("make_database_handle",
-             [](const rkv::Client& client,
+             [](const yokan::Client& client,
                 py_hg_addr_t addr,
                 uint16_t provider_id,
-                rkv_database_id_t database_id) {
+                yk_database_id_t database_id) {
                 return client.makeDatabaseHandle(addr, provider_id, database_id);
              },
              "address"_a, "provider_id"_a, "database_id"_a);
 
-    py::class_<rkv::Database>(m, "Database")
+    py::class_<yokan::Database>(m, "Database")
         // --------------------------------------------------------------
         // COUNT
         // --------------------------------------------------------------
         .def("count",
-             [](const rkv::Database& db, int32_t mode) {
+             [](const yokan::Database& db, int32_t mode) {
                 return db.count(mode);
-             }, "mode"_a=RKV_MODE_DEFAULT)
+             }, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // PUT
         // --------------------------------------------------------------
         .def("put",
-             static_cast<void(*)(const rkv::Database&, const py::buffer&,
+             static_cast<void(*)(const yokan::Database&, const py::buffer&,
                          const py::buffer&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("put",
-             static_cast<void(*)(const rkv::Database&, const std::string&,
+             static_cast<void(*)(const yokan::Database&, const std::string&,
                          const py::buffer&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("put",
-             static_cast<void(*)(const rkv::Database&, const std::string&,
+             static_cast<void(*)(const yokan::Database&, const std::string&,
                          const std::string&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // PUT_MULTI
         // --------------------------------------------------------------
         .def("put_multi",
-             static_cast<void(*)(const rkv::Database&,
+             static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<py::buffer,py::buffer>>&,
                 int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("put_multi",
-             static_cast<void(*)(const rkv::Database&,
+             static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string,py::buffer>>&,
                 int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("put_multi",
-             static_cast<void(*)(const rkv::Database&,
+             static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string,std::string>>&,
                 int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // PUT_PACKED
         // --------------------------------------------------------------
         .def("put_packed",
-             [](const rkv::Database& db, const py::buffer& keys,
+             [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t> key_sizes,
                 const py::buffer& vals,
                 const std::vector<size_t>& val_sizes,
@@ -496,36 +496,36 @@ PYBIND11_MODULE(pyyokan_client, m) {
                        val_info.ptr,
                        val_sizes.data(),
                        mode);
-             }, "keys"_a, "key_sizes"_a, "values"_a, "value_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "values"_a, "value_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // GET
         // --------------------------------------------------------------
         .def("get",
-             static_cast<size_t(*)(const rkv::Database&, const py::buffer&,
+             static_cast<size_t(*)(const yokan::Database&, const py::buffer&,
                 py::buffer&, int32_t)>(&get_helper),
-             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("get",
-             static_cast<size_t(*)(const rkv::Database&, const std::string&,
+             static_cast<size_t(*)(const yokan::Database&, const std::string&,
                 py::buffer&, int32_t)>(&get_helper),
-             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // GET_MULTI
         // --------------------------------------------------------------
         .def("get_multi",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 const std::vector<std::pair<py::buffer, py::buffer>>&,
                 int32_t)>(&get_multi_helper),
-             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("get_multi",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string, py::buffer>>&,
                 int32_t)>(&get_multi_helper),
-             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // GET_PACKED
         // --------------------------------------------------------------
         .def("get_packed",
-             [](const rkv::Database& db, const py::buffer& keys,
+             [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
                 py::buffer& vals,
                 int32_t mode) {
@@ -544,38 +544,38 @@ PYBIND11_MODULE(pyyokan_client, m) {
                              vbuf_size, val_info.ptr, val_sizes.data(), mode);
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
-                    if(val_sizes[i] != RKV_KEY_NOT_FOUND)
+                    if(val_sizes[i] != YOKAN_KEY_NOT_FOUND)
                         result.append(val_sizes[i]);
                     else
                         result.append(py::none());
                 }
                 return result;
-             }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=RKV_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
-             static_cast<bool(*)(const rkv::Database&, const std::string&, int32_t)>(&exists_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<bool(*)(const yokan::Database&, const std::string&, int32_t)>(&exists_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("exists",
-             static_cast<bool(*)(const rkv::Database&, const py::buffer&, int32_t)>(&exists_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<bool(*)(const yokan::Database&, const py::buffer&, int32_t)>(&exists_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS_MULTI
         // --------------------------------------------------------------
         .def("exists_multi",
-             static_cast<std::vector<bool>(*)(const rkv::Database&,
+             static_cast<std::vector<bool>(*)(const yokan::Database&,
                  const std::vector<std::string>&, int32_t)>(&exists_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("exists_multi",
-             static_cast<std::vector<bool>(*)(const rkv::Database&,
+             static_cast<std::vector<bool>(*)(const yokan::Database&,
                  const std::vector<py::buffer>&, int32_t)>(&exists_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS_PACKED
         // --------------------------------------------------------------
         .def("exists_packed",
-             [](const rkv::Database& db, const py::buffer& keys,
+             [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
                 int32_t mode) {
                 auto count = key_sizes.size();
@@ -586,34 +586,34 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
                 return db.existsPacked(count, key_info.ptr, key_sizes.data(), mode);
-             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
-             static_cast<size_t(*)(const rkv::Database&, const std::string&, int32_t)>(&length_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<size_t(*)(const yokan::Database&, const std::string&, int32_t)>(&length_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("length",
-             static_cast<size_t(*)(const rkv::Database&, const py::buffer&, int32_t)>(&length_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<size_t(*)(const yokan::Database&, const py::buffer&, int32_t)>(&length_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LENGTH_MULTI
         // --------------------------------------------------------------
         .def("length_multi",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                          const std::vector<std::string>&,
                          int32_t)>(&length_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("length_multi",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                          const std::vector<py::buffer>&,
                          int32_t)>(&length_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LENGTH_PACKED
         // --------------------------------------------------------------
         .def("length_packed",
-             [](const rkv::Database& db, const py::buffer& keys,
+             [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
                 int32_t mode) {
                 auto count = key_sizes.size();
@@ -627,40 +627,40 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 db.lengthPacked(count, key_info.ptr, key_sizes.data(), val_sizes.data(), mode);
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
-                    if(val_sizes[i] != RKV_KEY_NOT_FOUND)
+                    if(val_sizes[i] != YOKAN_KEY_NOT_FOUND)
                         result.append(val_sizes[i]);
                     else
                         result.append(py::none());
                 }
                 return result;
-             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // ERASE
         // --------------------------------------------------------------
         .def("erase",
-             static_cast<void(*)(const rkv::Database&, const std::string&, int32_t)>(&erase_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const yokan::Database&, const std::string&, int32_t)>(&erase_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("erase",
-             static_cast<void(*)(const rkv::Database&, const py::buffer&, int32_t)>(&erase_helper),
-             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const yokan::Database&, const py::buffer&, int32_t)>(&erase_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // ERASE_MULTI
         // --------------------------------------------------------------
         .def("erase_multi",
-             static_cast<void(*)(const rkv::Database&,
+             static_cast<void(*)(const yokan::Database&,
                                  const std::vector<std::string>&,
                                  int32_t)>(&erase_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("erase_multi",
-             static_cast<void(*)(const rkv::Database&,
+             static_cast<void(*)(const yokan::Database&,
                                  const std::vector<py::buffer>&,
                                  int32_t)>(&erase_multi_helper),
-             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // ERASE_PACKED
         // --------------------------------------------------------------
         .def("erase_packed",
-             [](const rkv::Database& db, const py::buffer& keys,
+             [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
                 int32_t mode) {
                 auto count = key_sizes.size();
@@ -671,135 +671,135 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
                 db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
-             }, "keys"_a, "key_sizes"_a, "mode"_a=RKV_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LIST_KEYS
         // --------------------------------------------------------------
         .def("list_keys",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const py::buffer&,
                 const py::buffer&,
                 int32_t)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const py::buffer&,
                 const std::string&,
                 int32_t)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const std::string&,
                 const py::buffer&,
                 int32_t)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const std::string&,
                 const std::string&,
                 int32_t)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LIST_KEYS_PACKED
         // --------------------------------------------------------------
         .def("list_keys_packed",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const py::buffer&,
                 const py::buffer&, int32_t)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys_packed",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const std::string&,
                 const py::buffer&, int32_t)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys_packed",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const py::buffer&,
                 const std::string&, int32_t)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys_packed",
-             static_cast<py::list(*)(const rkv::Database&,
+             static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const std::string&,
                 const std::string&, int32_t)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LIST_KEYVALS
         // --------------------------------------------------------------
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&,
+                const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const py::buffer&, const py::buffer&,
                 int32_t)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&,
+                const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const std::string&, const py::buffer&,
                 int32_t)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&,
+                const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const py::buffer&, const std::string&,
                 int32_t)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&,
+                const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const std::string&, const std::string&,
                 int32_t)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LIST_KEYVALS_PACKED
         // --------------------------------------------------------------
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&, py::buffer&, py::buffer&, size_t,
+                const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const py::buffer&, const py::buffer&,
                 int32_t)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&, py::buffer&, py::buffer&, size_t,
+                const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const std::string&, const py::buffer&,
                 int32_t)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&, py::buffer&, py::buffer&, size_t,
+                const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const py::buffer&, const std::string&,
                 int32_t)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const rkv::Database&, py::buffer&, py::buffer&, size_t,
+                const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const std::string&, const std::string&,
                 int32_t)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=RKV_MODE_DEFAULT)
+             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
     ;
 }
 

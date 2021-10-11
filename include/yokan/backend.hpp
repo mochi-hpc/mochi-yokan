@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#ifndef __RKV_BACKEND_H
-#define __RKV_BACKEND_H
+#ifndef __YOKAN_BACKEND_H
+#define __YOKAN_BACKEND_H
 
 #include <limits>
 #include <vector>
@@ -13,9 +13,9 @@
 #include <functional>
 #include <yokan/common.h>
 
-template <typename T> class __RKVBackendRegistration;
+template <typename T> class __YOKANBackendRegistration;
 
-namespace rkv {
+namespace yokan {
 
 /**
  * @brief Wrapper for user memory (equivalent to
@@ -80,39 +80,39 @@ struct BitField {
  * @brief Status returned by all the backend functions.
  */
 enum class Status : uint8_t {
-    OK           = RKV_SUCCESS,
-    InvalidType  = RKV_ERR_INVALID_BACKEND,
-    InvalidConf  = RKV_ERR_INVALID_CONFIG,
-    InvalidArg   = RKV_ERR_INVALID_ARGS,
-    NotFound     = RKV_ERR_KEY_NOT_FOUND,
-    SizeError    = RKV_ERR_BUFFER_SIZE,
-    KeyExists    = RKV_ERR_KEY_EXISTS,
-    NotSupported = RKV_ERR_OP_UNSUPPORTED,
-    Corruption   = RKV_ERR_CORRUPTION,
-    IOError      = RKV_ERR_IO,
-    Incomplete   = RKV_ERR_INCOMPLETE,
-    TimedOut     = RKV_ERR_TIMEOUT,
-    Aborted      = RKV_ERR_ABORTED,
-    Busy         = RKV_ERR_BUSY,
-    Expired      = RKV_ERR_EXPIRED,
-    TryAgain     = RKV_ERR_TRY_AGAIN,
-    System       = RKV_ERR_SYSTEM,
-    Canceled     = RKV_ERR_CANCELED,
-    Permission   = RKV_ERR_PERMISSION,
-    InvalidMode  = RKV_ERR_MODE,
-    Other        = RKV_ERR_OTHER
+    OK           = YOKAN_SUCCESS,
+    InvalidType  = YOKAN_ERR_INVALID_BACKEND,
+    InvalidConf  = YOKAN_ERR_INVALID_CONFIG,
+    InvalidArg   = YOKAN_ERR_INVALID_ARGS,
+    NotFound     = YOKAN_ERR_KEY_NOT_FOUND,
+    SizeError    = YOKAN_ERR_BUFFER_SIZE,
+    KeyExists    = YOKAN_ERR_KEY_EXISTS,
+    NotSupported = YOKAN_ERR_OP_UNSUPPORTED,
+    Corruption   = YOKAN_ERR_CORRUPTION,
+    IOError      = YOKAN_ERR_IO,
+    Incomplete   = YOKAN_ERR_INCOMPLETE,
+    TimedOut     = YOKAN_ERR_TIMEOUT,
+    Aborted      = YOKAN_ERR_ABORTED,
+    Busy         = YOKAN_ERR_BUSY,
+    Expired      = YOKAN_ERR_EXPIRED,
+    TryAgain     = YOKAN_ERR_TRY_AGAIN,
+    System       = YOKAN_ERR_SYSTEM,
+    Canceled     = YOKAN_ERR_CANCELED,
+    Permission   = YOKAN_ERR_PERMISSION,
+    InvalidMode  = YOKAN_ERR_MODE,
+    Other        = YOKAN_ERR_OTHER
 };
 
 /**
  * @brief Size used for a UserMem value when the key was not found.
  */
-constexpr auto KeyNotFound = RKV_KEY_NOT_FOUND;
+constexpr auto KeyNotFound = YOKAN_KEY_NOT_FOUND;
 
 /**
  * @brief Size used for a UserMem value when the provided buffer
  * was too small to hold the value.
  */
-constexpr auto BufTooSmall = RKV_SIZE_TOO_SMALL;
+constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
 
 /**
  * @brief Abstract embedded key/value storage object.
@@ -363,7 +363,7 @@ class KeyValueStoreInterface {
  */
 class KeyValueStoreFactory {
 
-    template <typename T> friend class ::__RKVBackendRegistration;
+    template <typename T> friend class ::__YOKANBackendRegistration;
 
     public:
 
@@ -414,23 +414,23 @@ class KeyValueStoreFactory {
 /**
  * @brief This macro should be used to register new backend types.
  */
-#define RKV_REGISTER_BACKEND(__backend_name, __backend_type) \
-    static __RKVBackendRegistration<__backend_type>          \
-    __rkv##__backend_name##_backend(#__backend_name)
+#define YOKAN_REGISTER_BACKEND(__backend_name, __backend_type) \
+    static __YOKANBackendRegistration<__backend_type>          \
+    __yk##__backend_name##_backend(#__backend_name)
 
-template <typename T> class __RKVBackendRegistration {
+template <typename T> class __YOKANBackendRegistration {
 
     public:
 
-    __RKVBackendRegistration(const std::string &backend_name) {
-        rkv::KeyValueStoreFactory::make_fn[backend_name] =
-            [](const std::string &config, rkv::KeyValueStoreInterface** kvs) {
+    __YOKANBackendRegistration(const std::string &backend_name) {
+        ::yokan::KeyValueStoreFactory::make_fn[backend_name] =
+            [](const std::string &config, ::yokan::KeyValueStoreInterface** kvs) {
                 return T::create(config, kvs);
             };
     }
 };
 
-using rkv_database = rkv::KeyValueStoreInterface;
-using rkv_database_t = rkv::KeyValueStoreInterface*;
+using yk_database = ::yokan::KeyValueStoreInterface;
+using yk_database_t = ::yokan::KeyValueStoreInterface*;
 
 #endif
