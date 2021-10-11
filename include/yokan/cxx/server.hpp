@@ -6,8 +6,8 @@
 #ifndef __RKV_SERVER_HPP
 #define __RKV_SERVER_HPP
 
-#include <rkv/rkv-server.h>
-#include <rkv/cxx/rkv-exception.hpp>
+#include <yokan/server.h>
+#include <yokan/cxx/exception.hpp>
 
 namespace rkv {
 

@@ -1,7 +1,7 @@
 # (C) 2021 The University of Chicago
 # See COPYRIGHT in top-level directory.
 cmake_minimum_required (VERSION 3.15)
-project (rkv C CXX)
+project (yokan C CXX)
 enable_testing ()
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
@@ -124,11 +124,11 @@ endif ()
 
 
 # library version set here (e.g. for shared libs).
-set (RKV_VERSION_MAJOR 0)
-set (RKV_VERSION_MINOR 1)
-set (RKV_VERSION_PATCH 0)
-set (RKV_VERSION
-     "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}.${RKV_VERSION_PATCH}")
+set (YOKAN_VERSION_MAJOR 0)
+set (YOKAN_VERSION_MINOR 1)
+set (YOKAN_VERSION_PATCH 0)
+set (YOKAN_VERSION
+     "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
 add_subdirectory (src)
 if(${ENABLE_TESTS})

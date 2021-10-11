@@ -7,7 +7,7 @@
 #define __RKV_BULK_CACHE_H
 
 #include <margo.h>
-#include <rkv/rkv-common.h>
+#include <yokan/common.h>
 
 #if defined(__cplusplus)
 extern "C" {

@@ -6,7 +6,7 @@
 #ifndef _ADMIN_H
 #define _ADMIN_H
 
-#include "rkv/rkv-admin.h"
+#include "yokan/admin.h"
 
 typedef struct rkv_admin {
    margo_instance_id mid;

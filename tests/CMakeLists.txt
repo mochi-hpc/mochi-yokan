@@ -11,9 +11,9 @@ foreach (test-source ${test-sources})
       ${CMAKE_CURRENT_BINARY_DIR}/../src
     )
     target_link_libraries (${test-target}
-        rkv-server
-        rkv-admin
-        rkv-client)
+        yokan-server
+        yokan-admin
+        yokan-client)
     add_test (NAME ${test-target} COMMAND timeout 200 ./${test-target})
 endforeach ()
 

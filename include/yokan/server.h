@@ -6,8 +6,8 @@
 #ifndef __RKV_SERVER_H
 #define __RKV_SERVER_H
 
-#include <rkv/rkv-common.h>
-#include <rkv/rkv-bulk-cache.h>
+#include <yokan/common.h>
+#include <yokan/bulk-cache.h>
 #include <margo.h>
 
 #ifdef __cplusplus

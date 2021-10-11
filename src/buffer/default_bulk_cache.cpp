@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "rkv/rkv-bulk-cache.h"
+#include "yokan/bulk-cache.h"
 #include "../common/logging.h"
 #include <atomic>
 

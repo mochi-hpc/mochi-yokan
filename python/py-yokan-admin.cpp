@@ -1,6 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <rkv/cxx/rkv-admin.hpp>
+#include <yokan/cxx/admin.hpp>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -11,10 +11,10 @@ typedef py::capsule py_hg_addr_t;
 #define MID2CAPSULE(__mid)   py::capsule((void*)(__mid),  "margo_instance_id", nullptr)
 #define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t", nullptr)
 
-PYBIND11_MODULE(pyrkv_admin, m) {
+PYBIND11_MODULE(pyyokan_admin, m) {
     m.doc() = "Python binding for the RKV admin library";
 
-    py::module::import("pyrkv_common");
+    py::module::import("pyyokan_common");
 
     py::class_<rkv::Admin>(m, "Admin")
         .def(py::init<py_margo_instance_id>(),

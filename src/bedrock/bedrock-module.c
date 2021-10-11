@@ -5,10 +5,10 @@
  */
 #include <bedrock/module.h>
 #include <string.h>
-#include "rkv/rkv-server.h"
-#include "rkv/rkv-client.h"
-#include "rkv/rkv-admin.h"
-#include "rkv/rkv-provider-handle.h"
+#include "yokan/server.h"
+#include "yokan/client.h"
+#include "yokan/admin.h"
+#include "yokan/provider-handle.h"
 #include "../client/client.h"
 
 static int rkv_register_provider(

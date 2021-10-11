@@ -3,9 +3,9 @@ exec_prefix=${prefix}
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
-Name: rkv-admin
+Name: yokan-admin
 Description: <insert description here>
-Version: @RKV_VERSION@
+Version: @YOKAN_VERSION@
 
 Requires: margo
 Libs: -L${libdir} @ADMIN_PRIVATE_LIBS@

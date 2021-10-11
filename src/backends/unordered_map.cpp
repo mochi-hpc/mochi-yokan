@@ -3,8 +3,8 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "rkv/rkv-backend.hpp"
-#include "rkv/rkv-watcher.hpp"
+#include "yokan/backend.hpp"
+#include "yokan/watcher.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/locks.hpp"

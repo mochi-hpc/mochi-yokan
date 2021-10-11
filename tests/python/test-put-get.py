@@ -9,10 +9,10 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyrkv_common as rkv
-from pyrkv_admin import Admin
-from pyrkv_client import Client
-from pyrkv_server import Provider
+import pyyokan_common as yokan
+from pyyokan_admin import Admin
+from pyyokan_client import Client
+from pyyokan_server import Provider
 
 class TestPutGet(unittest.TestCase):
 
@@ -62,7 +62,7 @@ class TestPutGet(unittest.TestCase):
             vsize = self.db.get(key=k, value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(rkv.Exception):
+        with self.assertRaises(yokan.Exception):
             self.db.get(key='xxxxx', value=out_val)
 
     def test_put_get_buffers(self):
@@ -76,7 +76,7 @@ class TestPutGet(unittest.TestCase):
                                 value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(rkv.Exception):
+        with self.assertRaises(yokan.Exception):
             self.db.get(key=bytearray(b'xxxxx'), value=out_val)
 
     def test_put_get_partial(self):

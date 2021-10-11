@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <rkv/cxx/rkv-client.hpp>
-#include <rkv/cxx/rkv-database.hpp>
+#include <yokan/cxx/client.hpp>
+#include <yokan/cxx/database.hpp>
 #include <iostream>
 #include <numeric>
 
@@ -392,10 +392,10 @@ static auto list_keyvals_packed_helper(
     return result;
 }
 
-PYBIND11_MODULE(pyrkv_client, m) {
+PYBIND11_MODULE(pyyokan_client, m) {
     m.doc() = "Python binding for the RKV client library";
 
-    py::module::import("pyrkv_common");
+    py::module::import("pyyokan_common");
 
     m.attr("RKV_MODE_DEFAULT")     = RKV_MODE_DEFAULT;
     m.attr("RKV_MODE_INCLUSIVE")   = RKV_MODE_INCLUSIVE;

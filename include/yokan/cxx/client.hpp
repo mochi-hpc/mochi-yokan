@@ -6,9 +6,9 @@
 #ifndef __RKV_CLIENT_HPP
 #define __RKV_CLIENT_HPP
 
-#include <rkv/rkv-client.h>
-#include <rkv/cxx/rkv-exception.hpp>
-#include <rkv/cxx/rkv-database.hpp>
+#include <yokan/client.h>
+#include <yokan/cxx/exception.hpp>
+#include <yokan/cxx/database.hpp>
 
 namespace rkv {
 

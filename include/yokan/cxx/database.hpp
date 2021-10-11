@@ -6,8 +6,8 @@
 #ifndef __RKV_DATABASE_HPP
 #define __RKV_DATABASE_HPP
 
-#include <rkv/rkv-database.h>
-#include <rkv/cxx/rkv-exception.hpp>
+#include <yokan/database.h>
+#include <yokan/cxx/exception.hpp>
 
 namespace rkv {
 

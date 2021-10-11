@@ -5,8 +5,8 @@
  */
 #include <stdio.h>
 #include <margo.h>
-#include <rkv/rkv-server.h>
-#include <rkv/rkv-admin.h>
+#include <yokan/server.h>
+#include <yokan/admin.h>
 #include "available-backends.h"
 #include "munit/munit.h"
 

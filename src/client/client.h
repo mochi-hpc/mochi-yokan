@@ -6,8 +6,8 @@
 #ifndef _CLIENT_H
 #define _CLIENT_H
 
-#include "rkv/rkv-client.h"
-#include "rkv/rkv-database.h"
+#include "yokan/client.h"
+#include "yokan/database.h"
 
 typedef struct rkv_client {
    margo_instance_id mid;

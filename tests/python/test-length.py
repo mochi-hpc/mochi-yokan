@@ -9,10 +9,10 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyrkv_common as rkv
-from pyrkv_admin import Admin
-from pyrkv_client import Client
-from pyrkv_server import Provider
+import pyyokan_common as yokan
+from pyyokan_admin import Admin
+from pyyokan_client import Client
+from pyyokan_server import Provider
 
 class TestLength(unittest.TestCase):
 
@@ -59,14 +59,14 @@ class TestLength(unittest.TestCase):
         """Test that we can check that the keys put do have the correct length."""
         for key, val in self.reference.items():
             self.assertEqual(self.db.length(key), len(val))
-        with self.assertRaises(rkv.Exception):
+        with self.assertRaises(yokan.Exception):
             self.db.length('xxxxx')
 
     def test_length_buffer(self):
         """Test that we can check that the keys put do have the correct length."""
         for key, val in self.reference.items():
             self.assertEqual(self.db.length(bytearray(key.encode('ascii'))), len(val))
-        with self.assertRaises(rkv.Exception):
+        with self.assertRaises(yokan.Exception):
             self.db.length(bytearray('xxxxx'.encode('ascii')))
 
     def test_length_multi_string(self):

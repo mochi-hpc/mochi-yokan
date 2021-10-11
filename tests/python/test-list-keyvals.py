@@ -9,9 +9,9 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-from pyrkv_admin import Admin
-from pyrkv_client import Client
-from pyrkv_server import Provider
+from pyyokan_admin import Admin
+from pyyokan_client import Client
+from pyyokan_server import Provider
 
 class TestListKeyVals(unittest.TestCase):
 

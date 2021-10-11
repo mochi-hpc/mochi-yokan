@@ -91,129 +91,129 @@ set (bedrock-module-src-files
 include (CMakePackageConfigHelpers)
 
 # where to install files for "find_package"
-set (rkv-pkg "share/cmake/rkv")
+set (yokan-pkg "share/cmake/yokan")
 
 # set version fo shared library
-set (rkv-vers "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}")
+set (yokan-vers "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}")
 
-# headers (necessary for the pyrkv_common target to know where to find headers
+# headers (necessary for the pyyokan_common target to know where to find headers
 # and what to link against)
-add_library (rkv-headers INTERFACE)
-target_include_directories (rkv-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-target_link_libraries (rkv-headers INTERFACE PkgConfig::uuid)
+add_library (yokan-headers INTERFACE)
+target_include_directories (yokan-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries (yokan-headers INTERFACE PkgConfig::uuid)
 
 # server library
-add_library (rkv-server ${server-src-files} ${backend-src-files})
-target_link_libraries (rkv-server
+add_library (yokan-server ${server-src-files} ${backend-src-files})
+target_link_libraries (yokan-server
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE nlohmann_json
     PRIVATE ${DB_DEPENDENCIES}
     PRIVATE coverage_config)
-target_include_directories (rkv-server PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (rkv-server BEFORE PUBLIC
+target_include_directories (yokan-server PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (yokan-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (rkv-server BEFORE PUBLIC
+target_include_directories (yokan-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (rkv-server
-    PROPERTIES VERSION ${RKV_VERSION}
-    SOVERSION ${RKV_VERSION_MAJOR})
+set_target_properties (yokan-server
+    PROPERTIES VERSION ${YOKAN_VERSION}
+    SOVERSION ${YOKAN_VERSION_MAJOR})
 
 # client library
-add_library (rkv-client ${client-src-files})
-target_link_libraries (rkv-client
+add_library (yokan-client ${client-src-files})
+target_link_libraries (yokan-client
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE coverage_config)
-target_include_directories (rkv-client PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (rkv-client BEFORE PUBLIC
+target_include_directories (yokan-client PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (yokan-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (rkv-client BEFORE PUBLIC
+target_include_directories (yokan-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (rkv-client
-    PROPERTIES VERSION ${RKV_VERSION}
-    SOVERSION ${RKV_VERSION_MAJOR})
+set_target_properties (yokan-client
+    PROPERTIES VERSION ${YOKAN_VERSION}
+    SOVERSION ${YOKAN_VERSION_MAJOR})
 
 # admin library
-add_library (rkv-admin ${admin-src-files})
-target_link_libraries (rkv-admin
+add_library (yokan-admin ${admin-src-files})
+target_link_libraries (yokan-admin
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE coverage_config)
-target_include_directories (rkv-admin PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (rkv-admin BEFORE PUBLIC
+target_include_directories (yokan-admin PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (yokan-admin BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (rkv-admin BEFORE PUBLIC
+target_include_directories (yokan-admin BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (rkv-admin
-    PROPERTIES VERSION ${RKV_VERSION}
-    SOVERSION ${RKV_VERSION_MAJOR})
+set_target_properties (yokan-admin
+    PROPERTIES VERSION ${YOKAN_VERSION}
+    SOVERSION ${YOKAN_VERSION_MAJOR})
 
 if (${ENABLE_BEDROCK})
 # bedrock-module library
-add_library (rkv-bedrock-module ${bedrock-module-src-files})
-target_link_libraries (rkv-bedrock-module
-    PUBLIC rkv-server
-    PUBLIC rkv-admin
-    PUBLIC rkv-client
+add_library (yokan-bedrock-module ${bedrock-module-src-files})
+target_link_libraries (yokan-bedrock-module
+    PUBLIC yokan-server
+    PUBLIC yokan-admin
+    PUBLIC yokan-client
     PUBLIC bedrock-server
     PRIVATE coverage_config)
-target_include_directories (rkv-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (rkv-bedrock-module BEFORE PUBLIC
+target_include_directories (yokan-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
+target_include_directories (yokan-bedrock-module BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (rkv-bedrock-module BEFORE PUBLIC
+target_include_directories (yokan-bedrock-module BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (rkv-bedrock-module
-    PROPERTIES VERSION ${RKV_VERSION}
-    SOVERSION ${RKV_VERSION_MAJOR})
+set_target_properties (yokan-bedrock-module
+    PROPERTIES VERSION ${YOKAN_VERSION}
+    SOVERSION ${YOKAN_VERSION_MAJOR})
 endif ()
 
 # installation stuff (packaging and install commands)
 write_basic_package_version_file(
-    "rkv-config-version.cmake"
-    VERSION ${RKV_VERSION}
+    "yokan-config-version.cmake"
+    VERSION ${YOKAN_VERSION}
     COMPATIBILITY AnyNewerVersion)
 
 # generate our config file for find_package()
 set(INCLUDE_INSTALL_DIR include/)
 set(LIB_INSTALL_DIR lib/)
-configure_package_config_file(rkv-config.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/rkv-config.cmake
-  INSTALL_DESTINATION ${LIB_INSTALL_DIR}/rkv/cmake
+configure_package_config_file(yokan-config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/yokan-config.cmake
+  INSTALL_DESTINATION ${LIB_INSTALL_DIR}/yokan/cmake
   PATH_VARS INCLUDE_INSTALL_DIR)
 
 # some bits for the pkg-config file
 set (DEST_DIR "${CMAKE_INSTALL_PREFIX}")
-set (SERVER_PRIVATE_LIBS "-lrkv-server")
-set (CLIENT_PRIVATE_LIBS "-lrkv-client")
-set (ADMIN_PRIVATE_LIBS  "-lrkv-admin")
-configure_file ("rkv-server.pc.in" "rkv-server.pc" @ONLY)
-configure_file ("rkv-client.pc.in" "rkv-client.pc" @ONLY)
-configure_file ("rkv-admin.pc.in"  "rkv-admin.pc"  @ONLY)
+set (SERVER_PRIVATE_LIBS "-lyokan-server")
+set (CLIENT_PRIVATE_LIBS "-lyokan-client")
+set (ADMIN_PRIVATE_LIBS  "-lyokan-admin")
+configure_file ("yokan-server.pc.in" "yokan-server.pc" @ONLY)
+configure_file ("yokan-client.pc.in" "yokan-client.pc" @ONLY)
+configure_file ("yokan-admin.pc.in"  "yokan-admin.pc"  @ONLY)
 
 # configure config.h
 configure_file ("config.h.in" "config.h" @ONLY)
 
 # "make install" rules
-install (TARGETS rkv-server rkv-client rkv-admin
-         EXPORT rkv-targets
+install (TARGETS yokan-server yokan-client yokan-admin
+         EXPORT yokan-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
 if (${ENABLE_BEDROCK})
-    install (TARGETS rkv-bedrock-module
+    install (TARGETS yokan-bedrock-module
              ARCHIVE DESTINATION lib
              LIBRARY DESTINATION lib)
 endif ()
-install (EXPORT rkv-targets
-         DESTINATION ${rkv-pkg}
-         FILE "rkv-targets.cmake")
-install (FILES "${CMAKE_CURRENT_BINARY_DIR}/rkv-config.cmake"
-               "${CMAKE_CURRENT_BINARY_DIR}/rkv-config-version.cmake"
-         DESTINATION ${rkv-pkg} )
-install (DIRECTORY ../include/rkv
+install (EXPORT yokan-targets
+         DESTINATION ${yokan-pkg}
+         FILE "yokan-targets.cmake")
+install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-config.cmake"
+               "${CMAKE_CURRENT_BINARY_DIR}/yokan-config-version.cmake"
+         DESTINATION ${yokan-pkg} )
+install (DIRECTORY ../include/yokan
          DESTINATION include
          FILES_MATCHING PATTERN "*.h")
-install (FILES "${CMAKE_CURRENT_BINARY_DIR}/rkv-server.pc"
-               "${CMAKE_CURRENT_BINARY_DIR}/rkv-client.pc"
-               "${CMAKE_CURRENT_BINARY_DIR}/rkv-admin.pc"
+install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-server.pc"
+               "${CMAKE_CURRENT_BINARY_DIR}/yokan-client.pc"
+               "${CMAKE_CURRENT_BINARY_DIR}/yokan-admin.pc"
          DESTINATION "lib/pkgconfig/")

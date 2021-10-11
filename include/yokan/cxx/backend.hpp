@@ -6,6 +6,6 @@
 #ifndef __RKV_BACKEND_CXX_HPP
 #define __RKV_BACKEND_CXX_HPP
 
-#include <rkv/rkv-backend.hpp>
+#include <yokan/backend.hpp>
 
 #endif

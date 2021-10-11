@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "rkv/rkv-backend.hpp"
+#include "yokan/backend.hpp"
 #include "../common/locks.hpp"
 #include "../common/modes.hpp"
 #include <unqlite.h>

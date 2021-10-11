@@ -10,7 +10,7 @@
 #include <mercury_macros.h>
 #include <mercury_proc.h>
 #include <mercury_proc_string.h>
-#include "rkv/rkv-common.h"
+#include "yokan/common.h"
 
 // LCOV_EXCL_START
 

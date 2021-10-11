@@ -6,8 +6,8 @@
 #ifndef __RKV_ADMIN_HPP
 #define __RKV_ADMIN_HPP
 
-#include <rkv/rkv-admin.h>
-#include <rkv/cxx/rkv-exception.hpp>
+#include <yokan/admin.h>
+#include <yokan/cxx/exception.hpp>
 #include <vector>
 
 namespace rkv {

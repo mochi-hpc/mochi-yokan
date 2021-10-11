@@ -1,11 +1,11 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <rkv/cxx/rkv-exception.hpp>
+#include <yokan/cxx/exception.hpp>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-PYBIND11_MODULE(pyrkv_common, m) {
+PYBIND11_MODULE(pyyokan_common, m) {
     m.doc() = "Python binding for common stuff in the RKV library";
 
     py::register_exception<rkv::Exception>(m, "Exception");

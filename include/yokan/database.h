@@ -8,8 +8,8 @@
 
 #include <stdbool.h>
 #include <margo.h>
-#include <rkv/rkv-common.h>
-#include <rkv/rkv-client.h>
+#include <yokan/common.h>
+#include <yokan/client.h>
 
 #ifdef __cplusplus
 extern "C" {

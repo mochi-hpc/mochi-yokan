@@ -6,7 +6,7 @@
 #ifndef __RKV_MODES_HPP
 #define __RKV_MODES_HPP
 
-#include "rkv/rkv-common.h"
+#include "yokan/common.h"
 #include "config.h"
 #include <cstring>
 #ifdef HAS_LUA

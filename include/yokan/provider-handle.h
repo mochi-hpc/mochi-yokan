@@ -7,7 +7,7 @@
 #define __RKV_PROVIDER_HANDLE_H
 
 #include <margo.h>
-#include <rkv/rkv-common.h>
+#include <yokan/common.h>
 
 #ifdef __cplusplus
 extern "C" {

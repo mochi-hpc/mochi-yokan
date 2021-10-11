@@ -5,7 +5,7 @@
  */
 #include "../common/types.h"
 #include "admin.h"
-#include "rkv/rkv-admin.h"
+#include "yokan/admin.h"
 
 rkv_return_t rkv_admin_init(margo_instance_id mid, rkv_admin_t* admin)
 {

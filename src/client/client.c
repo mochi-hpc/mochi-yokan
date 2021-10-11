@@ -5,7 +5,7 @@
  */
 #include "../common/types.h"
 #include "client.h"
-#include "rkv/rkv-client.h"
+#include "yokan/client.h"
 #include <stdio.h>
 
 rkv_return_t rkv_client_init(margo_instance_id mid, rkv_client_t* client)

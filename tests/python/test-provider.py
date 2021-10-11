@@ -5,8 +5,8 @@ import unittest
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
-import pyrkv_common as rkv
-from pyrkv_server import Provider
+import pyyokan_common as yokan
+from pyyokan_server import Provider
 from pymargo.core import Engine
 
 class TestInitProvider(unittest.TestCase):
@@ -66,7 +66,7 @@ class TestInitProvider(unittest.TestCase):
             mid=engine.get_internal_mid(),
             provider_id=42,
             config='{}')
-        with self.assertRaises(rkv.Exception):
+        with self.assertRaises(yokan.Exception):
             provider2 = Provider(
                 mid=engine.get_internal_mid(),
                 provider_id=42,

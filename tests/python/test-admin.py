@@ -7,8 +7,8 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-from pyrkv_admin import Admin
-from pyrkv_server import Provider
+from pyyokan_admin import Admin
+from pyyokan_server import Provider
 
 class TestAdmin(unittest.TestCase):
 

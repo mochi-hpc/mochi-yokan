@@ -6,7 +6,7 @@
 #ifndef __RKV_EXCEPTION_HPP
 #define __RKV_EXCEPTION_HPP
 
-#include <rkv/rkv-common.h>
+#include <yokan/common.h>
 #include <exception>
 
 namespace rkv {

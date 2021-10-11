@@ -7,7 +7,7 @@
 #define __RKV_ALLOCATOR_HPP
 
 #include "logging.h"
-#include "rkv/rkv-allocator.h"
+#include "yokan/allocator.h"
 #include <memory>
 #include <iostream>
 

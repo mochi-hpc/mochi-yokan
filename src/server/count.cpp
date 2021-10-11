@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "rkv/rkv-server.h"
+#include "yokan/server.h"
 #include "provider.hpp"
 #include "../common/types.h"
 #include "../common/defer.hpp"

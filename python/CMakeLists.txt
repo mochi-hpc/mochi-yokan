@@ -1,24 +1,24 @@
-add_library (pyrkv_common MODULE py-rkv-common.cpp)
-target_link_libraries (pyrkv_common PRIVATE pybind11::module rkv-headers PRIVATE coverage_config)
-pybind11_extension (pyrkv_common)
-pybind11_strip (pyrkv_common)
+add_library (pyyokan_common MODULE py-yokan-common.cpp)
+target_link_libraries (pyyokan_common PRIVATE pybind11::module yokan-headers PRIVATE coverage_config)
+pybind11_extension (pyyokan_common)
+pybind11_strip (pyyokan_common)
 
-add_library (pyrkv_client MODULE py-rkv-client.cpp)
-target_link_libraries (pyrkv_client PRIVATE pybind11::module rkv-client PRIVATE coverage_config)
-pybind11_extension (pyrkv_client)
-pybind11_strip (pyrkv_client)
+add_library (pyyokan_client MODULE py-yokan-client.cpp)
+target_link_libraries (pyyokan_client PRIVATE pybind11::module yokan-client PRIVATE coverage_config)
+pybind11_extension (pyyokan_client)
+pybind11_strip (pyyokan_client)
 
-add_library (pyrkv_admin MODULE py-rkv-admin.cpp)
-target_link_libraries (pyrkv_admin PRIVATE pybind11::module rkv-admin PRIVATE coverage_config)
-pybind11_extension (pyrkv_admin)
-pybind11_strip (pyrkv_admin)
+add_library (pyyokan_admin MODULE py-yokan-admin.cpp)
+target_link_libraries (pyyokan_admin PRIVATE pybind11::module yokan-admin PRIVATE coverage_config)
+pybind11_extension (pyyokan_admin)
+pybind11_strip (pyyokan_admin)
 
-add_library (pyrkv_server MODULE py-rkv-server.cpp)
-target_link_libraries (pyrkv_server PRIVATE pybind11::module rkv-server PRIVATE coverage_config)
-pybind11_extension (pyrkv_server)
-pybind11_strip (pyrkv_server)
+add_library (pyyokan_server MODULE py-yokan-server.cpp)
+target_link_libraries (pyyokan_server PRIVATE pybind11::module yokan-server PRIVATE coverage_config)
+pybind11_extension (pyyokan_server)
+pybind11_strip (pyyokan_server)
 
-install (TARGETS pyrkv_common pyrkv_client pyrkv_admin pyrkv_server
-         EXPORT rkv-targets
+install (TARGETS pyyokan_common pyyokan_client pyyokan_admin pyyokan_server
+         EXPORT yokan-targets
          ARCHIVE DESTINATION lib/python3/dist-packages
          LIBRARY DESTINATION lib/python3/dist-packages)
