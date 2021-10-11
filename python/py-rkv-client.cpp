@@ -14,6 +14,15 @@ typedef py::capsule py_hg_addr_t;
 #define MID2CAPSULE(__mid)   py::capsule((void*)(__mid),  "margo_instance_id", nullptr)
 #define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t", nullptr)
 
+
+static auto get_buffer_info(const py::buffer& buf) {
+    return buf.request();
+}
+
+static auto get_buffer_info(const std::string& str) {
+    return py::buffer_info{ str.data(), (ssize_t)str.size(), false };
+}
+
 #define CHECK_BUFFER_IS_CONTIGUOUS(__buf_info__) do { \
     ssize_t __stride__ = (__buf_info__).itemsize;     \
     for(ssize_t i=0; i < (__buf_info__).ndim; i++) {  \
@@ -27,6 +36,127 @@ typedef py::capsule py_hg_addr_t;
     if((__buf_info__).readonly)                     \
         throw rkv::Exception(RKV_ERR_READONLY);     \
 } while(0)
+
+template <typename KeyType, typename ValueType>
+static void put_helper(const rkv::Database& db, const KeyType& key,
+                       const ValueType& val, int32_t mode) {
+    auto key_info = get_buffer_info(key);
+    auto val_info = get_buffer_info(val);
+    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+    db.put(key_info.ptr,
+            key_info.itemsize*key_info.size,
+            val_info.ptr,
+            val_info.itemsize*val_info.size,
+            mode);
+}
+
+template <typename KeyType, typename ValueType>
+static void put_multi_helper(const rkv::Database& db,
+                             const std::vector<std::pair<KeyType,ValueType>>& keyvals,
+                             int32_t mode) {
+    auto count = keyvals.size();
+    std::vector<const void*> keys(count);
+    std::vector<const void*> vals(count);
+    std::vector<size_t> key_sizes(count);
+    std::vector<size_t> val_sizes(count);
+    for(size_t i = 0; i < count; i++) {
+        auto key_info = get_buffer_info(keyvals[i].first);
+        auto val_info = get_buffer_info(keyvals[i].second);
+        CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+        CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+        keys[i] = key_info.ptr;
+        vals[i] = val_info.ptr;
+        key_sizes[i] = key_info.itemsize*key_info.size;
+        val_sizes[i] = val_info.itemsize*val_info.size;
+    }
+    db.putMulti(count,
+            keys.data(),
+            key_sizes.data(),
+            vals.data(),
+            val_sizes.data(),
+            mode);
+}
+
+template<typename KeyType>
+static auto get_helper(const rkv::Database& db, const KeyType& key,
+                       py::buffer& val, int32_t mode) {
+    auto key_info = get_buffer_info(key);
+    auto val_info = val.request();
+    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+    CHECK_BUFFER_IS_WRITABLE(val_info);
+    size_t vsize = val_info.itemsize*val_info.size;
+    db.get(key_info.ptr,
+           key_info.itemsize*key_info.size,
+           val_info.ptr,
+           &vsize,
+           mode);
+    return vsize;
+}
+
+template<typename KeyType>
+static auto get_multi_helper(const rkv::Database& db,
+                             const std::vector<std::pair<KeyType, py::buffer>>& keyvals,
+                             int32_t mode) {
+    auto count = keyvals.size();
+    std::vector<const void*> keys(count);
+    std::vector<void*>       vals(count);
+    std::vector<size_t>      key_sizes(count);
+    std::vector<size_t>      val_sizes(count);
+    for(size_t i = 0; i < count; i++) {
+        auto key_info = get_buffer_info(keyvals[i].first);
+        auto val_info = get_buffer_info(keyvals[i].second);
+        CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+        CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+        CHECK_BUFFER_IS_WRITABLE(val_info);
+        keys[i] = key_info.ptr;
+        vals[i] = val_info.ptr;
+        key_sizes[i] = key_info.itemsize*key_info.size;
+        val_sizes[i] = val_info.itemsize*val_info.size;
+    }
+    db.getMulti(count,
+                keys.data(),
+                key_sizes.data(),
+                vals.data(),
+                val_sizes.data(),
+                mode);
+    py::list result;
+    for(size_t i=0; i < count; i++) {
+        if(val_sizes[i] == RKV_KEY_NOT_FOUND)
+            result.append(py::none());
+        else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
+            result.append(-1);
+        else
+            result.append(val_sizes[i]);
+    }
+    return result;
+}
+
+template<typename KeyType>
+static auto exists_helper(const rkv::Database& db,
+                          const KeyType& key, int32_t mode) {
+    auto key_info = get_buffer_info(key);
+    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+    size_t ksize = key_info.itemsize*key_info.size;
+    return db.exists(key_info.ptr, ksize, mode);
+}
+
+template<typename KeyType>
+static auto exists_multi_helper(const rkv::Database& db,
+                                const std::vector<KeyType>& keys,
+                                int32_t mode) {
+    const auto count = keys.size();
+    std::vector<const void*> key_ptrs(count);
+    std::vector<size_t>      key_size(count);
+    for(size_t i = 0; i < count; i++) {
+        auto key_info = get_buffer_info(keys[i]);
+        CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+        key_ptrs[i] = key_info.ptr;
+        key_size[i] = key_info.itemsize*key_info.size;
+    }
+    return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
+}
 
 PYBIND11_MODULE(pyrkv_client, m) {
     m.doc() = "Python binding for the RKV client library";
@@ -72,116 +202,35 @@ PYBIND11_MODULE(pyrkv_client, m) {
         // PUT
         // --------------------------------------------------------------
         .def("put",
-             [](const rkv::Database& db, const py::buffer& key,
-                const py::buffer& val, int32_t mode) {
-                auto key_info = key.request();
-                auto val_info = val.request();
-                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                db.put(key_info.ptr,
-                       key_info.itemsize*key_info.size,
-                       val_info.ptr,
-                       val_info.itemsize*val_info.size,
-                       mode);
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&, const py::buffer&,
+                         const py::buffer&, int32_t)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("put",
-             [](const rkv::Database& db, const std::string& key,
-                const py::buffer& val, int32_t mode) {
-                auto val_info = val.request();
-                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                db.put(key.data(),
-                       key.size(),
-                       val_info.ptr,
-                       val_info.itemsize*val_info.size,
-                       mode);
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&, const std::string&,
+                         const py::buffer&, int32_t)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("put",
-             [](const rkv::Database& db, const std::string& key,
-                const std::string& val, int32_t mode) {
-                db.put(key.data(),
-                       key.size(),
-                       val.data(),
-                       val.size(),
-                       mode);
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&, const std::string&,
+                         const std::string&, int32_t)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // PUT_MULTI
         // --------------------------------------------------------------
         .def("put_multi",
-             [](const rkv::Database& db,
-                const std::vector<std::pair<py::buffer,py::buffer>>& keyvals,
-                int32_t mode) {
-                auto count = keyvals.size();
-                std::vector<const void*> keys(count);
-                std::vector<const void*> vals(count);
-                std::vector<size_t> key_sizes(count);
-                std::vector<size_t> val_sizes(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto key_info = keyvals[i].first.request();
-                    auto val_info = keyvals[i].second.request();
-                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                    keys[i] = key_info.ptr;
-                    vals[i] = val_info.ptr;
-                    key_sizes[i] = key_info.itemsize*key_info.size;
-                    val_sizes[i] = val_info.itemsize*val_info.size;
-                }
-                db.putMulti(count,
-                            keys.data(),
-                            key_sizes.data(),
-                            vals.data(),
-                            val_sizes.data(),
-                            mode);
-             }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&,
+                const std::vector<std::pair<py::buffer,py::buffer>>&,
+                int32_t)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("put_multi",
-             [](const rkv::Database& db,
-                const std::vector<std::pair<std::string,py::buffer>>& keyvals,
-                int32_t mode) {
-                auto count = keyvals.size();
-                std::vector<const void*> keys(count);
-                std::vector<const void*> vals(count);
-                std::vector<size_t> key_sizes(count);
-                std::vector<size_t> val_sizes(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto& key = keyvals[i].first;
-                    auto val_info = keyvals[i].second.request();
-                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                    keys[i] = key.data();
-                    vals[i] = val_info.ptr;
-                    key_sizes[i] = key.size();
-                    val_sizes[i] = val_info.itemsize*val_info.size;
-                }
-                db.putMulti(count,
-                            keys.data(),
-                            key_sizes.data(),
-                            vals.data(),
-                            val_sizes.data(),
-                            mode);
-             }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&,
+                const std::vector<std::pair<std::string,py::buffer>>&,
+                int32_t)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("put_multi",
-             [](const rkv::Database& db,
-                const std::vector<std::pair<std::string,std::string>>& keyvals,
-                int32_t mode) {
-                auto count = keyvals.size();
-                std::vector<const void*> keys(count);
-                std::vector<const void*> vals(count);
-                std::vector<size_t> key_sizes(count);
-                std::vector<size_t> val_sizes(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto& key = keyvals[i].first;
-                    auto& val = keyvals[i].second;
-                    keys[i] = key.data();
-                    vals[i] = val.data();
-                    key_sizes[i] = key.size();
-                    val_sizes[i] = val.size();
-                }
-                db.putMulti(count,
-                            keys.data(),
-                            key_sizes.data(),
-                            vals.data(),
-                            val_sizes.data(),
-                            mode);
-             }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<void(*)(const rkv::Database&,
+                const std::vector<std::pair<std::string,std::string>>&,
+                int32_t)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // PUT_PACKED
         // --------------------------------------------------------------
@@ -218,111 +267,26 @@ PYBIND11_MODULE(pyrkv_client, m) {
         // GET
         // --------------------------------------------------------------
         .def("get",
-             [](const rkv::Database& db, const py::buffer& key,
-                py::buffer& val, int32_t mode) {
-                auto key_info = key.request();
-                auto val_info = val.request();
-                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                CHECK_BUFFER_IS_WRITABLE(val_info);
-                size_t vsize = val_info.itemsize*val_info.size;
-                db.get(key_info.ptr,
-                       key_info.itemsize*key_info.size,
-                       val_info.ptr,
-                       &vsize,
-                       mode);
-                return vsize;
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<size_t(*)(const rkv::Database&, const py::buffer&,
+                py::buffer&, int32_t)>(&get_helper),
+             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("get",
-             [](const rkv::Database& db, const std::string& key,
-                py::buffer& val, int32_t mode) {
-                auto val_info = val.request();
-                CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                CHECK_BUFFER_IS_WRITABLE(val_info);
-                size_t vsize = val_info.itemsize*val_info.size;
-                db.get(key.data(),
-                       key.size(),
-                       val_info.ptr,
-                       &vsize,
-                       mode);
-                return vsize;
-             }, "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<size_t(*)(const rkv::Database&, const std::string&,
+                py::buffer&, int32_t)>(&get_helper),
+             "key"_a, "value"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // GET_MULTI
         // --------------------------------------------------------------
         .def("get_multi",
-             [](const rkv::Database& db,
-                const std::vector<std::pair<py::buffer, py::buffer>>& keyvals,
-                int32_t mode) {
-                auto count = keyvals.size();
-                std::vector<const void*> keys(count);
-                std::vector<void*>       vals(count);
-                std::vector<size_t>      key_sizes(count);
-                std::vector<size_t>      val_sizes(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto key_info = keyvals[i].first.request();
-                    auto val_info = keyvals[i].second.request();
-                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                    CHECK_BUFFER_IS_WRITABLE(val_info);
-                    keys[i] = key_info.ptr;
-                    vals[i] = val_info.ptr;
-                    key_sizes[i] = key_info.itemsize*key_info.size;
-                    val_sizes[i] = val_info.itemsize*val_info.size;
-                }
-                db.getMulti(count,
-                            keys.data(),
-                            key_sizes.data(),
-                            vals.data(),
-                            val_sizes.data(),
-                            mode);
-                py::list result;
-                for(size_t i=0; i < count; i++) {
-                    if(val_sizes[i] == RKV_KEY_NOT_FOUND)
-                        result.append(py::none());
-                    else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
-                        result.append(-1);
-                    else
-                        result.append(val_sizes[i]);
-                }
-                return result;
-             }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<py::list(*)(const rkv::Database&,
+                const std::vector<std::pair<py::buffer, py::buffer>>&,
+                int32_t)>(&get_multi_helper),
+             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("get_multi",
-             [](const rkv::Database& db,
-                const std::vector<std::pair<std::string, py::buffer>>& keyvals,
-                int32_t mode) {
-                auto count = keyvals.size();
-                std::vector<const void*> keys(count);
-                std::vector<void*>       vals(count);
-                std::vector<size_t>      key_sizes(count);
-                std::vector<size_t>      val_sizes(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto& key = keyvals[i].first;
-                    auto val_info = keyvals[i].second.request();
-                    CHECK_BUFFER_IS_CONTIGUOUS(val_info);
-                    CHECK_BUFFER_IS_WRITABLE(val_info);
-                    keys[i] = key.data();
-                    vals[i] = val_info.ptr;
-                    key_sizes[i] = key.size();
-                    val_sizes[i] = val_info.itemsize*val_info.size;
-                }
-                db.getMulti(count,
-                            keys.data(),
-                            key_sizes.data(),
-                            vals.data(),
-                            val_sizes.data(),
-                            mode);
-                py::list result;
-                for(size_t i=0; i < count; i++) {
-                    if(val_sizes[i] == RKV_KEY_NOT_FOUND)
-                        result.append(py::none());
-                    else if(val_sizes[i] == RKV_SIZE_TOO_SMALL)
-                        result.append(-1);
-                    else
-                        result.append(val_sizes[i]);
-                }
-                return result;
-             }, "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<py::list(*)(const rkv::Database&,
+                const std::vector<std::pair<std::string, py::buffer>>&,
+                int32_t)>(&get_multi_helper),
+             "pairs"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // GET_PACKED
         // --------------------------------------------------------------
@@ -357,47 +321,22 @@ PYBIND11_MODULE(pyrkv_client, m) {
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
-             [](const rkv::Database& db, const std::string& key,
-                int32_t mode) {
-                return db.exists(key.data(), key.size(), mode);
-             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<bool(*)(const rkv::Database&, const std::string&, int32_t)>(&exists_helper),
+             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("exists",
-             [](const rkv::Database& db, const py::buffer& key,
-                int32_t mode) {
-                auto key_info = key.request();
-                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                size_t ksize = key_info.itemsize*key_info.size;
-                return db.exists(key_info.ptr, ksize, mode);
-             }, "key"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<bool(*)(const rkv::Database&, const py::buffer&, int32_t)>(&exists_helper),
+             "key"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS_MULTI
         // --------------------------------------------------------------
         .def("exists_multi",
-             [](const rkv::Database& db, const std::vector<std::string>& keys,
-                int32_t mode) {
-                const auto count = keys.size();
-                std::vector<const void*> key_ptrs(count);
-                std::vector<size_t>      key_size(count);
-                for(size_t i = 0; i < count; i++) {
-                    key_ptrs[i] = keys[i].data();
-                    key_size[i] = keys[i].size();
-                }
-                return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
-             }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<std::vector<bool>(*)(const rkv::Database&,
+                 const std::vector<std::string>&, int32_t)>(&exists_multi_helper),
+             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
         .def("exists_multi",
-             [](const rkv::Database& db, const std::vector<py::buffer>& keys,
-                int32_t mode) {
-                const auto count = keys.size();
-                std::vector<const void*> key_ptrs(count);
-                std::vector<size_t>      key_size(count);
-                for(size_t i = 0; i < count; i++) {
-                    auto key_info = keys[i].request();
-                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
-                    key_ptrs[i] = key_info.ptr;
-                    key_size[i] = key_info.itemsize*key_info.size;
-                }
-                return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
-             }, "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
+             static_cast<std::vector<bool>(*)(const rkv::Database&,
+                 const std::vector<py::buffer>&, int32_t)>(&exists_multi_helper),
+             "keys"_a, "mode"_a=RKV_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS_PACKED
         // --------------------------------------------------------------
