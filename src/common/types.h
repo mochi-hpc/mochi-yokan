@@ -11,6 +11,7 @@
 #include <mercury_proc.h>
 #include <mercury_proc_string.h>
 #include "yokan/common.h"
+#include <stdlib.h>
 
 // LCOV_EXCL_START
 
