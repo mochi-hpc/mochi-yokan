@@ -1,6 +1,6 @@
 # (C) 2021 The University of Chicago
 # See COPYRIGHT in top-level directory.
-cmake_minimum_required (VERSION 3.13)
+cmake_minimum_required (VERSION 3.15)
 project (rkv C CXX)
 enable_testing ()
 
@@ -26,6 +26,7 @@ option (ENABLE_LMDB       "Build with lmdb support" OFF)
 option (ENABLE_GDBM       "Build with gdbm support" OFF)
 option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
 option (ENABLE_LUA        "Build with Lua support" OFF)
+option (ENABLE_PYTHON     "Build the Python module" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -114,6 +115,13 @@ if (ENABLE_LUA)
     set (HAS_LUA ON)
     set (CMAKE_CXX_STANDARD 17)
 endif ()
+
+if (ENABLE_PYTHON)
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+    find_package(pybind11 REQUIRED)
+    add_subdirectory (python)
+endif ()
+
 
 # library version set here (e.g. for shared libs).
 set (RKV_VERSION_MAJOR 0)

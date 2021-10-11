@@ -13,6 +13,9 @@ jobs:
   codecov:
     runs-on: ubuntu-latest
     steps:
+    - name: Install system packages
+      run: |
+        sudo apt install -y python3-dev
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Add latest Spack release
@@ -22,7 +25,8 @@ jobs:
       run: |
         eval `/opt/spack/bin/spack env activate --sh .` &&
         /opt/spack/bin/spack external find --not-buildable cmake &&
-        /opt/spack/bin/spack external find --not-buildable perl
+        /opt/spack/bin/spack external find --not-buildable perl &&
+        /opt/spack/bin/spack external find --not-buildable python
     - name: Add mochi-spack-packages
       run: |
         git clone https://github.com/mochi-hpc/mochi-spack-packages /opt/spack/mochi-spack-packages
@@ -39,7 +43,7 @@ jobs:
       run: |
         eval `/opt/spack/bin/spack env activate --sh .` &&
         mkdir build && cd build &&
-        cmake .. -DENABLE_COVERAGE=ON -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_LEVELDB=ON -DENABLE_ROCKSDB=ON -DENABLE_BERKELEYDB=ON -DENABLE_TKRZW=ON -DENABLE_GDBM=ON -DENABLE_LMDB=ON -DENABLE_UNQLITE=ON -DENABLE_LUA=ON &&
+        cmake .. -DENABLE_COVERAGE=ON -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_LEVELDB=ON -DENABLE_ROCKSDB=ON -DENABLE_BERKELEYDB=ON -DENABLE_TKRZW=ON -DENABLE_GDBM=ON -DENABLE_LMDB=ON -DENABLE_UNQLITE=ON -DENABLE_LUA=ON -DENABLE_PYTHON=ON &&
         make && make test
     - name: Upload code coverage files
       run: |

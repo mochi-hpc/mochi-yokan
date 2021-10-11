@@ -96,6 +96,12 @@ set (rkv-pkg "share/cmake/rkv")
 # set version fo shared library
 set (rkv-vers "${RKV_VERSION_MAJOR}.${RKV_VERSION_MINOR}")
 
+# headers (necessary for the pyrkv_common target to know where to find headers
+# and what to link against)
+add_library (rkv-headers INTERFACE)
+target_include_directories (rkv-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries (rkv-headers INTERFACE PkgConfig::uuid)
+
 # server library
 add_library (rkv-server ${server-src-files} ${backend-src-files})
 target_link_libraries (rkv-server
