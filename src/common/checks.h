@@ -72,7 +72,7 @@
         } \
     } while(0)
 
-static inline constexpr int32_t incompatible_modes[][2] = {
+static constexpr int32_t incompatible_modes[][2] = {
     { YOKAN_MODE_APPEND, YOKAN_MODE_NEW_ONLY },
     { YOKAN_MODE_NEW_ONLY, YOKAN_MODE_EXIST_ONLY },
     { 0, 0 }};
