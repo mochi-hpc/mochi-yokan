@@ -6,6 +6,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+    - name: Install system packages
+      run: |
+        apt install -y python3-dev
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Add latest Spack release
@@ -15,7 +18,8 @@ jobs:
       run: |
         eval `/opt/spack/bin/spack env activate --sh .` &&
         /opt/spack/bin/spack external find --not-buildable cmake &&
-        /opt/spack/bin/spack external find --not-buildable perl
+        /opt/spack/bin/spack external find --not-buildable perl &&
+        /opt/spack/bin/spack external find --not-buildable python
     - name: Add mochi-spack-packages
       run: |
         git clone https://github.com/mochi-hpc/mochi-spack-packages /opt/spack/mochi-spack-packages
