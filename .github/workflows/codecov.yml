@@ -15,7 +15,7 @@ jobs:
     steps:
     - name: Install system packages
       run: |
-        apt install -y python3-dev
+        sudo apt install -y python3-dev
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Add latest Spack release
