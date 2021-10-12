@@ -34,9 +34,7 @@ static int yk_deregister_provider(
 
 static char* yk_get_provider_config(
         bedrock_module_provider_t provider) {
-    (void)provider;
-    // TODO
-    return strdup("{}");
+    return yk_provider_get_config(provider);
 }
 
 static int yk_init_client(

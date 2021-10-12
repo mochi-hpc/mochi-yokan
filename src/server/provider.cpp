@@ -19,6 +19,8 @@ static inline bool check_token(
         yk_provider_t provider,
         const char* token);
 
+static inline bool open_backends_from_config(yk_provider_t provider);
+
 yk_return_t yk_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
@@ -49,6 +51,19 @@ yk_return_t yk_provider_register(
         // LCOV_EXCL_STOP
     }
 
+    json config;
+    if(args->config != NULL) {
+        config = json::parse(args->config);
+    } else {
+        config = json::object();
+    }
+    if(not config.contains("databases"))
+        config["databases"] = json::array();
+    if(not config["databases"].is_array()) {
+        YOKAN_LOG_ERROR(mid, "\"databases\" field in configuration is not an array");
+        return YOKAN_ERR_INVALID_CONFIG;
+    }
+
     p = new yk_provider;
     if(p == NULL) {
         // LCOV_EXCL_START
@@ -60,6 +75,7 @@ yk_return_t yk_provider_register(
     p->mid = mid;
     p->provider_id = provider_id;
     p->pool = a.pool;
+    p->config = config;
     p->token = (a.token && strlen(a.token)) ? a.token : "";
 
     /* Bulk cache */
@@ -77,6 +93,10 @@ yk_return_t yk_provider_register(
         delete p;
         return YOKAN_ERR_ALLOCATION;
         // LCOV_EXCL_STOP
+    }
+
+    if(!open_backends_from_config(p)) {
+        return YOKAN_ERR_INVALID_CONFIG;
     }
 
     /* Admin RPCs */
@@ -199,6 +219,11 @@ yk_return_t yk_provider_destroy(
     yk_finalize_provider(provider);
     YOKAN_LOG_TRACE(mid, "YOKAN provider successfuly destroyed");
     return YOKAN_SUCCESS;
+}
+
+char* yk_provider_get_config(yk_provider_t provider)
+{
+    return strdup(provider->config.dump().c_str());
 }
 
 void yk_open_database_ult(hg_handle_t h)
@@ -384,4 +409,56 @@ static inline bool check_token(
 {
     if(provider->token.empty()) return true;
     return provider->token == token;
+}
+
+static inline bool open_backends_from_config(yk_provider_t provider)
+{
+    auto& config = provider->config;
+    auto& databases = config["databases"];
+    // Check that all the backend entries are objects and have a "type" field,
+    // and an optional "config" field that is an object. If the "config" field
+    // is not found, it will be added.
+    for(auto& db : databases) {
+        if(not db.is_object()) {
+            YOKAN_LOG_ERROR(provider->mid,
+                "\"databases\" should only contain objects");
+            return false;
+        }
+        if(not db.contains("type")) {
+            YOKAN_LOG_ERROR(provider->mid,
+                "\"type\" field not found in database configuration");
+            return false;
+        }
+        auto type = db["type"].get<std::string>();
+        bool has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(type);
+        if(!has_backend_type) {
+            YOKAN_LOG_ERROR(provider->mid,
+                "could not find backend of type \"%s\"", type.c_str());
+            return false;
+        }
+        if(!db.contains("config"))
+            db["config"] = json::object();
+        auto& db_config = db["config"];
+        if(not db_config.is_object()) {
+            YOKAN_LOG_ERROR(provider->mid,
+                "\"config\" field in database definition should be an object");
+            return false;
+        }
+    }
+    // Ok, seems like all the store configurations are good
+    for(auto& db : databases) {
+        yk_database_id_t id;
+        yk_database_t database;
+        uuid_generate(id.uuid);
+        auto type = db["type"].get<std::string>();
+        auto config = db["config"].dump();
+        auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(type, config, &database);
+        if(status != yokan::Status::OK) {
+            YOKAN_LOG_ERROR(provider->mid,
+                "failed to open database of type %s", type.c_str());
+            return false;
+        }
+        provider->dbs[id] = database;
+    }
+    return true;
 }

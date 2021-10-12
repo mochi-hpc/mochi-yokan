@@ -39,7 +39,7 @@ struct yk_provider_args {
  * @param[in] args argument structure
  * @param[out] provider provider
  *
- * @return YOKAN_SUCCESS or error code defined in yk-common.h
+ * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_provider_register(
         margo_instance_id mid,
@@ -48,14 +48,20 @@ yk_return_t yk_provider_register(
         yk_provider_t* provider);
 
 /**
- * @brief Destroys the Alpha provider and deregisters its RPC.
+ * @brief Destroys the YOKAN provider and deregisters its RPC.
  *
- * @param[in] provider Alpha provider
+ * @param[in] provider YOKAN provider
  *
- * @return YOKAN_SUCCESS or error code defined in yk-common.h
+ * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_provider_destroy(
         yk_provider_t provider);
+
+/**
+ * @brief Returns the internal configuration of the YOKAN
+ * provider. The returned string must be free-ed by the caller.
+ */
+char* yk_provider_get_config(yk_provider_t provider);
 
 #ifdef __cplusplus
 }

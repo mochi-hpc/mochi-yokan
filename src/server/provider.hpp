@@ -7,6 +7,7 @@
 #define __PROVIDER_H
 
 #include "yokan/backend.hpp"
+#include <nlohmann/json.hpp>
 #include <margo.h>
 #include <uuid.h>
 #include <unordered_map>
@@ -33,13 +34,16 @@ inline bool operator!=(const yk_database_id_t& lhs, const yk_database_id_t& rhs)
     return std::memcmp(&lhs.uuid, &rhs.uuid, sizeof(lhs.uuid)) != 0;
 }
 
+using json = nlohmann::json;
+
 typedef struct yk_provider {
     /* Margo/Argobots/Mercury environment */
     margo_instance_id  mid;                 // Margo instance
     uint16_t           provider_id;         // Provider id
     ABT_pool           pool;                // Pool on which to post RPC requests
+    json               config;              // JSON configuration
     std::string        token;               // Security token
-    yk_bulk_cache     bulk_cache;          // Bulk cache functions
+    yk_bulk_cache      bulk_cache;          // Bulk cache functions
     void*              bulk_cache_data;     // Bulk cache data
 
     /* Databases */
