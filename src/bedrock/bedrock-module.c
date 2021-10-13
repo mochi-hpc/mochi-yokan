@@ -81,7 +81,7 @@ static int yk_destroy_provider_handle(
     return BEDROCK_SUCCESS;
 }
 
-static struct bedrock_module yk = {
+static struct bedrock_module yokan = {
     .register_provider       = yk_register_provider,
     .deregister_provider     = yk_deregister_provider,
     .get_provider_config     = yk_get_provider_config,
@@ -94,4 +94,4 @@ static struct bedrock_module yk = {
     .client_dependencies     = NULL
 };
 
-BEDROCK_REGISTER_MODULE(yk, yk)
+BEDROCK_REGISTER_MODULE(yokan, yokan)
