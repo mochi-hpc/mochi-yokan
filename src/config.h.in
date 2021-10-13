@@ -11,15 +11,15 @@
 #cmakedefine ENABLE_LOG_INFO
 #cmakedefine ENABLE_LOG_COLORS
 
-#cmakedefine HAS_LEVELDB
-#cmakedefine HAS_LMDB
-#cmakedefine HAS_BERKELEYDB
-#cmakedefine HAS_ROCKSDB
-#cmakedefine HAS_GDBM
-#cmakedefine HAS_PMEMKV
-#cmakedefine HAS_TKRZW
-#cmakedefine HAS_UNQLITE
-#cmakedefine HAS_LUA
+#cmakedefine YOKAN_HAS_LEVELDB
+#cmakedefine YOKAN_HAS_LMDB
+#cmakedefine YOKAN_HAS_BERKELEYDB
+#cmakedefine YOKAN_HAS_ROCKSDB
+#cmakedefine YOKAN_HAS_GDBM
+#cmakedefine YOKAN_HAS_PMEMKV
+#cmakedefine YOKAN_HAS_TKRZW
+#cmakedefine YOKAN_HAS_UNQLITE
+#cmakedefine YOKAN_HAS_LUA
 
 #ifdef ENABLE_LOG_DEBUG
 #define ENABLE_LOG_ERROR

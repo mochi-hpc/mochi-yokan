@@ -205,6 +205,7 @@ if (${ENABLE_BEDROCK})
              LIBRARY DESTINATION lib)
 endif ()
 install (EXPORT yokan-targets
+         NAMESPACE yokan
          DESTINATION ${yokan-pkg}
          FILE "yokan-targets.cmake")
 install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-config.cmake"

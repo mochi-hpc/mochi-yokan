@@ -133,7 +133,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         //            |YOKAN_MODE_IGNORE_KEYS
         //            |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
                     )

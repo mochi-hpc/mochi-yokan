@@ -9,7 +9,7 @@
 #include "yokan/common.h"
 #include "config.h"
 #include <cstring>
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
 #include <sol/sol.hpp>
 #endif
 
@@ -28,7 +28,7 @@ struct Filter {
     int32_t     m_mode;
     const void* m_filter;
     size_t      m_fsize;
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
     sol::state* m_lua = nullptr;
 #endif
 
@@ -37,7 +37,7 @@ struct Filter {
     : m_mode(mode)
     , m_filter(filter)
     , m_fsize(fsize) {
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
         if(m_mode & YOKAN_MODE_LUA_FILTER) {
             m_lua = new sol::state{};
             m_lua->open_libraries(sol::lib::base);
@@ -53,23 +53,23 @@ struct Filter {
     : m_mode(other.m_mode)
     , m_filter(other.m_filter)
     , m_fsize(other.m_fsize)
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
     , m_lua(other.m_lua)
 #endif
     {
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
         other.m_lua = nullptr;
 #endif
     }
 
     ~Filter() {
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
         if(m_lua) delete m_lua;
 #endif
     }
 
     bool check(const void* key, size_t ksize) const {
-#ifdef HAS_LUA
+#ifdef YOKAN_HAS_LUA
         if(m_mode & YOKAN_MODE_LUA_FILTER) {
             (*m_lua)["__key__"] = ksize > 0 ?
                 std::string_view(static_cast<const char*>(key), ksize)

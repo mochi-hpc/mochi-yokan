@@ -5,28 +5,28 @@ static const char* available_backends[] = {
     "unordered_map",
     "set",
     "unordered_set",
-#ifdef HAS_LEVELDB
+#ifdef YOKAN_HAS_LEVELDB
     "leveldb",
 #endif
-#ifdef HAS_LMDB
+#ifdef YOKAN_HAS_LMDB
     "lmdb",
 #endif
-#ifdef HAS_BERKELEYDB
+#ifdef YOKAN_HAS_BERKELEYDB
     "berkeleydb",
 #endif
-#ifdef HAS_ROCKSDB
+#ifdef YOKAN_HAS_ROCKSDB
     "rocksdb",
 #endif
-#ifdef HAS_GDBM
+#ifdef YOKAN_HAS_GDBM
     "gdbm",
 #endif
-#ifdef HAS_PMEMKV
+#ifdef YOKAN_HAS_PMEMKV
     "pmemkv",
 #endif
-#ifdef HAS_TKRZW
+#ifdef YOKAN_HAS_TKRZW
     "tkrzw",
 #endif
-#ifdef HAS_UNQLITE
+#ifdef YOKAN_HAS_UNQLITE
     "unqlite",
 #endif
     NULL
@@ -37,36 +37,36 @@ static const char* backend_configs[] = {
     "{}",
     "{}",
     "{}",
-#ifdef HAS_LEVELDB
+#ifdef YOKAN_HAS_LEVELDB
     "{\"path\":\"/tmp/leveldb-test\","
     " \"create_if_missing\":true}",
 #endif
-#ifdef HAS_LMDB
+#ifdef YOKAN_HAS_LMDB
     "{\"path\":\"/tmp/lmdb-test\","
     " \"create_if_missing\":true}",
 #endif
-#ifdef HAS_BERKELEYDB
+#ifdef YOKAN_HAS_BERKELEYDB
     "{\"home\":\"/tmp/berkeleydb-test\","
     " \"file\":\"my-bdb\","
     " \"create_if_missing\":true,"
     " \"type\":\"btree\"}",
 #endif
-#ifdef HAS_ROCKSDB
+#ifdef YOKAN_HAS_ROCKSDB
     "{\"path\":\"/tmp/rocksdb-test\","
     " \"create_if_missing\":true}",
 #endif
-#ifdef HAS_GDBM
+#ifdef YOKAN_HAS_GDBM
     "{\"path\":\"/tmp/gdbm-test\","
     " \"create_if_missing\":true}",
 #endif
-#ifdef HAS_PMEMKV
+#ifdef YOKAN_HAS_PMEMKV
     "{}",
 #endif
-#ifdef HAS_TKRZW
+#ifdef YOKAN_HAS_TKRZW
     "{\"path\":\"/tmp/trkzw-test\","
     " \"type\":\"tree\"}",
 #endif
-#ifdef HAS_UNQLITE
+#ifdef YOKAN_HAS_UNQLITE
     "{\"path\":\":mem:\","
     "\"mode\":\"memory\"}",
 #endif
