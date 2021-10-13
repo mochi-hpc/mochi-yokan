@@ -18,7 +18,7 @@
 #define YOKAN_LOG_DEBUG(__mid__, __msg__, ...) \
     margo_debug(__mid__, "[yokan] %s:%d: " __msg__, __func__, __LINE__, ##__VA_ARGS__)
 #define YOKAN_LOG_INFO(__mid__, __msg__, ...) \
-    margo_info(__mid__, "[yokan] %s:%d: " __msg__, __func__, __LINE__, ##__VA_ARGS__)
+    margo_info(__mid__, "[yokan] " __msg__, ##__VA_ARGS__)
 #define YOKAN_LOG_WARNING(__mid__, __msg__, ...) \
     margo_warning(__mid__, "[yokan] %s:%d: " __msg__, __func__, __LINE__, ##__VA_ARGS__)
 #define YOKAN_LOG_ERROR(__mid__, __msg__, ...) \

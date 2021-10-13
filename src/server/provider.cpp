@@ -482,6 +482,8 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         db["__id__"] = std::string(db_id);
         db["config"] = std::move(final_db_config);
         provider->dbs[id] = database;
+
+        YOKAN_LOG_INFO(provider->mid, "opened database %s", db_id);
     }
     return true;
 }
