@@ -52,9 +52,9 @@ yk_return_t yk_provider_register(
     }
 
     json config;
-    if(args->config != NULL) {
+    if(a.config != NULL) {
         try {
-            config = json::parse(args->config);
+            config = json::parse(a.config);
         } catch(const std::exception& ex) {
             YOKAN_LOG_ERROR(mid, "failed to parse JSON configuration: %s", ex.what());
             return YOKAN_ERR_INVALID_CONFIG;
