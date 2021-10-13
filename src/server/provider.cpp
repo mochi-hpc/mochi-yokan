@@ -183,7 +183,7 @@ yk_return_t yk_provider_register(
 
     if(provider)
         *provider = p;
-    margo_info(mid, "YOKAN provider registration done");
+    YOKAN_LOG_INFO(mid, "YOKAN provider registration done");
     return YOKAN_SUCCESS;
 }
 
@@ -196,7 +196,7 @@ static void yk_finalize_provider(void* p)
         delete pair.second;
         // LCOV_EXCL_STOP
     }
-    margo_info(mid, "Finalizing YOKAN provider");
+    YOKAN_LOG_TRACE(mid, "Finalizing YOKAN provider");
     margo_deregister(mid, provider->open_database_id);
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
@@ -210,7 +210,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->list_keyvals_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
-    margo_info(mid, "YOKAN provider successfuly finalized");
+    YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");
 }
 
 yk_return_t yk_provider_destroy(
@@ -283,7 +283,7 @@ void yk_open_database_ult(hg_handle_t h)
     out.id = id;
 
     yk_database_id_to_string(id, id_str);
-    YOKAN_LOG_TRACE(mid, "created database %s of type \"%s\"", id_str, in.type);
+    YOKAN_LOG_INFO(mid, "created database %s of type \"%s\"", id_str, in.type);
 
 }
 DEFINE_MARGO_RPC_HANDLER(yk_open_database_ult)
@@ -323,6 +323,10 @@ void yk_close_database_ult(hg_handle_t h)
     delete provider->dbs[in.id];
     provider->dbs.erase(in.id);
     out.ret = YOKAN_SUCCESS;
+
+    char db_id_str[37];
+    yk_database_id_to_string(in.id, db_id_str);
+    YOKAN_LOG_INFO(mid, "closed database %s", db_id_str);
 }
 DEFINE_MARGO_RPC_HANDLER(yk_close_database_ult)
 
@@ -358,6 +362,10 @@ void yk_destroy_database_ult(hg_handle_t h)
     database->destroy();
     delete database;
     provider->dbs.erase(in.id);
+
+    char db_id_str[37];
+    yk_database_id_to_string(in.id, db_id_str);
+    YOKAN_LOG_INFO(mid, "destroyed database %s", db_id_str);
 
     out.ret = YOKAN_SUCCESS;
 }
