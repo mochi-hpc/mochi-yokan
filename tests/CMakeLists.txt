@@ -13,7 +13,8 @@ foreach (test-source ${test-sources})
     target_link_libraries (${test-target}
         yokan-server
         yokan-admin
-        yokan-client)
+        yokan-client
+        nlohmann_json)
     add_test (NAME ${test-target} COMMAND timeout 200 ./${test-target})
 endforeach ()
 

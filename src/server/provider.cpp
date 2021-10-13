@@ -53,7 +53,12 @@ yk_return_t yk_provider_register(
 
     json config;
     if(args->config != NULL) {
-        config = json::parse(args->config);
+        try {
+            config = json::parse(args->config);
+        } catch(const std::exception& ex) {
+            YOKAN_LOG_ERROR(mid, "failed to parse JSON configuration: %s", ex.what());
+            return YOKAN_ERR_INVALID_CONFIG;
+        }
     } else {
         config = json::object();
     }
@@ -451,13 +456,23 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         yk_database_t database;
         uuid_generate(id.uuid);
         auto type = db["type"].get<std::string>();
-        auto config = db["config"].dump();
+        auto& initial_db_config =  db["config"];
+        auto config = initial_db_config.dump();
         auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(type, config, &database);
         if(status != yokan::Status::OK) {
             YOKAN_LOG_ERROR(provider->mid,
                 "failed to open database of type %s", type.c_str());
             return false;
         }
+        auto final_db_config = json::parse(database->config());
+        for(auto& config_entry : initial_db_config.items()) {
+            if(not final_db_config.contains(config_entry.key()))
+                final_db_config[config_entry.key()] = config_entry.value();
+        }
+        char db_id[37];
+        yk_database_id_to_string(id, db_id);
+        db["__id__"] = std::string(db_id);
+        db["config"] = std::move(final_db_config);
         provider->dbs[id] = database;
     }
     return true;
