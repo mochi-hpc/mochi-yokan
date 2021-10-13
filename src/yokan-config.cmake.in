@@ -45,7 +45,7 @@ endif()
 
 if(YOKAN_HAS_GDBM)
     find_dependency (GDBM)
-endif
+endif()
 
 if(YOKAN_HAS_LMDB)
     pkg_check_modules (lmdb REQUIRED IMPORTED_TARGET lmdb)
