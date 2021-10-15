@@ -46,6 +46,15 @@ class Linker {
                            descriptor.substr(p+1));
         }
     }
+
+    static void open(const std::string& filename) {
+        void* handle;
+        handle = dlopen(filename.c_str(), RTLD_NOW | RTLD_GLOBAL);
+        if(!handle) {
+           YOKAN_LOG_ERROR(0, "dlopen failed to open file %s (%s)",
+                filename.c_str(), dlerror());
+        }
+    }
 };
 
 }

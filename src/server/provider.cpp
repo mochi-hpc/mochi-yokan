@@ -7,6 +7,7 @@
 #include "provider.hpp"
 #include "../common/types.h"
 #include "../common/defer.hpp"
+#include "../common/linker.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include "../buffer/default_bulk_cache.hpp"
@@ -442,7 +443,15 @@ static inline bool open_backends_from_config(yk_provider_t provider)
                 "\"type\" field not found in database configuration");
             return false;
         }
-        auto type = db["type"].get<std::string>();
+        auto full_type = db["type"].get<std::string>();
+        auto type = full_type;
+        {
+            auto p = full_type.find(':');
+            if(p != std::string::npos) {
+                yokan::Linker::open(full_type.substr(0,p));
+                type = full_type.substr(p+1);
+            }
+        }
         bool has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(type);
         if(!has_backend_type) {
             YOKAN_LOG_ERROR(provider->mid,
