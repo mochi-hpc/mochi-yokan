@@ -2,3 +2,5 @@
 
 ![](https://github.com/mochi-hpc/mochi-yokan/actions/workflows/test.yml/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/mochi-hpc/mochi-yokan/branch/main/graph/badge.svg)](https://codecov.io/gh/mochi-hpc/mochi-yokan)
+
+Please see documentation [here](https://mochi.readthedocs.io/en/latest/yokan.html).
