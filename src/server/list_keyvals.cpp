@@ -63,8 +63,8 @@ void yk_list_keyvals_ult(hg_handle_t h)
     const size_t keys_offset   = vsizes_offset + in.count*sizeof(size_t);
     const size_t vals_offset   = keys_offset + in.keys_buf_size;
 
-    // transfer ksizes only if in.packed is false
     size_t size_to_transfer = in.from_ksize + in.filter_size;
+    // transfer ksizes and vsizes only if in.packed is false
     if(!in.packed) size_to_transfer += 2*in.count*sizeof(size_t);
 
     if(size_to_transfer > 0) {

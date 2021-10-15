@@ -67,7 +67,7 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
             // check allocators
             if(!cfg.contains("allocators")) {
                 cfg["allocators"]["key_allocator"] = "default";
-                cfg["allocators"]["pair_allocator"] = "default";
+                cfg["allocators"]["node_allocator"] = "default";
             } else if(!cfg["allocators"].is_object()) {
                 return Status::InvalidConf;
             }
