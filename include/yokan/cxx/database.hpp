@@ -8,6 +8,7 @@
 
 #include <yokan/database.h>
 #include <yokan/cxx/exception.hpp>
+#include <vector>
 
 namespace yokan {
 
