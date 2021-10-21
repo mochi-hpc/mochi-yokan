@@ -13,6 +13,7 @@ set (server-src-files
 
 set (backend-src-files
      backends/backends.cpp
+     backends/null.cpp
      backends/map.cpp
      backends/unordered_map.cpp
      backends/set.cpp
