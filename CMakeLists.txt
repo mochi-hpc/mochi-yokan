@@ -70,6 +70,8 @@ endif ()
 pkg_check_modules (margo REQUIRED IMPORTED_TARGET margo)
 # search for uuid
 pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
+# search for tclap
+pkg_check_modules (tclap REQUIRED IMPORTED_TARGET tclap)
 
 if (ENABLE_LEVELDB)
     pkg_check_modules (leveldb REQUIRED IMPORTED_TARGET leveldb)
@@ -136,6 +138,7 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
+add_subdirectory (benchmark)
 
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)

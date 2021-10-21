@@ -116,10 +116,6 @@ constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
 
 /**
  * @brief Abstract embedded key/value storage object.
- *
- * Note: in the interest of forcing implementers to think about
- * optimizing their backends, all the methods are pure virtual,
- * even if some methods could be implemented in terms of other methods.
  */
 class KeyValueStoreInterface {
 
