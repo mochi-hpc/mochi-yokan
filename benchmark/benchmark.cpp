@@ -1244,8 +1244,8 @@ static options parse_arguments(int argc, char** argv) {
             "p", "provider-id", "Id of the Yokan provider", false, 0, "integer");
         TCLAP::ValueArg<std::string> prefixArg(
             "", "prefix", "Prefix to use for some of the keys", false, "", "string");
-        TCLAP::ValueArg<uint8_t> prefixFreqArg(
-            "", "prefix-freq", "Persentage of appearance of the prefix", false, 50, "float");
+        TCLAP::ValueArg<uint16_t> prefixFreqArg(
+            "", "prefix-freq", "Persentage of appearance of the prefix", false, 50, "integer");
         TCLAP::ValueArg<unsigned> batchSizeArg(
             "b", "batch-size", "Batch size for operations that acces multiple items", false, 0, "integer");
         TCLAP::SwitchArg noRemoveArg(
