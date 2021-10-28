@@ -138,6 +138,7 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
+add_subdirectory (bin)
 add_subdirectory (benchmark)
 
 # library version set here (e.g. for shared libs).

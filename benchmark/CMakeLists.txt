@@ -1,4 +1,4 @@
-add_executable(yokan-benchmark benchmark.cpp)
-target_link_libraries(yokan-benchmark yokan-client PkgConfig::tclap)
+add_executable(yk-benchmark benchmark.cpp)
+target_link_libraries(yk-benchmark yokan-client PkgConfig::tclap)
 
-install(TARGETS yokan-benchmark DESTINATION bin)
+install(TARGETS yk-benchmark DESTINATION bin)
