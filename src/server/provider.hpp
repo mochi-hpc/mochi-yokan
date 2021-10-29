@@ -64,6 +64,15 @@ typedef struct yk_provider {
     hg_id_t erase_id;
     hg_id_t list_keys_id;
     hg_id_t list_keyvals_id;
+    hg_id_t coll_create_id;
+    hg_id_t coll_drop_id;
+    hg_id_t coll_exists_id;
+    hg_id_t coll_erase_id;
+    hg_id_t coll_last_id_id;
+    hg_id_t coll_size_id;
+    hg_id_t coll_load_id;
+    hg_id_t coll_store_id;
+    hg_id_t coll_update_id;
 } yk_provider;
 
 /* Admin RPCs */
@@ -95,6 +104,25 @@ DECLARE_MARGO_RPC_HANDLER(yk_list_keys_ult)
 void yk_list_keys_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)
 void yk_list_keyvals_ult(hg_handle_t h);
+
+DECLARE_MARGO_RPC_HANDLER(yk_coll_create_ult)
+void yk_coll_create_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_drop_ult)
+void yk_coll_drop_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_exists_ult)
+void yk_coll_exists_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_erase_ult)
+void yk_coll_erase_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_last_id_ult)
+void yk_coll_last_id_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_size_ult)
+void yk_coll_size_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_load_ult)
+void yk_coll_load_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_store_ult)
+void yk_coll_store_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_coll_update_ult)
+void yk_coll_update_ult(hg_handle_t h);
 
 static inline yk_database_t find_database(yk_provider_t provider,
                                            yk_database_id_t* db_id)

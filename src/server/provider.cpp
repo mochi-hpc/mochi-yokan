@@ -180,6 +180,60 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keyvals_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_create",
+            coll_create_in_t, coll_create_out_t,
+            yk_coll_create_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_create_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_drop",
+            coll_drop_in_t, coll_drop_out_t,
+            yk_coll_drop_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_drop_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_exists",
+            coll_exists_in_t, coll_exists_out_t,
+            yk_coll_exists_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_exists_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_erase",
+            coll_erase_in_t, coll_erase_out_t,
+            yk_coll_erase_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_erase_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_last_id",
+            coll_last_id_in_t, coll_last_id_out_t,
+            yk_coll_last_id_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_last_id_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_size",
+            coll_size_in_t, coll_size_out_t,
+            yk_coll_size_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_size_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_load",
+            coll_load_in_t, coll_load_out_t,
+            yk_coll_load_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_load_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_store",
+            coll_store_in_t, coll_store_out_t,
+            yk_coll_store_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_store_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_update",
+            coll_update_in_t, coll_update_out_t,
+            yk_coll_update_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_update_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
     if(provider)

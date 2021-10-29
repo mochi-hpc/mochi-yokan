@@ -9,6 +9,15 @@ set (server-src-files
      server/exists.cpp
      server/list_keys.cpp
      server/list_keyvals.cpp
+     server/coll_create.cpp
+     server/coll_drop.cpp
+     server/coll_exists.cpp
+     server/coll_erase.cpp
+     server/coll_last_id.cpp
+     server/coll_size.cpp
+     server/coll_store.cpp
+     server/coll_update.cpp
+     server/coll_load.cpp
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files
