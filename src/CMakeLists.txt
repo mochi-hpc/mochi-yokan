@@ -80,7 +80,16 @@ set (client-src-files
      client/length.cpp
      client/exists.cpp
      client/list_keys.cpp
-     client/list_keyvals.cpp)
+     client/list_keyvals.cpp
+     client/coll_create.cpp
+     client/coll_drop.cpp
+     client/coll_exists.cpp
+     client/coll_erase.cpp
+     client/coll_last_id.cpp
+     client/coll_size.cpp
+     client/coll_store.cpp
+     client/coll_update.cpp
+     client/coll_load.cpp)
 
 set (admin-src-files
      admin/admin.c)

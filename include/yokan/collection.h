@@ -178,10 +178,57 @@ yk_return_t yk_coll_load_packed(yk_database_handle_t dbh,
                                 const char* collection,
                                 int32_t mode,
                                 size_t count,
-                                const yk_id_t* ids
+                                const yk_id_t* ids,
                                 size_t rbufsize,
-                                const void* records,
-                                const size_t* rsizes);
+                                void* records,
+                                size_t* rsizes);
+
+/**
+ * @brief Low-level load operation based on a bulk handle.
+ * This function will take the data in [offset, offset+size[
+ * from the bulk handle and interpret it as follows:
+ * - The first count * sizeof(size_t) bytes store the record sizes.
+ * - The next N bytes store records back to back, where
+ *   N = sum of record sizes
+ * Origin represents the address of the process that created
+ * the bulk handle. If NULL, the bulk handle is considered to
+ * have been created by the calling process.
+ *
+ * This function is useful in situation where a process received
+ * a bulk handle from another process and wants to forward it to
+ * an YOKAN provider.
+ *
+ * Note: the "packed" argument is important. It specifies whether
+ * the process that created the bulk handle did so by exposing a single
+ * contiguous buffer in which packed records are meant to be stored
+ * (in which case the record sizes do not matter as an input), or
+ * if individual buffers were exposed to hold each records (in which case
+ * the record sizes do matter as an input).
+ *
+ * @param dbh Database handle
+ * @param collection Collection name
+ * @param mode Mode
+ * @param count Number of records
+ * @param ids Record ids
+ * @param origin Origin address
+ * @param data Bulk handle containing record sizes and data
+ * @param offset Offset in the bulk handle
+ * @param size Size of the bulk handle (from offset)
+ * @param packed Whether records are packed
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
+                              const char* collection,
+                              int32_t mode,
+                              size_t count,
+                              const yk_id_t* ids,
+                              const char* origin,
+                              hg_bulk_t data,
+                              size_t offset,
+                              size_t size,
+                              bool packed);
+
 /**
  * @brief Get the number of records currently stored in the
  * collection.
@@ -215,6 +262,7 @@ yk_return_t yk_coll_last_id(yk_database_handle_t dbh,
                             int32_t mode,
                             yk_id_t* id);
 
+#if 0
 /**
  * @brief Fetch a record from the collection. The response
  * argument must have been allocated using yk_response_alloc.
@@ -284,6 +332,7 @@ yk_return_t yk_coll_filter(yk_database_handle_t dbh,
                            const void* filter,
                            size_t fsize,
                            yk_response_t response);
+#endif
 
 /**
  * @brief Update a record from the collection.
@@ -347,6 +396,33 @@ yk_return_t yk_coll_update_packed(yk_database_handle_t dbh,
                                   const size_t* rsizes);
 
 /**
+ * @brief Low-level version of update that takes an already
+ * create bulk handle. The bulk handle is interpreted the same
+ * way as in yk_coll_store_bulk.
+ *
+ * @param dbh Database handle
+ * @param name Collection name
+ * @param mode Mode
+ * @param count Number of records
+ * @param ids Record ids
+ * @param origin Origin address
+ * @param data Bulk containing data
+ * @param offset Offset in the bulk in which the data is
+ * @param size Size of the bulk region (after offset)
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_coll_update_bulk(yk_database_handle_t dbh,
+                                           const char* name,
+                                           int32_t mode,
+                                           size_t count,
+                                           const yk_id_t* ids,
+                                           const char* origin,
+                                           hg_bulk_t data,
+                                           size_t offset,
+                                           size_t size);
+
+/**
  * @brief Erase a record from the collection.
  *
  * @param[in] dbh Database handle
@@ -372,7 +448,8 @@ yk_return_t yk_coll_erase(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_erase_multi(yk_collection_t collection,
+yk_return_t yk_coll_erase_multi(yk_database_handle_t dbh,
+                                const char* collection,
                                 int32_t mode,
                                 size_t count,
                                 const yk_id_t* ids);

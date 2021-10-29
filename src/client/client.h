@@ -8,20 +8,31 @@
 
 #include "yokan/client.h"
 #include "yokan/database.h"
+#include "yokan/collection.h"
 
 typedef struct yk_client {
-   margo_instance_id mid;
+    margo_instance_id mid;
 
-   hg_id_t           count_id;
-   hg_id_t           exists_id;
-   hg_id_t           length_id;
-   hg_id_t           put_id;
-   hg_id_t           get_id;
-   hg_id_t           erase_id;
-   hg_id_t           list_keys_id;
-   hg_id_t           list_keyvals_id;
+    hg_id_t           count_id;
+    hg_id_t           exists_id;
+    hg_id_t           length_id;
+    hg_id_t           put_id;
+    hg_id_t           get_id;
+    hg_id_t           erase_id;
+    hg_id_t           list_keys_id;
+    hg_id_t           list_keyvals_id;
 
-   uint64_t          num_database_handles;
+    hg_id_t           coll_create_id;
+    hg_id_t           coll_drop_id;
+    hg_id_t           coll_exists_id;
+    hg_id_t           coll_erase_id;
+    hg_id_t           coll_last_id_id;
+    hg_id_t           coll_size_id;
+    hg_id_t           coll_load_id;
+    hg_id_t           coll_store_id;
+    hg_id_t           coll_update_id;
+
+    uint64_t          num_database_handles;
 } yk_client;
 
 typedef struct yk_database_handle {
