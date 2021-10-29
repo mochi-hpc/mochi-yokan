@@ -141,6 +141,11 @@ static inline void yk_database_id_from_string(
     uuid_parse(in, id->uuid);
 }
 
+/**
+ * @brief Record when working with collections.
+ */
+typedef uint64_t yk_id_t;
+
 #ifdef __cplusplus
 }
 #endif
