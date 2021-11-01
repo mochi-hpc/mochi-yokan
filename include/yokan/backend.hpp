@@ -197,6 +197,7 @@ class DatabaseInterface {
         (void)b;
         return Status::NotSupported;
     }
+
     /**
      * @brief Get the size of values associated with the keys. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory holding the
@@ -349,6 +350,198 @@ class DatabaseInterface {
         (void)keySizes;
         (void)vals;
         (void)valSizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Create a collection in the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     *
+     * @return Status
+     */
+    virtual Status collCreate(int32_t mode, const char* name) {
+        (void)mode;
+        (void)name;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Erase a collection from the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     *
+     * @return Status
+     */
+    virtual Status collDrop(int32_t mode, const char* name) {
+        (void)mode;
+        (void)name;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Check if a collection exists in the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param flag Set to true if the collection exists
+     *
+     * @return Status
+     */
+    virtual Status collExists(int32_t mode, const char* name, bool* flag) const {
+        (void)mode;
+        (void)name;
+        (void)flag;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the last id in the collection (i.e. the id that the next document
+     * stored will have).
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param id Last id
+     *
+     * @return Status
+     */
+    virtual Status collLastID(int32_t mode, const char* name, yk_id_t* id) const {
+        (void)mode;
+        (void)name;
+        (void)id;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the collection size (may be different from LastID if some
+     * documents have been erased).
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param size Size
+     *
+     * @return Status
+     */
+    virtual Status collSize(int32_t mode, const char* name, size_t* size) const {
+        (void)mode;
+        (void)name;
+        (void)size;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the size of document associated with ids.
+     *
+     * @param collection Name of the collection.
+     * @param mode Mode.
+     * @param ids Buffer storing ids of the documents.
+     * @param sizes Buffer in which to put sizes of the documents.
+     *
+     * @return Status.
+     */
+    virtual Status docSize(const char* collection,
+                           int32_t mode,
+                           const BasicUserMem<yk_id_t>& ids,
+                           BasicUserMem<size_t>& sizes) const {
+        (void)collection;
+        (void)mode;
+        (void)ids;
+        (void)sizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Store multiple documents into the database.
+     *
+     * @param [in] collection Name of the collection.
+     * @param [in] mode Mode.
+     * @param [in] documents Buffer containing documents to put.
+     * @param [in] size Buffer containing the sizes of documents.
+     * @param [in] ids Buffer to store resulting document ids.
+     *
+     * @return Status.
+     */
+    virtual Status docStore(const char* collection,
+                            int32_t mode,
+                            const UserMem& documents,
+                            const BasicUserMem<size_t>& sizes,
+                            BasicUserMem<yk_id_t>& ids) {
+        (void)collection;
+        (void)mode;
+        (void)documents;
+        (void)sizes;
+        (void)ids;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Update multiple documents in the database.
+     *
+     * @param [in] collection Name of the collection.
+     * @param [in] mode Mode.
+     * @param [in] ids Buffer containing document ids.
+     * @param [in] documents Buffer containing documents to put.
+     * @param [in] size Buffer containing the sizes of documents.
+     *
+     * @return Status.
+     */
+    virtual Status docStore(const char* collection,
+                            int32_t mode,
+                            const BasicUserMem<yk_id_t>& ids,
+                            const UserMem& documents,
+                            const BasicUserMem<size_t>& sizes) {
+        (void)collection;
+        (void)mode;
+        (void)documents;
+        (void)sizes;
+        (void)ids;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Load documents associated of ids.
+     * sizes is used both as input (to know where to place data in documents
+     * and how much is available to each document) and as output (to store
+     * the actual size of each value).
+     *
+     * @param collection Name of the collection.
+     * @param mode Mode.
+     * @param packed whether data is packed.
+     * @param ids Buffer containing document ids.
+     * @param documents Documents to get.
+     * @param sizes Size of the documents.
+     *
+     * @return Status.
+     */
+    virtual Status docLoad(const char* collection,
+                           int32_t mode, bool packed,
+                           const BasicUserMem<yk_id_t>& ids,
+                           UserMem& documents,
+                           BasicUserMem<size_t>& sizes) {
+        (void)collection;
+        (void)mode;
+        (void)packed;
+        (void)ids;
+        (void)documents;
+        (void)sizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Erase a set of documents.
+     *
+     * @param [in] mode Mode.
+     * @param [in] ids Ids of the documents to erase.
+     *
+     * @return Status.
+     */
+    virtual Status docErase(const char* collection,
+                            int32_t mode, const BasicUserMem<yk_id_t>& ids) {
+        (void)mode;
+        (void)ids;
+        (void)collection;
         return Status::NotSupported;
     }
 };
