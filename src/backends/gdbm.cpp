@@ -27,11 +27,11 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-class GDBMKeyValueStore : public KeyValueStoreInterface {
+class GDBMDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         bool use_lock;
         std::string path;
@@ -51,7 +51,7 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
             return Status::InvalidConf;
 
         auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
-        *kvs = new GDBMKeyValueStore(std::move(cfg), use_lock, db);
+        *kvs = new GDBMDatabase(std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
@@ -263,7 +263,7 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~GDBMKeyValueStore() {
+    ~GDBMDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         if(m_db) gdbm_close(m_db);
@@ -271,7 +271,7 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    GDBMKeyValueStore(json cfg, bool use_lock, GDBM_FILE db)
+    GDBMDatabase(json cfg, bool use_lock, GDBM_FILE db)
     : m_config(std::move(cfg))
     , m_db(db)
     {
@@ -286,4 +286,4 @@ class GDBMKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(gdbm, yokan::GDBMKeyValueStore);
+YOKAN_REGISTER_BACKEND(gdbm, yokan::GDBMDatabase);

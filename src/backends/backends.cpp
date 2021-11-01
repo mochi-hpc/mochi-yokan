@@ -8,7 +8,7 @@
 namespace yokan {
 
 std::unordered_map<std::string,
-            std::function<Status(const std::string&,KeyValueStoreInterface**)>>
-    KeyValueStoreFactory::make_fn;
+            std::function<Status(const std::string&,DatabaseInterface**)>>
+    DatabaseFactory::make_fn;
 
 }

@@ -30,7 +30,7 @@ namespace fs = std::experimental::filesystem;
 
 using json = nlohmann::json;
 
-class LevelDBKeyValueStore : public KeyValueStoreInterface {
+class LevelDBDatabase : public DatabaseInterface {
 
     public:
 
@@ -44,7 +44,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -102,7 +102,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBKeyValueStore(db, std::move(cfg));
+        *kvs = new LevelDBDatabase(db, std::move(cfg));
 
         return Status::OK;
     }
@@ -473,13 +473,13 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~LevelDBKeyValueStore() {
+    ~LevelDBDatabase() {
         delete m_db;
     }
 
     private:
 
-    LevelDBKeyValueStore(leveldb::DB* db, json&& cfg)
+    LevelDBDatabase(leveldb::DB* db, json&& cfg)
     : m_db(db)
     , m_config(std::move(cfg)) {
         m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
@@ -497,4 +497,4 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(leveldb, yokan::LevelDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(leveldb, yokan::LevelDBDatabase);

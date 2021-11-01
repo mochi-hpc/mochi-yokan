@@ -18,7 +18,7 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-class UnQLiteKeyValueStore : public KeyValueStoreInterface {
+class UnQLiteDatabase : public DatabaseInterface {
 
     static Status convertStatus(int ret) {
         switch(ret) {
@@ -51,7 +51,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_AND_ADD_MISSING(__json__, __field__, __type__, __default__, __required__) \
@@ -121,7 +121,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             if(ret != UNQLITE_OK) return convertStatus(ret);
         }
 
-        *kvs = new UnQLiteKeyValueStore(std::move(cfg), use_lock, db);
+        *kvs = new UnQLiteDatabase(std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
@@ -672,7 +672,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~UnQLiteKeyValueStore() {
+    ~UnQLiteDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         if(m_db)
@@ -681,7 +681,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    UnQLiteKeyValueStore(json cfg, bool use_lock, unqlite* db)
+    UnQLiteDatabase(json cfg, bool use_lock, unqlite* db)
     : m_db(db)
     , m_config(std::move(cfg))
     {
@@ -696,4 +696,4 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(unqlite, yokan::UnQLiteKeyValueStore);
+YOKAN_REGISTER_BACKEND(unqlite, yokan::UnQLiteDatabase);

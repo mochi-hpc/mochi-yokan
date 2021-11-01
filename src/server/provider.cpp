@@ -332,7 +332,7 @@ void yk_open_database_ult(hg_handle_t h)
         return;;
     }
 
-    has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(in.type);
+    has_backend_type = yokan::DatabaseFactory::hasBackendType(in.type);
 
     if(!has_backend_type) {
         YOKAN_LOG_ERROR(mid, "could not find backend of type \"%s\"", in.type);
@@ -342,7 +342,7 @@ void yk_open_database_ult(hg_handle_t h)
 
     uuid_generate(id.uuid);
 
-    auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config, &database);
+    auto status = yokan::DatabaseFactory::makeDatabase(in.type, in.config, &database);
     if(status != yokan::Status::OK) {
         YOKAN_LOG_ERROR(mid, "failed to open database of type %s", in.type);
         out.ret = static_cast<yk_return_t>(status);
@@ -522,7 +522,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
                 type = full_type.substr(p+1);
             }
         }
-        bool has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(type);
+        bool has_backend_type = yokan::DatabaseFactory::hasBackendType(type);
         if(!has_backend_type) {
             YOKAN_LOG_ERROR(provider->mid,
                 "could not find backend of type \"%s\"", type.c_str());
@@ -545,7 +545,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         auto type = db["type"].get<std::string>();
         auto& initial_db_config =  db["config"];
         auto config = initial_db_config.dump();
-        auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(type, config, &database);
+        auto status = yokan::DatabaseFactory::makeDatabase(type, config, &database);
         if(status != yokan::Status::OK) {
             YOKAN_LOG_ERROR(provider->mid,
                 "failed to open database of type %s", type.c_str());

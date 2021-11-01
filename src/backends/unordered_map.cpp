@@ -27,7 +27,7 @@ using json = nlohmann::json;
 
 // TODO we could dependency-inject a hash function (and the to_equal<T> function)
 template<typename KeyType>
-struct UnorderedMapKeyValueStoreHash {
+struct UnorderedMapDatabaseHash {
 
 #if __cplusplus >= 201703L
     using sv = std::string_view;
@@ -41,11 +41,11 @@ struct UnorderedMapKeyValueStoreHash {
     }
 };
 
-class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
+class UnorderedMapDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, val_alloc, node_alloc;
@@ -124,7 +124,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapKeyValueStore(std::move(cfg), node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapDatabase(std::move(cfg), node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -472,7 +472,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~UnorderedMapKeyValueStore() {
+    ~UnorderedMapDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -489,10 +489,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                                          Allocator<char>>;
     using equal_type = std::equal_to<key_type>;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
-    using hash_type = UnorderedMapKeyValueStoreHash<key_type>;
+    using hash_type = UnorderedMapDatabaseHash<key_type>;
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
-    UnorderedMapKeyValueStore(json cfg,
+    UnorderedMapDatabase(json cfg,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator,
                      const yk_allocator_t& val_allocator)
@@ -521,4 +521,4 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(unordered_map, yokan::UnorderedMapKeyValueStore);
+YOKAN_REGISTER_BACKEND(unordered_map, yokan::UnorderedMapDatabase);

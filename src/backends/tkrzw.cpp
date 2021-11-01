@@ -55,11 +55,11 @@ static Status convertStatus(const tkrzw::Status& status) {
     return Status::OK;
 }
 
-class TkrzwKeyValueStore : public KeyValueStoreInterface {
+class TkrzwDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_COMPLETE(__cfg__, __field__, __type__, __default__, __required__) \
@@ -262,7 +262,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
             delete db;
             return convertStatus(status);
         }
-        *kvs = new TkrzwKeyValueStore(std::move(cfg), db);
+        *kvs = new TkrzwDatabase(std::move(cfg), db);
         return Status::OK;
     }
 
@@ -762,7 +762,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~TkrzwKeyValueStore() {
+    ~TkrzwDatabase() {
         if(m_db) {
             m_db->Close();
             delete m_db;
@@ -774,7 +774,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     json        m_config;
     tkrzw::DBM* m_db = nullptr;
 
-    TkrzwKeyValueStore(json config, tkrzw::DBM* db)
+    TkrzwDatabase(json config, tkrzw::DBM* db)
     : m_config(std::move(config))
     , m_db(db)
     {}
@@ -782,4 +782,4 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(tkrzw, yokan::TkrzwKeyValueStore);
+YOKAN_REGISTER_BACKEND(tkrzw, yokan::TkrzwDatabase);

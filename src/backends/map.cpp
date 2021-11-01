@@ -21,7 +21,7 @@ namespace yokan {
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct MapKeyValueStoreCompare {
+struct MapDatabaseCompare {
 
     // LCOV_EXCL_START
     static bool DefaultMemCmp(const void* lhs, size_t lhsize,
@@ -39,9 +39,9 @@ struct MapKeyValueStoreCompare {
 
     cmp_type cmp = &DefaultMemCmp;
 
-    MapKeyValueStoreCompare() = default;
+    MapDatabaseCompare() = default;
 
-    MapKeyValueStoreCompare(cmp_type comparator)
+    MapDatabaseCompare(cmp_type comparator)
     : cmp(comparator) {}
 
     bool operator()(const KeyType& lhs, const KeyType& rhs) const {
@@ -63,11 +63,11 @@ struct MapKeyValueStoreCompare {
     using is_transparent = int;
 };
 
-class MapKeyValueStore : public KeyValueStoreInterface {
+class MapDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
@@ -139,7 +139,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new MapDatabase(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -626,7 +626,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~MapKeyValueStore() {
+    ~MapDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -641,12 +641,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                        Allocator<char>>;
     using value_type = std::basic_string<char, std::char_traits<char>,
                                          Allocator<char>>;
-    using comparator = MapKeyValueStoreCompare<key_type>;
+    using comparator = MapDatabaseCompare<key_type>;
     using cmp_type = comparator::cmp_type;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
     using map_type = std::map<key_type, value_type, comparator, allocator>;
 
-    MapKeyValueStore(json cfg,
+    MapDatabase(json cfg,
                      cmp_type cmp_fun,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator,
@@ -672,4 +672,4 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(map, yokan::MapKeyValueStore);
+YOKAN_REGISTER_BACKEND(map, yokan::MapDatabase);

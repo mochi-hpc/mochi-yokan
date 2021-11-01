@@ -27,7 +27,7 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-class LMDBKeyValueStore : public KeyValueStoreInterface {
+class LMDBDatabase : public DatabaseInterface {
 
     public:
 
@@ -65,7 +65,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -125,7 +125,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBKeyValueStore(std::move(cfg), env, db);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db);
 
         return Status::OK;
     }
@@ -638,7 +638,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~LMDBKeyValueStore() {
+    ~LMDBDatabase() {
         if(m_env) {
             mdb_dbi_close(m_env, m_db);
             mdb_env_close(m_env);
@@ -648,7 +648,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    LMDBKeyValueStore(json&& cfg, MDB_env* env, MDB_dbi db)
+    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
     : m_config(std::move(cfg))
     , m_env(env)
     , m_db(db) {}
@@ -660,4 +660,4 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(lmdb, yokan::LMDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(lmdb, yokan::LMDBDatabase);

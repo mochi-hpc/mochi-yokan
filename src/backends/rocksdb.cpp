@@ -30,7 +30,7 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-class RocksDBKeyValueStore : public KeyValueStoreInterface {
+class RocksDBDatabase : public DatabaseInterface {
 
     public:
 
@@ -65,7 +65,7 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         }
     }
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -195,7 +195,7 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new RocksDBKeyValueStore(db, std::move(cfg));
+        *kvs = new RocksDBDatabase(db, std::move(cfg));
 
         return Status::OK;
     }
@@ -566,14 +566,14 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~RocksDBKeyValueStore() {
+    ~RocksDBDatabase() {
         if(m_db)
             delete m_db;
     }
 
     private:
 
-    RocksDBKeyValueStore(rocksdb::DB* db, json&& cfg)
+    RocksDBDatabase(rocksdb::DB* db, json&& cfg)
     : m_db(db)
     , m_config(std::move(cfg)) {
 
@@ -612,4 +612,4 @@ class RocksDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(rocksdb, yokan::RocksDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(rocksdb, yokan::RocksDBDatabase);

@@ -115,18 +115,18 @@ constexpr auto KeyNotFound = YOKAN_KEY_NOT_FOUND;
 constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
 
 /**
- * @brief Abstract embedded key/value storage object.
+ * @brief Abstract embedded database object.
  */
-class KeyValueStoreInterface {
+class DatabaseInterface {
 
     public:
 
-    KeyValueStoreInterface() = default;
-    virtual ~KeyValueStoreInterface() = default;
-    KeyValueStoreInterface(const KeyValueStoreInterface&) = default;
-    KeyValueStoreInterface(KeyValueStoreInterface&&) = default;
-    KeyValueStoreInterface& operator=(const KeyValueStoreInterface&) = default;
-    KeyValueStoreInterface& operator=(KeyValueStoreInterface&&) = default;
+    DatabaseInterface() = default;
+    virtual ~DatabaseInterface() = default;
+    DatabaseInterface(const DatabaseInterface&) = default;
+    DatabaseInterface(DatabaseInterface&&) = default;
+    DatabaseInterface& operator=(const DatabaseInterface&) = default;
+    DatabaseInterface& operator=(DatabaseInterface&&) = default;
 
     /**
      * @brief Get the name of the backend (e.g. "map").
@@ -354,19 +354,19 @@ class KeyValueStoreInterface {
 };
 
 /**
- * @brief The KeyValueStoreFactory is used by the provider to build
+ * @brief The DatabaseFactory is used by the provider to build
  * key/value store instances of various types.
  */
-class KeyValueStoreFactory {
+class DatabaseFactory {
 
     template <typename T> friend class ::__YOKANBackendRegistration;
 
     public:
 
-    KeyValueStoreFactory() = delete;
+    DatabaseFactory() = delete;
 
     /**
-     * @brief Create a KeyValueStoreInterface object of a specified
+     * @brief Create a DatabaseInterface object of a specified
      * type and return a pointer to it. It is the respondibility of
      * the user to call delete on this pointer.
      *
@@ -374,14 +374,14 @@ class KeyValueStoreFactory {
      *
      * @param backendType Name of the backend.
      * @param jsonConfig Json-formatted configuration string.
-     * @param kvs Created KeyValueStoreInterface pointer.
+     * @param kvs Created DatabaseInterface pointer.
      *
      * @return Status.
      */
-    static Status makeKeyValueStore(
+    static Status makeDatabase(
             const std::string& backendType,
             const std::string& jsonConfig,
-            KeyValueStoreInterface** kvs) {
+            DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
         return make_fn[backendType](jsonConfig, kvs);
     }
@@ -401,7 +401,7 @@ class KeyValueStoreFactory {
 
     static std::unordered_map<
                 std::string,
-                std::function<Status(const std::string&,KeyValueStoreInterface**)>>
+                std::function<Status(const std::string&,DatabaseInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
 };
 
@@ -419,14 +419,14 @@ template <typename T> class __YOKANBackendRegistration {
     public:
 
     __YOKANBackendRegistration(const std::string &backend_name) {
-        ::yokan::KeyValueStoreFactory::make_fn[backend_name] =
-            [](const std::string &config, ::yokan::KeyValueStoreInterface** kvs) {
+        ::yokan::DatabaseFactory::make_fn[backend_name] =
+            [](const std::string &config, ::yokan::DatabaseInterface** kvs) {
                 return T::create(config, kvs);
             };
     }
 };
 
-using yk_database = ::yokan::KeyValueStoreInterface;
-using yk_database_t = ::yokan::KeyValueStoreInterface*;
+using yk_database = ::yokan::DatabaseInterface;
+using yk_database_t = ::yokan::DatabaseInterface*;
 
 #endif

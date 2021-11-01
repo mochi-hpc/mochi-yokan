@@ -20,12 +20,12 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-class NullKeyValueStore : public KeyValueStoreInterface {
+class NullDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
-        *kvs = new NullKeyValueStore(json::parse(config));
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
+        *kvs = new NullDatabase(json::parse(config));
         return Status::OK;
     }
 
@@ -131,11 +131,11 @@ class NullKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~NullKeyValueStore() {}
+    ~NullDatabase() {}
 
     private:
 
-    NullKeyValueStore(json cfg)
+    NullDatabase(json cfg)
     : m_config(std::move(cfg))
     {}
 
@@ -144,4 +144,4 @@ class NullKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(null, yokan::NullKeyValueStore);
+YOKAN_REGISTER_BACKEND(null, yokan::NullDatabase);

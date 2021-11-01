@@ -49,11 +49,11 @@ static inline Status convertStatus(int bdb_status) {
     return Status::Other;
 }
 
-class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
+class BerkeleyDBDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_SET_DEFAULT(__cfg__, __field__, __type__, __default__) \
@@ -125,7 +125,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
             return convertStatus(status);
         }
 
-        *kvs = new BerkeleyDBKeyValueStore(cfg, db_type, db_env, db);
+        *kvs = new BerkeleyDBDatabase(cfg, db_type, db_env, db);
         return Status::OK;
     }
 
@@ -690,7 +690,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
         return ret;
     }
 
-    ~BerkeleyDBKeyValueStore() {
+    ~BerkeleyDBDatabase() {
         if(m_db) {
             m_db->close(0);
             delete m_db;
@@ -708,7 +708,7 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
     DbEnv* m_db_env = nullptr;
     Db*    m_db = nullptr;
 
-    BerkeleyDBKeyValueStore(json cfg, int db_type, DbEnv* env, Db* db)
+    BerkeleyDBDatabase(json cfg, int db_type, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
     , m_db_type(db_type)
     , m_db_env(env)
@@ -717,4 +717,4 @@ class BerkeleyDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(berkeleydb, yokan::BerkeleyDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(berkeleydb, yokan::BerkeleyDBDatabase);
