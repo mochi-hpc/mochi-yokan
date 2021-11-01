@@ -198,12 +198,6 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->coll_exists_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_erase",
-            coll_erase_in_t, coll_erase_out_t,
-            yk_coll_erase_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->coll_erase_id = id;
-
     id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_last_id",
             coll_last_id_in_t, coll_last_id_out_t,
             yk_coll_last_id_ult, provider_id, p->pool);
@@ -216,23 +210,35 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->coll_size_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_load",
-            coll_load_in_t, coll_load_out_t,
-            yk_coll_load_ult, provider_id, p->pool);
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_erase",
+            doc_erase_in_t, doc_erase_out_t,
+            yk_doc_erase_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
-    p->coll_load_id = id;
+    p->doc_erase_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_store",
-            coll_store_in_t, coll_store_out_t,
-            yk_coll_store_ult, provider_id, p->pool);
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_load",
+            doc_load_in_t, doc_load_out_t,
+            yk_doc_load_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
-    p->coll_store_id = id;
+    p->doc_load_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_update",
-            coll_update_in_t, coll_update_out_t,
-            yk_coll_update_ult, provider_id, p->pool);
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_store",
+            doc_store_in_t, doc_store_out_t,
+            yk_doc_store_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
-    p->coll_update_id = id;
+    p->doc_store_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_update",
+            doc_update_in_t, doc_update_out_t,
+            yk_doc_update_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_update_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_size",
+            doc_size_in_t, doc_size_out_t,
+            yk_doc_size_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_size_id = id;
 
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
@@ -263,6 +269,16 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->erase_id);
     margo_deregister(mid, provider->list_keys_id);
     margo_deregister(mid, provider->list_keyvals_id);
+    margo_deregister(mid, provider->coll_create_id);
+    margo_deregister(mid, provider->coll_drop_id);
+    margo_deregister(mid, provider->coll_exists_id);
+    margo_deregister(mid, provider->coll_last_id_id);
+    margo_deregister(mid, provider->coll_size_id);
+    margo_deregister(mid, provider->doc_erase_id);
+    margo_deregister(mid, provider->doc_store_id);
+    margo_deregister(mid, provider->doc_load_id);
+    margo_deregister(mid, provider->doc_update_id);
+    margo_deregister(mid, provider->doc_size_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
     YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");

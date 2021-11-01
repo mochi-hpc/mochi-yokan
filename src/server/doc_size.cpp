@@ -11,11 +11,11 @@
 #include "../common/checks.h"
 #include <numeric>
 
-void yk_coll_load_ult(hg_handle_t h)
+void yk_doc_size_ult(hg_handle_t h)
 {
     hg_return_t hret;
-    coll_load_in_t in;
-    coll_load_out_t out;
+    doc_size_in_t in;
+    doc_size_out_t out;
 
     out.ret = YOKAN_SUCCESS;
 
@@ -39,4 +39,4 @@ void yk_coll_load_ult(hg_handle_t h)
 
     out.ret = YOKAN_ERR_OP_UNSUPPORTED;
 }
-DEFINE_MARGO_RPC_HANDLER(yk_coll_load_ult)
+DEFINE_MARGO_RPC_HANDLER(yk_doc_size_ult)

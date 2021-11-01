@@ -12,23 +12,23 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
-                                         const char* name,
-                                         int32_t mode,
-                                         size_t count,
-                                         const yk_id_t* ids,
-                                         const char* origin,
-                                         hg_bulk_t data,
-                                         size_t offset,
-                                         size_t size,
-                                         bool packed) {
+extern "C" yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
+                                        const char* name,
+                                        int32_t mode,
+                                        size_t count,
+                                        const yk_id_t* ids,
+                                        const char* origin,
+                                        hg_bulk_t data,
+                                        size_t offset,
+                                        size_t size,
+                                        bool packed) {
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
     yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
-    coll_load_in_t in;
-    coll_load_out_t out;
+    doc_load_in_t in;
+    doc_load_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id     = dbh->database_id;
@@ -42,7 +42,7 @@ extern "C" yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
     in.size      = size;
     in.packed    = packed;
 
-    hret = margo_create(mid, dbh->addr, dbh->client->coll_load_id, &handle);
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_load_id, &handle);
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
@@ -60,14 +60,14 @@ extern "C" yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
     return ret;
 }
 
-extern "C" yk_return_t yk_coll_load_packed(yk_database_handle_t dbh,
-                                           const char* collection,
-                                           int32_t mode,
-                                           size_t count,
-                                           const yk_id_t* ids,
-                                           size_t rbufsize,
-                                           void* records,
-                                           size_t* rsizes) {
+extern "C" yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
+                                          const char* collection,
+                                          int32_t mode,
+                                          size_t count,
+                                          const yk_id_t* ids,
+                                          size_t rbufsize,
+                                          void* records,
+                                          size_t* rsizes) {
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes || (!records && rbufsize))
@@ -90,16 +90,16 @@ extern "C" yk_return_t yk_coll_load_packed(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_coll_load_bulk(dbh, collection, mode, count, ids, nullptr, bulk, 0, total_size, true);
+    return yk_doc_load_bulk(dbh, collection, mode, count, ids, nullptr, bulk, 0, total_size, true);
 }
 
-extern "C" yk_return_t yk_coll_load_multi(yk_database_handle_t dbh,
-                                          const char* collection,
-                                          int32_t mode,
-                                          size_t count,
-                                          const yk_id_t* ids,
-                                          void* const* records,
-                                          size_t* rsizes) {
+extern "C" yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
+                                         const char* collection,
+                                         int32_t mode,
+                                         size_t count,
+                                         const yk_id_t* ids,
+                                         void* const* records,
+                                         size_t* rsizes) {
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes || !records)
@@ -131,14 +131,14 @@ extern "C" yk_return_t yk_coll_load_multi(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_coll_load_bulk(dbh, collection, mode, count, ids, nullptr, bulk, 0, total_size, false);
+    return yk_doc_load_bulk(dbh, collection, mode, count, ids, nullptr, bulk, 0, total_size, false);
 }
 
-extern "C" yk_return_t yk_coll_load(yk_database_handle_t dbh,
-                                    const char* collection,
-                                    int32_t mode,
-                                    yk_id_t id,
-                                    void* record,
-                                    size_t* size) {
-    return yk_coll_load_packed(dbh, collection, mode, 1, &id, *size, record, size);
+extern "C" yk_return_t yk_doc_load(yk_database_handle_t dbh,
+                                   const char* collection,
+                                   int32_t mode,
+                                   yk_id_t id,
+                                   void* record,
+                                   size_t* size) {
+    return yk_doc_load_packed(dbh, collection, mode, 1, &id, *size, record, size);
 }

@@ -33,12 +33,13 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_coll_create",  &c->coll_create_id,  &flag);
         margo_registered_name(mid, "yk_coll_drop",    &c->coll_drop_id,    &flag);
         margo_registered_name(mid, "yk_coll_exists",  &c->coll_exists_id,  &flag);
-        margo_registered_name(mid, "yk_coll_erase",   &c->coll_erase_id,   &flag);
         margo_registered_name(mid, "yk_coll_last_id", &c->coll_last_id_id, &flag);
         margo_registered_name(mid, "yk_coll_size",    &c->coll_size_id,    &flag);
-        margo_registered_name(mid, "yk_coll_load",    &c->coll_load_id,    &flag);
-        margo_registered_name(mid, "yk_coll_store",   &c->coll_store_id,   &flag);
-        margo_registered_name(mid, "yk_coll_update",  &c->coll_update_id,  &flag);
+        margo_registered_name(mid, "yk_doc_load",     &c->doc_load_id,     &flag);
+        margo_registered_name(mid, "yk_doc_erase",    &c->doc_erase_id,    &flag);
+        margo_registered_name(mid, "yk_doc_store",    &c->doc_store_id,    &flag);
+        margo_registered_name(mid, "yk_doc_update",   &c->doc_update_id,   &flag);
+        margo_registered_name(mid, "yk_doc_size",     &c->doc_size_id,     &flag);
 
     } else {
 
@@ -76,24 +77,27 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->coll_exists_id =
             MARGO_REGISTER(mid, "yk_coll_exists",
                            coll_exists_in_t, coll_exists_out_t, NULL);
-        c->coll_erase_id =
-            MARGO_REGISTER(mid, "yk_coll_erase",
-                           coll_erase_in_t, coll_erase_out_t, NULL);
         c->coll_last_id_id =
             MARGO_REGISTER(mid, "yk_coll_last_id",
                            coll_last_id_in_t, coll_last_id_out_t, NULL);
         c->coll_size_id =
             MARGO_REGISTER(mid, "yk_coll_size",
                            coll_size_in_t, coll_size_out_t, NULL);
-        c->coll_load_id =
-            MARGO_REGISTER(mid, "yk_coll_load",
-                           coll_load_in_t, coll_load_out_t, NULL);
-        c->coll_store_id =
-            MARGO_REGISTER(mid, "yk_coll_store",
-                           coll_store_in_t, coll_store_out_t, NULL);
-        c->coll_update_id =
-            MARGO_REGISTER(mid, "yk_coll_update",
-                           coll_update_in_t, coll_update_out_t, NULL);
+        c->doc_erase_id =
+            MARGO_REGISTER(mid, "yk_doc_erase",
+                           doc_erase_in_t, doc_erase_out_t, NULL);
+        c->doc_load_id =
+            MARGO_REGISTER(mid, "yk_doc_load",
+                           doc_load_in_t, doc_load_out_t, NULL);
+        c->doc_store_id =
+            MARGO_REGISTER(mid, "yk_doc_store",
+                           doc_store_in_t, doc_store_out_t, NULL);
+        c->doc_update_id =
+            MARGO_REGISTER(mid, "yk_doc_update",
+                           doc_update_in_t, doc_update_out_t, NULL);
+        c->doc_size_id =
+            MARGO_REGISTER(mid, "yk_doc_size",
+                           doc_size_in_t, doc_size_out_t, NULL);
     }
 
     *client = c;

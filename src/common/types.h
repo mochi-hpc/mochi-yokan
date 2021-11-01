@@ -15,9 +15,14 @@
 
 // LCOV_EXCL_START
 
+// id_list is used for both arrays of ids and
+// arrays of sizes (ids are uint64_t anyway).
 typedef struct id_list {
     size_t count;
-    yk_id_t* ids;
+    union {
+        yk_id_t* ids;
+        uint64_t* sizes;
+    };
 } id_list;
 
 static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
@@ -214,15 +219,6 @@ MERCURY_GEN_PROC(coll_exists_out_t,
         ((int32_t)(ret))\
         ((uint8_t)(exists)))
 
-/* coll_erase */
-MERCURY_GEN_PROC(coll_erase_in_t,
-        ((yk_database_id_t)(db_id))\
-        ((int32_t)(mode))\
-        ((hg_string_t)(coll_name))\
-        ((id_list)(ids)))
-MERCURY_GEN_PROC(coll_erase_out_t,
-        ((int32_t)(ret)))
-
 /* coll_last_id */
 MERCURY_GEN_PROC(coll_last_id_in_t,
         ((yk_database_id_t)(db_id))\
@@ -241,8 +237,17 @@ MERCURY_GEN_PROC(coll_size_out_t,
         ((int32_t)(ret))\
         ((uint64_t)(size)))
 
-/* coll_store */
-MERCURY_GEN_PROC(coll_store_in_t,
+/* doc_erase */
+MERCURY_GEN_PROC(doc_erase_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids)))
+MERCURY_GEN_PROC(doc_erase_out_t,
+        ((int32_t)(ret)))
+
+/* doc_store */
+MERCURY_GEN_PROC(doc_store_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
@@ -251,12 +256,12 @@ MERCURY_GEN_PROC(coll_store_in_t,
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk)))
-MERCURY_GEN_PROC(coll_store_out_t,
+MERCURY_GEN_PROC(doc_store_out_t,
         ((int32_t)(ret))\
         ((id_list)(ids)))
 
-/* coll_update */
-MERCURY_GEN_PROC(coll_update_in_t,
+/* doc_update */
+MERCURY_GEN_PROC(doc_update_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
@@ -265,11 +270,11 @@ MERCURY_GEN_PROC(coll_update_in_t,
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk)))
-MERCURY_GEN_PROC(coll_update_out_t,
+MERCURY_GEN_PROC(doc_update_out_t,
         ((int32_t)(ret)))
 
-/* coll_load */
-MERCURY_GEN_PROC(coll_load_in_t,
+/* doc_load */
+MERCURY_GEN_PROC(doc_load_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
@@ -279,7 +284,17 @@ MERCURY_GEN_PROC(coll_load_in_t,
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk))\
         ((hg_bool_t)(packed)))
-MERCURY_GEN_PROC(coll_load_out_t,
+MERCURY_GEN_PROC(doc_load_out_t,
+        ((int32_t)(ret)))
+
+/* doc_size */
+MERCURY_GEN_PROC(doc_size_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids)))
+MERCURY_GEN_PROC(doc_size_out_t,
+        ((id_list)(sizes))\
         ((int32_t)(ret)))
 
 /* Extra hand-coded serialization functions */

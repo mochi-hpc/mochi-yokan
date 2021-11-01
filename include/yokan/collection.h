@@ -25,9 +25,9 @@ extern "C" {
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_create(yk_database_handle_t dbh,
-                           int32_t mode,
-                           const char* name);
+yk_return_t yk_collection_create(yk_database_handle_t dbh,
+                                 int32_t mode,
+                                 const char* name);
 
 /**
  * @brief Erase the collection from the underlying database.
@@ -38,9 +38,9 @@ yk_return_t yk_coll_create(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_drop(yk_database_handle_t dbh,
-                         int32_t mode,
-                         const char* collection);
+yk_return_t yk_collection_drop(yk_database_handle_t dbh,
+                               int32_t mode,
+                               const char* collection);
 
 /**
  * @brief Check if the collection exists in the underlying database.
@@ -52,144 +52,144 @@ yk_return_t yk_coll_drop(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_exists(yk_database_handle_t dbh,
-                           int32_t mode,
-                           const char* collection,
-                           uint8_t* flag);
+yk_return_t yk_collection_exists(yk_database_handle_t dbh,
+                                 int32_t mode,
+                                 const char* collection,
+                                 uint8_t* flag);
 
 /**
- * @brief Store a record into the collection.
+ * @brief Store a document into the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] record Record to store
- * @param[in] size Size of the record
- * @param[out] id Resulting record id
+ * @param[in] document Record to store
+ * @param[in] size Size of the document
+ * @param[out] id Resulting document id
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_store(yk_database_handle_t dbh,
+yk_return_t yk_doc_store(yk_database_handle_t dbh,
                           const char* collection,
                           int32_t mode,
-                          const void* record,
+                          const void* document,
                           size_t size,
                           yk_id_t* id);
 
 /**
- * @brief Store multiple records into the collection.
+ * @brief Store multiple documents into the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to store
- * @param[in] records Array of records
- * @param[in] rsizes Array of record sizes
- * @param[out] ids Resulting record ids
+ * @param[in] count Number of documents to store
+ * @param[in] documents Array of documents
+ * @param[in] rsizes Array of document sizes
+ * @param[out] ids Resulting document ids
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_store_multi(yk_database_handle_t dbh,
-                                const char* collection,
-                                int32_t mode,
-                                size_t count,
-                                const void* const* records,
-                                const size_t* rsizes,
-                                yk_id_t* ids);
+yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t count,
+                               const void* const* documents,
+                               const size_t* rsizes,
+                               yk_id_t* ids);
 
 /**
- * @brief Same as yk_coll_store_multi but the records
+ * @brief Same as yk_doc_store_multi but the documents
  * are packed contiguously in memory.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to store
- * @param[in] records Packed records
- * @param[in] rsizes Array of record sizes
- * @param[out] ids Resulting record ids
+ * @param[in] count Number of documents to store
+ * @param[in] documents Packed documents
+ * @param[in] rsizes Array of document sizes
+ * @param[out] ids Resulting document ids
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_store_packed(yk_database_handle_t dbh,
-                                 const char* collection,
-                                 int32_t mode,
-                                 size_t count,
-                                 const void* records,
-                                 const size_t* rsizes,
-                                 yk_id_t* ids);
+yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
+                                const char* collection,
+                                int32_t mode,
+                                size_t count,
+                                const void* documents,
+                                const size_t* rsizes,
+                                yk_id_t* ids);
 
 /**
- * @brief Load a record from the collection.
+ * @brief Load a document from the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
  * @param[int] id Record id
- * @param[out] record Record to load
- * @param[inout] size Size of the buffer (in) / record (out)
+ * @param[out] data Buffer to load the document
+ * @param[inout] size Size of the buffer (in) / document (out)
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_load(yk_database_handle_t dbh,
-                         const char* collection,
-                         int32_t mode,
-                         yk_id_t id,
-                         void* record,
-                         size_t* size);
+yk_return_t yk_doc_load(yk_database_handle_t dbh,
+                        const char* collection,
+                        int32_t mode,
+                        yk_id_t id,
+                        void* data,
+                        size_t* size);
 
 /**
- * @brief Load multiple records from the collection.
+ * @brief Load multiple documents from the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to store
+ * @param[in] count Number of documents to store
  * @param[in] ids Record ids
- * @param[out] records Array of records
- * @param[inout] rsizes Array of buffer/record sizes
+ * @param[out] documents Array of documents
+ * @param[inout] rsizes Array of buffer/document sizes
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_load_multi(yk_database_handle_t dbh,
+yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
                                const char* collection,
                                int32_t mode,
                                size_t count,
                                const yk_id_t* ids,
-                               void* const* records,
+                               void* const* documents,
                                size_t* rsizes);
 
 /**
- * @brief Same as yk_coll_load_multi but the records
+ * @brief Same as yk_doc_load_multi but the documents
  * are packed contiguously in memory.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to store
+ * @param[in] count Number of documents to store
  * @param[in] ids Record ids
  * @param[in] rbufsize Record buffer size
- * @param[out] records Packed records
- * @param[out] rsizes Array of record sizes
+ * @param[out] documents Packed documents
+ * @param[out] rsizes Array of document sizes
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_load_packed(yk_database_handle_t dbh,
+yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
                                 const char* collection,
                                 int32_t mode,
                                 size_t count,
                                 const yk_id_t* ids,
                                 size_t rbufsize,
-                                void* records,
+                                void* documents,
                                 size_t* rsizes);
 
 /**
  * @brief Low-level load operation based on a bulk handle.
  * This function will take the data in [offset, offset+size[
  * from the bulk handle and interpret it as follows:
- * - The first count * sizeof(size_t) bytes store the record sizes.
- * - The next N bytes store records back to back, where
- *   N = sum of record sizes
+ * - The first count * sizeof(size_t) bytes store the document sizes.
+ * - The next N bytes store documents back to back, where
+ *   N = sum of document sizes
  * Origin represents the address of the process that created
  * the bulk handle. If NULL, the bulk handle is considered to
  * have been created by the calling process.
@@ -200,25 +200,25 @@ yk_return_t yk_coll_load_packed(yk_database_handle_t dbh,
  *
  * Note: the "packed" argument is important. It specifies whether
  * the process that created the bulk handle did so by exposing a single
- * contiguous buffer in which packed records are meant to be stored
- * (in which case the record sizes do not matter as an input), or
- * if individual buffers were exposed to hold each records (in which case
- * the record sizes do matter as an input).
+ * contiguous buffer in which packed documents are meant to be stored
+ * (in which case the document sizes do not matter as an input), or
+ * if individual buffers were exposed to hold each documents (in which case
+ * the document sizes do matter as an input).
  *
  * @param dbh Database handle
  * @param collection Collection name
  * @param mode Mode
- * @param count Number of records
+ * @param count Number of documents
  * @param ids Record ids
  * @param origin Origin address
- * @param data Bulk handle containing record sizes and data
+ * @param data Bulk handle containing document sizes and data
  * @param offset Offset in the bulk handle
  * @param size Size of the bulk handle (from offset)
- * @param packed Whether records are packed
+ * @param packed Whether documents are packed
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
+yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
                               const char* collection,
                               int32_t mode,
                               size_t count,
@@ -230,180 +230,216 @@ yk_return_t yk_coll_load_bulk(yk_database_handle_t dbh,
                               bool packed);
 
 /**
- * @brief Get the number of records currently stored in the
+ * @brief Get the size of a document from the collection.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[int] id Record id
+ * @param[out] size Size document
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_size(yk_database_handle_t dbh,
+                        const char* collection,
+                        int32_t mode,
+                        yk_id_t id,
+                        size_t* size);
+
+/**
+ * @brief Get the size of multiple documents from the collection.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] count Number of documents to store
+ * @param[in] ids Record ids
+ * @param[out] rsizes Array of document sizes
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
+                              const char* collection,
+                              int32_t mode,
+                              size_t count,
+                              const yk_id_t* ids,
+                              size_t* rsizes);
+
+/**
+ * @brief Get the number of documents currently stored in the
  * collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[out] count Number of records stored
+ * @param[out] count Number of documents stored
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_size(yk_database_handle_t dbh,
-                         const char* collection,
-                         int32_t mode,
-                         size_t* count);
+yk_return_t yk_collection_size(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t* count);
 
 /**
- * @brief Get the last record id of the collection.
- * This value corresponds to the id of the next record
+ * @brief Get the last document id of the collection.
+ * This value corresponds to the id of the next document
  * that will be stored in the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[out] id Last record id
+ * @param[out] id Last document id
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_last_id(yk_database_handle_t dbh,
-                            const char* collection,
-                            int32_t mode,
-                            yk_id_t* id);
+yk_return_t yk_collection_last_id(yk_database_handle_t dbh,
+                                  const char* collection,
+                                  int32_t mode,
+                                  yk_id_t* id);
 
 #if 0
 /**
- * @brief Fetch a record from the collection. The response
+ * @brief Fetch a document from the collection. The response
  * argument must have been allocated using yk_response_alloc.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] id Id of the record to fetch
- * @param[in] response Response from which to extract the record
+ * @param[in] id Id of the document to fetch
+ * @param[in] response Response from which to extract the document
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_fetch(yk_database_handle_t dbh,
-                          const char* collection,
-                          int32_t mode,
-                          yk_id_t id,
-                          yk_response_t response);
+yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
+                         const char* collection,
+                         int32_t mode,
+                         yk_id_t id,
+                         yk_response_t response);
 
 /**
- * @brief Fetch multiple records from the collection.
+ * @brief Fetch multiple documents from the collection.
  * The response argument must have been allocated using
  * yk_response_alloc.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to fetch
- * @param[in] ids Ids of the records to fetch
- * @param[in] response Response from which to extract the records
+ * @param[in] count Number of documents to fetch
+ * @param[in] ids Ids of the documents to fetch
+ * @param[in] response Response from which to extract the documents
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_fetch_multi(yk_database_handle_t dbh,
-                                const char* collection,
-                                int32_t mode,
-                                size_t count,
-                                const yk_id_t* ids,
-                                yk_response_t response);
+yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t count,
+                               const yk_id_t* ids,
+                               yk_response_t response);
 
 /**
- * @brief Filter the collection, returning up to max records
+ * @brief Filter the collection, returning up to max documents
  * that match specified filter, starting from the given start_id.
  * The type of filter used is specified by the mode parameter.
  * By default (YOKAN_MODE_DEFAULT), or if filter is NULL and
- * fsize is 0, all the records are returned (same as
- * yk_coll_fetch_multi for the range of ids
- * [ start_id, start_id + max_records ]).
+ * fsize is 0, all the documents are returned (same as
+ * yk_doc_fetch_multi for the range of ids
+ * [ start_id, start_id + max_documents ]).
  * The response argument must have been allocated using
  * yk_response_alloc.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] start_id Start record id
- * @param[in] max_records Max number of records to return
+ * @param[in] start_id Start document id
+ * @param[in] max_documents Max number of documents to return
  * @param[in] filter Filter data
  * @param[in] fsize Size of the filter
  * @param[in] response Resulting response handle
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_filter(yk_database_handle_t dbh,
-                           const char* collection,
-                           int32_t mode,
-                           yk_id_t start_id,
-                           size_t max_records,
-                           const void* filter,
-                           size_t fsize,
-                           yk_response_t response);
+yk_return_t yk_doc_filter(yk_database_handle_t dbh,
+                          const char* collection,
+                          int32_t mode,
+                          yk_id_t start_id,
+                          size_t max_documents,
+                          const void* filter,
+                          size_t fsize,
+                          yk_response_t response);
 #endif
 
 /**
- * @brief Update a record from the collection.
+ * @brief Update a document from the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
  * @param[in] id Record id
- * @param[in] record New record content
- * @param[in] size Size of the record
+ * @param[in] document New document content
+ * @param[in] size Size of the document
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_update(yk_database_handle_t dbh,
-                           const char* collection,
-                           int32_t mode,
-                           yk_id_t id,
-                           const void* record,
-                           size_t size);
+yk_return_t yk_doc_update(yk_database_handle_t dbh,
+                          const char* collection,
+                          int32_t mode,
+                          yk_id_t id,
+                          const void* document,
+                          size_t size);
 
 /**
- * @brief Update multiple records.
+ * @brief Update multiple documents.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to update
- * @param[in] ids Ids of the records to update
- * @param[in] records Array of pointers to record data
- * @param[in] rsizes Array of record sizes
+ * @param[in] count Number of documents to update
+ * @param[in] ids Ids of the documents to update
+ * @param[in] documents Array of pointers to document data
+ * @param[in] rsizes Array of document sizes
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_update_multi(yk_database_handle_t dbh,
+yk_return_t yk_doc_update_multi(yk_database_handle_t dbh,
+                                const char* collection,
+                                int32_t mode,
+                                size_t count,
+                                const yk_id_t* ids,
+                                const void* const* documents,
+                                const size_t* rsizes);
+
+/**
+ * @brief Update multiple documents that are contiguous in memory.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] count Number of documents to update
+ * @param[in] ids Ids of the documents to update
+ * @param[in] documents Contiguous buffer of documents
+ * @param[in] rsizes Array of document sizes
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_update_packed(yk_database_handle_t dbh,
                                  const char* collection,
                                  int32_t mode,
                                  size_t count,
                                  const yk_id_t* ids,
-                                 const void* const* records,
+                                 const void* documents,
                                  const size_t* rsizes);
-
-/**
- * @brief Update multiple records that are contiguous in memory.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[in] count Number of records to update
- * @param[in] ids Ids of the records to update
- * @param[in] records Contiguous buffer of records
- * @param[in] rsizes Array of record sizes
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_coll_update_packed(yk_database_handle_t dbh,
-                                  const char* collection,
-                                  int32_t mode,
-                                  size_t count,
-                                  const yk_id_t* ids,
-                                  const void* records,
-                                  const size_t* rsizes);
 
 /**
  * @brief Low-level version of update that takes an already
  * create bulk handle. The bulk handle is interpreted the same
- * way as in yk_coll_store_bulk.
+ * way as in yk_doc_store_bulk.
  *
  * @param dbh Database handle
  * @param name Collection name
  * @param mode Mode
- * @param count Number of records
+ * @param count Number of documents
  * @param ids Record ids
  * @param origin Origin address
  * @param data Bulk containing data
@@ -412,47 +448,47 @@ yk_return_t yk_coll_update_packed(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_update_bulk(yk_database_handle_t dbh,
-                                           const char* name,
-                                           int32_t mode,
-                                           size_t count,
-                                           const yk_id_t* ids,
-                                           const char* origin,
-                                           hg_bulk_t data,
-                                           size_t offset,
-                                           size_t size);
+yk_return_t yk_doc_update_bulk(yk_database_handle_t dbh,
+                               const char* name,
+                               int32_t mode,
+                               size_t count,
+                               const yk_id_t* ids,
+                               const char* origin,
+                               hg_bulk_t data,
+                               size_t offset,
+                               size_t size);
 
 /**
- * @brief Erase a record from the collection.
+ * @brief Erase a document from the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] id Id of the record to erase
+ * @param[in] id Id of the document to erase
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_erase(yk_database_handle_t dbh,
-                          const char* collection,
-                          int32_t mode,
-                          yk_id_t id);
+yk_return_t yk_doc_erase(yk_database_handle_t dbh,
+                         const char* collection,
+                         int32_t mode,
+                         yk_id_t id);
 
 /**
- * @brief Erase multiple records from the collection.
+ * @brief Erase multiple documents from the collection.
  *
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[in] count Number of records to erase
- * @param[in] ids Ids of the records to erase
+ * @param[in] count Number of documents to erase
+ * @param[in] ids Ids of the documents to erase
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_coll_erase_multi(yk_database_handle_t dbh,
-                                const char* collection,
-                                int32_t mode,
-                                size_t count,
-                                const yk_id_t* ids);
+yk_return_t yk_doc_erase_multi(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t count,
+                               const yk_id_t* ids);
 
 #ifdef __cplusplus
 }

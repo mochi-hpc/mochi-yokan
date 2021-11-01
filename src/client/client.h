@@ -25,12 +25,13 @@ typedef struct yk_client {
     hg_id_t           coll_create_id;
     hg_id_t           coll_drop_id;
     hg_id_t           coll_exists_id;
-    hg_id_t           coll_erase_id;
     hg_id_t           coll_last_id_id;
     hg_id_t           coll_size_id;
-    hg_id_t           coll_load_id;
-    hg_id_t           coll_store_id;
-    hg_id_t           coll_update_id;
+    hg_id_t           doc_erase_id;
+    hg_id_t           doc_load_id;
+    hg_id_t           doc_store_id;
+    hg_id_t           doc_update_id;
+    hg_id_t           doc_size_id;
 
     uint64_t          num_database_handles;
 } yk_client;

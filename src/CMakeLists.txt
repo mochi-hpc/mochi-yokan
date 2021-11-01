@@ -12,12 +12,13 @@ set (server-src-files
      server/coll_create.cpp
      server/coll_drop.cpp
      server/coll_exists.cpp
-     server/coll_erase.cpp
      server/coll_last_id.cpp
      server/coll_size.cpp
-     server/coll_store.cpp
-     server/coll_update.cpp
-     server/coll_load.cpp
+     server/doc_erase.cpp
+     server/doc_store.cpp
+     server/doc_update.cpp
+     server/doc_load.cpp
+     server/doc_size.cpp
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files
@@ -93,12 +94,13 @@ set (client-src-files
      client/coll_create.cpp
      client/coll_drop.cpp
      client/coll_exists.cpp
-     client/coll_erase.cpp
      client/coll_last_id.cpp
      client/coll_size.cpp
-     client/coll_store.cpp
-     client/coll_update.cpp
-     client/coll_load.cpp)
+     client/doc_erase.cpp
+     client/doc_store.cpp
+     client/doc_update.cpp
+     client/doc_size.cpp
+     client/doc_load.cpp)
 
 set (admin-src-files
      admin/admin.c)

@@ -12,7 +12,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" yk_return_t yk_coll_erase_multi(
+extern "C" yk_return_t yk_doc_erase_multi(
         yk_database_handle_t dbh,
         const char* collection,
         int32_t mode,
@@ -24,8 +24,8 @@ extern "C" yk_return_t yk_coll_erase_multi(
     margo_instance_id mid = dbh->client->mid;
     yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
-    coll_erase_in_t in;
-    coll_erase_out_t out;
+    doc_erase_in_t in;
+    doc_erase_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id     = dbh->database_id;
@@ -34,7 +34,7 @@ extern "C" yk_return_t yk_coll_erase_multi(
     in.ids.count = count;
     in.ids.ids   = (yk_id_t*)ids;
 
-    hret = margo_create(mid, dbh->addr, dbh->client->coll_erase_id, &handle);
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_erase_id, &handle);
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
@@ -51,9 +51,9 @@ extern "C" yk_return_t yk_coll_erase_multi(
     return ret;
 }
 
-extern "C" yk_return_t yk_coll_erase(yk_database_handle_t dbh,
-                                     const char* name,
-                                     int32_t mode,
-                                     yk_id_t id) {
-    return yk_coll_erase_multi(dbh, name, mode, 1, &id);
+extern "C" yk_return_t yk_doc_erase(yk_database_handle_t dbh,
+                                    const char* name,
+                                    int32_t mode,
+                                    yk_id_t id) {
+    return yk_doc_erase_multi(dbh, name, mode, 1, &id);
 }

@@ -12,10 +12,10 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" yk_return_t yk_coll_exists(yk_database_handle_t dbh,
-                                      int32_t mode,
-                                      const char* name,
-                                      uint8_t* flag) {
+extern "C" yk_return_t yk_collection_exists(yk_database_handle_t dbh,
+                                            int32_t mode,
+                                            const char* name,
+                                            uint8_t* flag) {
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
