@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
@@ -49,7 +50,7 @@ static inline Status convertStatus(int bdb_status) {
     return Status::Other;
 }
 
-class BerkeleyDBDatabase : public DatabaseInterface {
+class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 

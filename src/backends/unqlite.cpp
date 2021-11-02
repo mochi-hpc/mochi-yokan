@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
-#include "../common/locks.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/modes.hpp"
 #include <unqlite.h>
 #include <nlohmann/json.hpp>

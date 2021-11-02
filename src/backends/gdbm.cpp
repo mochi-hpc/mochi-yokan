@@ -4,7 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
-#include "../common/locks.hpp"
+#include "yokan/util/locks.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <string>

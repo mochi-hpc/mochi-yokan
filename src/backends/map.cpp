@@ -5,9 +5,9 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>

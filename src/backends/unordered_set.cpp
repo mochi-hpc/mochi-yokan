@@ -4,9 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <unordered_set>

@@ -37,6 +37,14 @@ struct BasicUserMem {
     inline const T& operator[](I index) const {
         return data[index];
     }
+
+    BasicUserMem(std::vector<T>& v)
+    : data(v.data())
+    , size(v.size()) {}
+
+    BasicUserMem(T* d, size_t s)
+    : data(d)
+    , size(s) {}
 };
 
 /**
@@ -260,6 +268,9 @@ class DatabaseInterface {
      * - ksizes.size == vsizes.size
      * - the sum of ksizes <= keys.size
      * - the sum of vsizes <= vals.size
+     *
+     * Note: this function is not const because it can potentially
+     * call erase() if a YOKAN_MODE_CONSUME is specified, for instance.
      *
      * @param mode Mode.
      * @param packed whether data is packed.
@@ -487,11 +498,11 @@ class DatabaseInterface {
      *
      * @return Status.
      */
-    virtual Status docStore(const char* collection,
-                            int32_t mode,
-                            const BasicUserMem<yk_id_t>& ids,
-                            const UserMem& documents,
-                            const BasicUserMem<size_t>& sizes) {
+    virtual Status docUpdate(const char* collection,
+                             int32_t mode,
+                             const BasicUserMem<yk_id_t>& ids,
+                             const UserMem& documents,
+                             const BasicUserMem<size_t>& sizes) {
         (void)collection;
         (void)mode;
         (void)documents;
