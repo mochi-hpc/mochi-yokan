@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
@@ -30,7 +31,7 @@ namespace fs = std::experimental::filesystem;
 
 using json = nlohmann::json;
 
-class LevelDBDatabase : public DatabaseInterface {
+class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 

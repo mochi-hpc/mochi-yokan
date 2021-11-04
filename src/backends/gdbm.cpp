@@ -5,6 +5,7 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/util/locks.hpp"
+#include "yokan/doc-mixin.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <string>
@@ -27,7 +28,7 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-class GDBMDatabase : public DatabaseInterface {
+class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 

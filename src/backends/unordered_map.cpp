@@ -5,6 +5,7 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
@@ -41,7 +42,7 @@ struct UnorderedMapDatabaseHash {
     }
 };
 
-class UnorderedMapDatabase : public DatabaseInterface {
+class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 

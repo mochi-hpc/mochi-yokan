@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "yokan/util/locks.hpp"
 #include "../common/modes.hpp"
 #include <unqlite.h>
@@ -18,7 +19,7 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-class UnQLiteDatabase : public DatabaseInterface {
+class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     static Status convertStatus(int ret) {
         switch(ret) {
