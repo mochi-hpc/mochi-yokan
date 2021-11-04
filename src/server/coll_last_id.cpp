@@ -37,6 +37,9 @@ void yk_coll_last_id_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+    yk_id_t last_id;
+    out.ret = static_cast<yk_return_t>(
+        database->collLastID(in.mode, in.coll_name, &last_id));
+    out.last_id = last_id;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_coll_last_id_ult)

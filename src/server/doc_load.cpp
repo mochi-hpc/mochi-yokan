@@ -16,6 +16,7 @@ void yk_doc_load_ult(hg_handle_t h)
     hg_return_t hret;
     doc_load_in_t in;
     doc_load_out_t out;
+    hg_addr_t origin_addr = HG_ADDR_NULL;
 
     out.ret = YOKAN_SUCCESS;
 
@@ -33,10 +34,66 @@ void yk_doc_load_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
+    if(in.origin) {
+        hret = margo_addr_lookup(mid, in.origin, &origin_addr);
+        CHECK_HRET_OUT(hret, margo_addr_lookup);
+    } else {
+        hret = margo_addr_dup(mid, info->addr, &origin_addr);
+        CHECK_HRET_OUT(hret, margo_addr_dup);
+    }
+    DEFER(margo_addr_free(mid, origin_addr));
+
     yk_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+    yk_buffer_t buffer = provider->bulk_cache.get(
+        provider->bulk_cache_data, in.size, HG_BULK_READWRITE);
+    CHECK_BUFFER(buffer);
+    DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
+
+    size_t count = in.ids.count;
+    size_t docs_offset = count*sizeof(size_t);
+
+    if(!in.packed) {
+        /* transfer available sizes for each document */
+        hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
+            in.bulk, in.offset, buffer->bulk, 0, docs_offset);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    }
+
+    yokan::BasicUserMem<yk_id_t> ids{ in.ids.ids, in.ids.count };
+    auto sizes_umem = yokan::BasicUserMem<size_t>{
+        reinterpret_cast<size_t*>(buffer->data),
+        count
+    };
+    auto docs_umem = yokan::UserMem{
+        buffer->data + docs_offset,
+        in.size - docs_offset
+    };
+
+    out.ret = static_cast<yk_return_t>(
+        database->docLoad(in.coll_name, in.mode, in.packed, ids, docs_umem, sizes_umem));
+
+    if(out.ret == YOKAN_SUCCESS) {
+        margo_request req = MARGO_REQUEST_NULL;
+        if(docs_umem.size != 0) {
+            // transfer docs
+            hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
+                    in.bulk, in.offset + docs_offset,
+                    buffer->bulk, docs_offset, in.size - docs_offset, &req);
+            CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+        }
+        // transfer doc sizes
+        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+                in.bulk, in.offset,
+                buffer->bulk, 0, count*sizeof(size_t));
+        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+
+        if(req != MARGO_REQUEST_NULL) {
+            hret = margo_wait(req);
+            CHECK_HRET_OUT(hret, margo_wait);
+        }
+    }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_load_ult)

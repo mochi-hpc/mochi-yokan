@@ -37,6 +37,7 @@ void yk_coll_drop_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+    out.ret = static_cast<yk_return_t>(
+        database->collDrop(in.mode, in.coll_name));
 }
 DEFINE_MARGO_RPC_HANDLER(yk_coll_drop_ult)

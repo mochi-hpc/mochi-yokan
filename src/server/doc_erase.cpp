@@ -37,6 +37,8 @@ void yk_doc_erase_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+    yokan::BasicUserMem<yk_id_t> ids{ in.ids.ids, in.ids.count };
+    out.ret = static_cast<yk_return_t>(
+        database->docErase(in.coll_name, in.mode, ids));
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_erase_ult)

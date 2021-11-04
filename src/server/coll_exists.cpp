@@ -37,6 +37,9 @@ void yk_coll_exists_ult(hg_handle_t h)
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+    bool flag;
+    out.ret = static_cast<yk_return_t>(
+        database->collExists(in.mode, in.coll_name, &flag));
+    out.exists = flag;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_coll_exists_ult)
