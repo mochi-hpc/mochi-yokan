@@ -4,6 +4,7 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
@@ -55,7 +56,7 @@ static Status convertStatus(const tkrzw::Status& status) {
     return Status::OK;
 }
 
-class TkrzwDatabase : public DatabaseInterface {
+class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 

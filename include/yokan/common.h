@@ -27,6 +27,7 @@ extern "C" {
     X(YOKAN_ERR_INVALID_BACKEND, "Invalid backend type") \
     X(YOKAN_ERR_INVALID_CONFIG, "Invalid configuration") \
     X(YOKAN_ERR_INVALID_TOKEN, "Invalid token")          \
+    X(YOKAN_ERR_INVALID_ID, "Invalid document id")       \
     X(YOKAN_ERR_FROM_MERCURY, "Mercury error")           \
     X(YOKAN_ERR_FROM_ARGOBOTS, "Argobots error")         \
     X(YOKAN_ERR_OP_UNSUPPORTED, "Unsupported operation") \

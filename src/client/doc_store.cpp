@@ -71,7 +71,7 @@ extern "C" yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
 
     if(count == 0)
         return YOKAN_SUCCESS;
-    else if(!records || !rsizes)
+    else if(rsizes == nullptr)
         return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -125,8 +125,10 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
     margo_instance_id mid = dbh->client->mid;
 
     for(unsigned i = 0; i < count; i++) {
-        ptrs.push_back(const_cast<void*>(records[i]));
-        sizes.push_back(rsizes[i]);
+        if(rsizes[i] != 0) {
+            ptrs.push_back(const_cast<void*>(records[i]));
+            sizes.push_back(rsizes[i]);
+        }
     }
 
     size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);

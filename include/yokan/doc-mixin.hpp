@@ -6,6 +6,7 @@
 #ifndef __YOKAN_DOC_MIXIN_H
 #define __YOKAN_DOC_MIXIN_H
 
+#include <iostream>
 #include <yokan/backend.hpp>
 #include <yokan/util/locks.hpp>
 #include <cstring>
@@ -109,7 +110,7 @@ class DocumentStoreMixin : public DB {
         auto status = _collGetMetadata(collection, strlen(collection), &metadata);
         if(status == Status::OK)
             *size = metadata.last_id;
-        return Status::NotSupported;
+        return status;
     }
 
     Status docSize(const char* collection,
@@ -156,6 +157,14 @@ class DocumentStoreMixin : public DB {
         auto name_len = strlen(collection);
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
+        ScopedWriteLock lock(m_lock);
+        CollectionMetadata metadata;
+        auto status = _collGetMetadata(collection, name_len, &metadata);
+        if(status != Status::OK) return status;
+        for(unsigned i=0; i < ids.size; i++) {
+            if(ids[i] >= metadata.last_id)
+                return Status::InvalidID;
+        }
         return put(mode, keys, ksizes, documents, sizes);
     }
 
@@ -211,6 +220,7 @@ class DocumentStoreMixin : public DB {
         BasicUserMem<size_t> vsize_umem{&vlen, 1};
         auto status = const_cast<DocumentStoreMixin*>(this)->get(0, true, key_umem, ksize_umem, val_umem, vsize_umem);
         if(status != Status::OK) return status;
+        if(vlen == YOKAN_KEY_NOT_FOUND) return Status::NotFound;
         if(vlen != sizeof(*metadata)) return Status::Corruption;
         return Status::OK;
     }

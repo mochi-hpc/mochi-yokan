@@ -92,6 +92,7 @@ enum class Status : uint8_t {
     InvalidType  = YOKAN_ERR_INVALID_BACKEND,
     InvalidConf  = YOKAN_ERR_INVALID_CONFIG,
     InvalidArg   = YOKAN_ERR_INVALID_ARGS,
+    InvalidID    = YOKAN_ERR_INVALID_ID,
     NotFound     = YOKAN_ERR_KEY_NOT_FOUND,
     SizeError    = YOKAN_ERR_BUFFER_SIZE,
     KeyExists    = YOKAN_ERR_KEY_EXISTS,

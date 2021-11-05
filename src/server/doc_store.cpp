@@ -10,6 +10,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include <numeric>
+#include <iostream>
 
 void yk_doc_store_ult(hg_handle_t h)
 {
@@ -71,7 +72,7 @@ void yk_doc_store_ult(hg_handle_t h)
         return;
     }
     auto docs_umem = yokan::UserMem{
-        ptr + in.count*sizeof(size_t),
+        ptr,
         total_doc_size
     };
 
