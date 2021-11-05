@@ -13,6 +13,7 @@
 
 void yk_doc_size_ult(hg_handle_t h)
 {
+    std::vector<size_t> sizes;
     hg_return_t hret;
     doc_size_in_t in;
     doc_size_out_t out;
@@ -40,7 +41,7 @@ void yk_doc_size_ult(hg_handle_t h)
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yokan::BasicUserMem<yk_id_t> ids{ in.ids.ids, in.ids.count };
-    std::vector<size_t> sizes(in.ids.count);
+    sizes.resize(in.ids.count);
     yokan::BasicUserMem<size_t> sizes_umem{sizes};
     out.ret = static_cast<yk_return_t>(
         database->docSize(in.coll_name, in.mode, ids, sizes_umem));

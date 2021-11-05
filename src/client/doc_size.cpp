@@ -67,5 +67,9 @@ extern "C" yk_return_t yk_doc_size(yk_database_handle_t dbh,
                                    int32_t mode,
                                    yk_id_t id,
                                    size_t* size) {
-    return yk_doc_size_multi(dbh, collection, mode, 1, &id, size);
+    if(size == nullptr) return YOKAN_ERR_INVALID_ARGS;
+    auto ret = yk_doc_size_multi(dbh, collection, mode, 1, &id, size);
+    if(ret == YOKAN_SUCCESS && *size == YOKAN_KEY_NOT_FOUND)
+        return YOKAN_ERR_KEY_NOT_FOUND;
+    return ret;
 }
