@@ -20,41 +20,41 @@ extern "C" {
  * @brief Create a collection in the specified database.
  *
  * @param[in] dbh Database handle
- * @param[in] mode Mode
  * @param[in] name Name of the collection (null-terminated)
+ * @param[in] mode Mode
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_collection_create(yk_database_handle_t dbh,
-                                 int32_t mode,
-                                 const char* name);
+                                 const char* name,
+                                 int32_t mode);
 
 /**
  * @brief Erase the collection from the underlying database.
  *
  * @param[in] dbh Database handle
- * @param[in] mode Mode
  * @param[in] collection Collection name (null-terminated)
+ * @param[in] mode Mode
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_collection_drop(yk_database_handle_t dbh,
-                               int32_t mode,
-                               const char* collection);
+                               const char* collection,
+                               int32_t mode);
 
 /**
  * @brief Check if the collection exists in the underlying database.
  *
  * @param[in] dbh Database handle
- * @param[in] mode Mode
  * @param[in] collection Collection name (null-terminated)
+ * @param[in] mode Mode
  * @param[out] flag set to 1 if the collection exists, 0 otherwise
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_collection_exists(yk_database_handle_t dbh,
-                                 int32_t mode,
                                  const char* collection,
+                                 int32_t mode,
                                  uint8_t* flag);
 
 /**

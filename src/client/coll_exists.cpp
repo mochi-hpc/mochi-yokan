@@ -13,8 +13,8 @@
 #include "../common/checks.h"
 
 extern "C" yk_return_t yk_collection_exists(yk_database_handle_t dbh,
-                                            int32_t mode,
                                             const char* name,
+                                            int32_t mode,
                                             uint8_t* flag) {
     CHECK_MODE_VALID(mode);
 

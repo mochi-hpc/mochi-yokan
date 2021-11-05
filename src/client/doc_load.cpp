@@ -140,5 +140,11 @@ extern "C" yk_return_t yk_doc_load(yk_database_handle_t dbh,
                                    yk_id_t id,
                                    void* record,
                                    size_t* size) {
-    return yk_doc_load_packed(dbh, collection, mode, 1, &id, *size, record, size);
+    auto ret = yk_doc_load_packed(dbh, collection, mode, 1, &id, *size, record, size);
+    if(ret != YOKAN_SUCCESS) return ret;
+    else if(*size == YOKAN_SIZE_TOO_SMALL)
+        return YOKAN_ERR_BUFFER_SIZE;
+    else if(*size == YOKAN_KEY_NOT_FOUND)
+        return YOKAN_ERR_KEY_NOT_FOUND;
+    return YOKAN_SUCCESS;
 }
