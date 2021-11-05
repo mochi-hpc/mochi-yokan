@@ -6,6 +6,7 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <iostream>
 #include "client.h"
 #include "../common/defer.hpp"
 #include "../common/types.h"
@@ -140,6 +141,7 @@ extern "C" yk_return_t yk_doc_load(yk_database_handle_t dbh,
                                    yk_id_t id,
                                    void* record,
                                    size_t* size) {
+    if(!size) return YOKAN_ERR_INVALID_ARGS;
     auto ret = yk_doc_load_packed(dbh, collection, mode, 1, &id, *size, record, size);
     if(ret != YOKAN_SUCCESS) return ret;
     else if(*size == YOKAN_SIZE_TOO_SMALL)

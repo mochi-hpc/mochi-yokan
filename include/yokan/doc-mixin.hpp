@@ -176,6 +176,11 @@ class DocumentStoreMixin : public DB {
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
         auto name_len = strlen(collection);
+        ScopedReadLock lock(m_lock);
+        bool e;
+        auto status = _collExists(collection, name_len, &e);
+        if(status != Status::OK) return status;
+        if(!e) return Status::NotFound;
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
         return get(mode, packed, keys, ksizes, documents, sizes);
