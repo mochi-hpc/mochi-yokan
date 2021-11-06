@@ -19,6 +19,10 @@ extern "C" yk_return_t yk_doc_erase_multi(
         size_t count,
         const yk_id_t* ids) {
 
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    if(ids == nullptr)
+        return YOKAN_ERR_INVALID_ARGS;
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
