@@ -10,8 +10,8 @@
 
 static void* test_get_context_setup(const MunitParameter params[], void* user_data)
 {
-    auto context = static_cast<test_context*>(
-        test_common_context_setup(params, user_data));
+    auto context = static_cast<kv_test_context*>(
+        kv_test_common_context_setup(params, user_data));
 
     auto count = context->reference.size();
     std::vector<const void*> kptrs;
@@ -48,7 +48,7 @@ static MunitResult test_get(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -74,7 +74,7 @@ static MunitResult test_get_too_small(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -104,7 +104,7 @@ static MunitResult test_get_key_not_found(const MunitParameter params[], void* d
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -129,7 +129,7 @@ static MunitResult test_get_empty_keys(const MunitParameter params[], void* data
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -161,7 +161,7 @@ static MunitResult test_get_multi(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -221,7 +221,7 @@ static MunitResult test_get_multi_empty_key(const MunitParameter params[], void*
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -290,7 +290,7 @@ static MunitResult test_get_multi_too_small(const MunitParameter params[], void*
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -353,7 +353,7 @@ static MunitResult test_get_multi_key_not_found(const MunitParameter params[], v
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -418,7 +418,7 @@ static MunitResult test_get_packed(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -469,7 +469,7 @@ static MunitResult test_get_packed_empty_key(const MunitParameter params[], void
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -539,7 +539,7 @@ static MunitResult test_get_packed_too_small(const MunitParameter params[], void
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -593,7 +593,7 @@ static MunitResult test_get_packed_key_not_found(const MunitParameter params[], 
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -650,7 +650,7 @@ static MunitResult test_get_bulk(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
     hg_return_t hret;
@@ -758,37 +758,37 @@ static MunitParameterEnum test_params[] = {
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
-  { (char*)"num-keyvals", NULL },
+  { (char*)"num-items", NULL },
   { NULL, NULL }
 };
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/get", test_get,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get/empty-keys", test_get_empty_keys,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get/too-small", test_get_too_small,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get/key-not-found", test_get_key_not_found,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi", test_get_multi,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi/empty-key", test_get_multi_empty_key,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi/too-small", test_get_multi_too_small,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_multi/key-not-found", test_get_multi_key_not_found,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed", test_get_packed,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/empty-key", test_get_packed_empty_key,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/too-small", test_get_packed_too_small,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_packed/key-not-found", test_get_packed_key_not_found,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/get_bulk", test_get_bulk,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

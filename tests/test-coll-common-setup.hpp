@@ -15,8 +15,6 @@
 #include <vector>
 #include <string>
 
-static size_t g_min_key_size = 8;
-static size_t g_max_key_size = 32;
 static size_t g_min_val_size = 1;
 static size_t g_max_val_size = 1024;
 static size_t g_num_items  = 64;
@@ -33,9 +31,20 @@ struct kv_test_context {
     bool                                        empty_values = false;
 };
 
+struct doc_test_context {
+    margo_instance_id        mid;
+    hg_addr_t                addr;
+    yk_admin_t               admin;
+    yk_client_t              client;
+    yk_provider_t            provider;
+    yk_database_id_t         id;
+    yk_database_handle_t     dbh;
+    std::vector<std::string> reference;
+};
+
 static const uint16_t provider_id = 42;
 
-static void* kv_test_common_context_setup(const MunitParameter params[], void* user_data)
+static void* doc_test_common_context_setup(const MunitParameter params[], void* user_data)
 {
     (void) params;
     (void) user_data;
@@ -49,18 +58,14 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     yk_database_handle_t dbh;
 
     // read parameters
-    const char* min_key_size = munit_parameters_get(params, "min-key-size");
-    const char* max_key_size = munit_parameters_get(params, "max-key-size");
     const char* min_val_size = munit_parameters_get(params, "min-val-size");
     const char* max_val_size = munit_parameters_get(params, "max-val-size");
-    const char* num_keyvals  = munit_parameters_get(params, "num-items");
+    const char* num_items  = munit_parameters_get(params, "num-itemss");
     const char* backend_type = munit_parameters_get(params, "backend");
     const char* backend_config = find_backend_config_for(backend_type);
-    if(min_key_size) g_min_key_size = std::atol(min_key_size);
-    if(max_key_size) g_max_key_size = std::atol(max_key_size);
-    if(min_val_size) g_min_val_size = std::atol(min_key_size);
-    if(max_val_size) g_max_val_size = std::atol(max_key_size);
-    if(num_keyvals)  g_num_items  = std::atol(num_keyvals);
+    if(min_val_size) g_min_val_size = std::atol(min_val_size);
+    if(max_val_size) g_max_val_size = std::atol(max_val_size);
+    if(num_items)  g_num_items  = std::atol(num_items);
     if(strcmp(backend_type, "set") == 0
     || strcmp(backend_type, "unordered_set") == 0) {
         g_max_val_size = 0;
@@ -100,7 +105,7 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     ret = yk_database_handle_create(client,
             addr, provider_id, id, &dbh);
     // create test context
-    struct kv_test_context* context = new kv_test_context;
+    struct doc_test_context* context = new doc_test_context;
     munit_assert_not_null(context);
     context->mid      = mid;
     context->addr     = addr;
@@ -109,42 +114,30 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     context->provider = provider;
     context->id       = id;
     context->dbh      = dbh;
-    if(g_max_val_size == 0 && g_min_val_size == 0) {
-        context->empty_values = true;
-    }
-    // create random key/value pairs with an empty value every 8 values
+    // create random docs with empty data every 8 values
     for(unsigned i = 0; i < g_num_items; i++) {
-        std::string key;
-        std::string val;
-        int ksize = munit_rand_int_range(g_min_key_size, g_max_key_size);
-        int vsize;
+        std::string doc;
+        size_t size;
         if(g_min_val_size == 0 && g_max_val_size == 0) {
-            vsize = 0;
+            size = 0;
         } else {
-            vsize = i % 8 == 0 ? 0 : munit_rand_int_range(g_min_val_size, g_max_val_size);
+            size = i % 8 == 0 ? 0 : munit_rand_int_range(g_min_val_size, g_max_val_size);
         }
-        key.resize(ksize);
-        val.resize(vsize);
-        for(int j = 0; j < ksize; j++) {
+        doc.resize(size);
+        for(int j = 0; j < (int)size; j++) {
             char c = (char)munit_rand_int_range(33, 126);
-            key[j] = c;
+            doc[j] = c;
         }
-        for(int j = 0; j < vsize; j++) {
-            char c = (char)munit_rand_int_range(33, 126);
-            val[j] = c;
-        }
-        context->reference.emplace(
-                std::move(key),
-                std::move(val));
+        context->reference.emplace_back(std::move(doc));
     }
 
     return context;
 }
 
-static void kv_test_common_context_tear_down(void* fixture)
+static void doc_test_common_context_tear_down(void* fixture)
 {
     yk_return_t ret;
-    struct kv_test_context* context = (struct kv_test_context*)fixture;
+    struct doc_test_context* context = (struct doc_test_context*)fixture;
     // destroy the database
     ret = yk_destroy_database(context->admin,
             context->addr, provider_id, NULL, context->id);

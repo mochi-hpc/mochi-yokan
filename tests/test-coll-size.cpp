@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "test-common-setup.hpp"
+#include "test-coll-common-setup.hpp"
 #include <yokan/collection.h>
 #include <algorithm>
 #include <numeric>
@@ -11,44 +11,47 @@
 #include <array>
 #include <iostream>
 
+static void* test_coll_size_context_setup(const MunitParameter params[], void* user_data)
+{
+    auto context = static_cast<doc_test_context*>(
+        doc_test_common_context_setup(params, user_data));
+
+    auto count = context->reference.size();
+    std::vector<const void*> ptrs;
+    std::vector<size_t>      sizes;
+
+    ptrs.reserve(count);
+    sizes.reserve(count);
+
+    for(auto& doc : context->reference) {
+        ptrs.push_back(doc.data());
+        sizes.push_back(doc.size());
+    }
+
+    yk_collection_create(context->dbh, "abcd", 0);
+
+    std::vector<yk_id_t> ids(count);
+    yk_doc_store_multi(context->dbh, "abcd", 0, count, ptrs.data(), sizes.data(), ids.data());
+
+    return context;
+}
+
 static MunitResult test_coll_doc_size(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
-    ret = yk_collection_create(dbh, "abcd", 0);
-    SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
-    const char* docs[] = {
-        "matthieu",
-        "phil",
-        nullptr, /* include a null document */
-        "rob",
-        "shane"
-    };
-    size_t doc_sizes[] = {
-        9, 5, 0, 4, 6 /* null terminator is included */
-    };
-
-    for(unsigned i=0; i < 5; i++) {
-        yk_id_t id;
-        ret = yk_doc_store(dbh, "abcd", 0, docs[i], doc_sizes[i], &id);
-        SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        munit_assert_long(id, ==, (long)i);
-    }
-
-    for(unsigned i=0; i < 5; i++) {
+    for(unsigned i=0; i < g_num_items; i++) {
         yk_id_t id = (yk_id_t)i;
         size_t size;
         ret = yk_doc_size(dbh, "abcd", 0, id, &size);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        munit_assert_long(size, ==, doc_sizes[i]);
+        auto& ref = context->reference[i];
+        munit_assert_long(size, ==, ref.size());
     }
 
     /* erroneous cases */
@@ -66,7 +69,7 @@ static MunitResult test_coll_doc_size(const MunitParameter params[], void* data)
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     /* tries to get size with an invalid id */
-    ret = yk_doc_size(dbh, "abcd", 0, 10, &size);
+    ret = yk_doc_size(dbh, "abcd", 0, g_num_items+1, &size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
@@ -77,67 +80,45 @@ static MunitResult test_coll_doc_size_multi(const MunitParameter params[], void*
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
-    ret = yk_collection_create(dbh, "abcd", 0);
-    SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
-    const char* docs[] = {
-        "matthieu",
-        "phil",
-        nullptr, /* include a null document */
-        "rob",
-        "shane"
-    };
-    size_t doc_sizes[] = {
-        9, 5, 0, 4, 6 /* null terminator is included */
-    };
-
-    for(unsigned i=0; i < 5; i++) {
-        yk_id_t id;
-        ret = yk_doc_store(dbh, "abcd", 0, docs[i], doc_sizes[i], &id);
-        SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        munit_assert_long(id, ==, (long)i);
-    }
-
-    std::vector<size_t> buf_sizes(6);
+    std::vector<size_t> buf_sizes(g_num_items+1);
     std::vector<yk_id_t> ids;
-    for(unsigned i=0; i < 6; i++) /* id 6 does not exist */
+    for(unsigned i=0; i < g_num_items+1; i++) /* id g_num_items does not exist */
         ids.push_back(i);
 
-    ret = yk_doc_size_multi(dbh, "abcd", 0, 6, ids.data(), buf_sizes.data());
+    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    for(unsigned i=0; i < 5; i++) {
-        if(i >= 5) {
+    for(unsigned i=0; i < g_num_items+1; i++) {
+        if(i == g_num_items) {
             munit_assert_long(buf_sizes[i], ==, YOKAN_KEY_NOT_FOUND);
             continue;
         }
-        munit_assert_long(buf_sizes[i], ==, doc_sizes[i]);
+        auto& ref = context->reference[i];
+        munit_assert_long(buf_sizes[i], ==, ref.size());
     }
 
     /* erroneous cases */
 
     /* tries to load with nullptr as ids */
-    ret = yk_doc_size_multi(dbh, "abcd", 0, 6, nullptr, buf_sizes.data());
+    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, nullptr, buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to get size with nullptr as size */
-    ret = yk_doc_size_multi(dbh, "abcd", 0, 6, ids.data(), nullptr);
+    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to get size of doc from a collection that does not exist */
-    ret = yk_doc_size_multi(dbh, "efgh", 0, 6, ids.data(), buf_sizes.data());
+    ret = yk_doc_size_multi(dbh, "efgh", 0, g_num_items+1, ids.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    for(unsigned i=0; i < 6; i++)
+    for(unsigned i=0; i < g_num_items+1; i++)
         munit_assert_long(buf_sizes[i], ==, YOKAN_KEY_NOT_FOUND);
 
     return MUNIT_OK;
@@ -145,15 +126,18 @@ static MunitResult test_coll_doc_size_multi(const MunitParameter params[], void*
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"min-val-size", NULL },
+  { (char*)"max-val-size", NULL },
+  { (char*)"num-items", NULL },
   { NULL, NULL }
 };
 
 static MunitTest test_suite_tests[] = {
     /* coll_create */
     { (char*) "/coll/doc_size", test_coll_doc_size,
-        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_coll_size_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/coll/doc_size_multi", test_coll_doc_size_multi,
-        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_coll_size_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

@@ -3,7 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
-#include "test-common-setup.hpp"
+#include "test-coll-common-setup.hpp"
 #include <yokan/collection.h>
 #include <algorithm>
 #include <numeric>
@@ -15,7 +15,7 @@ static MunitResult test_coll_create_exists_drop(const MunitParameter params[], v
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -50,7 +50,7 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -58,19 +58,8 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    const char* docs[] = {
-        "matthieu",
-        "phil",
-        "rob",
-        "shane"
-    };
-    size_t doc_sizes[] = {
-        9, 5, 4, 6 /* null terminator is included */
-    };
     size_t size;
     yk_id_t last_id;
-    char buffer[10];
-    size_t bufsize = 10;
     uint8_t flag;
 
     ret = yk_collection_size(dbh, "abcd", 0, &size);
@@ -83,28 +72,25 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     munit_assert_long(last_id, ==, 0);
 
-    for(int i=0; i < 4; i++) {
+    for(size_t i=0; i < context->reference.size(); i++) {
         yk_id_t id;
-        ret = yk_doc_store(dbh, "abcd", 0, docs[i], doc_sizes[i], &id);
+        ret = yk_doc_store(dbh, "abcd", 0,
+                context->reference[i].data(),
+                context->reference[i].size(), &id);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_long(id, ==, (long)i);
     }
 
-    ret = yk_doc_load(dbh,"abcd", 0, 2, buffer, &bufsize);
-    SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    munit_assert_string_equal(buffer, docs[2]);
-
     ret = yk_collection_size(dbh, "abcd", 0, &size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    munit_assert_long(size, ==, 4);
+    munit_assert_long(size, ==, context->reference.size());
 
     ret = yk_collection_last_id(dbh, "abcd", 0, &last_id);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    munit_assert_long(last_id, ==, 4);
+    munit_assert_long(last_id, ==, context->reference.size());
 
     ret = yk_collection_drop(dbh, "abcd", 0);
     SKIP_IF_NOT_IMPLEMENTED(ret);
@@ -123,8 +109,11 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
-    bufsize = 10;
-    ret = yk_doc_load(dbh, "abcd", 0, 2, buffer, &bufsize);
+    std::vector<char> buffer(g_max_val_size);
+    size_t bufsize = g_max_val_size;
+    ret = yk_doc_load(dbh, "abcd", 0,
+            context->reference.size()/2,
+            buffer.data(), &bufsize);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
@@ -133,15 +122,18 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"min-val-size", NULL },
+  { (char*)"max-val-size", NULL },
+  { (char*)"num-items", NULL },
   { NULL, NULL }
 };
 
 static MunitTest test_suite_tests[] = {
     /* coll_create */
     { (char*) "/coll/create_exists_drop", test_coll_create_exists_drop,
-        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        doc_test_common_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/coll/create_store_size_last_id", test_coll_create_store_size_last_id,
-        test_common_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        doc_test_common_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

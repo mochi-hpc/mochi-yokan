@@ -28,7 +28,7 @@ inline bool starts_with(const std::string& s, const std::string& prefix) {
 }
 
 struct list_keyvals_context {
-    test_context*                     base;
+    kv_test_context*                     base;
     std::map<std::string,std::string> ordered_ref;
     std::string                       prefix;
     int32_t                           mode;
@@ -37,8 +37,8 @@ struct list_keyvals_context {
 
 static void* test_list_keyvals_context_setup(const MunitParameter params[], void* user_data)
 {
-    auto base_context = static_cast<test_context*>(
-        test_common_context_setup(params, user_data));
+    auto base_context = static_cast<kv_test_context*>(
+        kv_test_common_context_setup(params, user_data));
 
     auto context = new list_keyvals_context;
     context->base = base_context;
@@ -92,7 +92,7 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
 static void test_list_keyvals_context_tear_down(void* user_data)
 {
     auto context = static_cast<list_keyvals_context*>(user_data);
-    test_common_context_tear_down(context->base);
+    kv_test_common_context_tear_down(context->base);
     delete context;
 }
 
@@ -763,7 +763,7 @@ static MunitParameterEnum test_params[] = {
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
-  { (char*)"num-keyvals", NULL },
+  { (char*)"num-items", NULL },
   { (char*)"keys-per-op", NULL },
   { NULL, NULL }
 };
