@@ -68,7 +68,7 @@ void yk_doc_update_ult(hg_handle_t h)
         return;
     }
     auto docs_umem = yokan::UserMem{
-        ptr + in.ids.count*sizeof(size_t),
+        ptr,
         total_doc_size
     };
     auto ids_umem = yokan::BasicUserMem<yk_id_t>{
