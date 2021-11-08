@@ -65,6 +65,7 @@ typedef enum yk_return_t {
 #define YOKAN_KEY_NOT_FOUND  (ULLONG_MAX)
 #define YOKAN_SIZE_TOO_SMALL (ULLONG_MAX-1)
 #define YOKAN_NO_MORE_KEYS   (ULLONG_MAX-2)
+#define YOKAN_NO_MORE_DOCS   (ULLONG_MAX-2) /* same as YOKAN_NO_MORE_KEYS */
 
 /**
  * @brief Modes can be passed to many functions to alter the
@@ -93,22 +94,25 @@ typedef enum yk_return_t {
  *   YOKAN_MODE_NO_PREFIX, if provided, will be re-interpreted
  *   accordingly, removing the suffix from the resulting keys.
  * - YOKAN_MODE_LUA_FILTER: interpret the filter as Lua code.
+ * - YOKAN_MODE_IGNORE_DOCS: only return IDs of documents matching
+ *   a filter.
  *
  * Important: not all backends support all modes.
  */
-#define YOKAN_MODE_DEFAULT      0b00000000000
-#define YOKAN_MODE_INCLUSIVE    0b00000000001
-#define YOKAN_MODE_APPEND       0b00000000010
-#define YOKAN_MODE_CONSUME      0b00000000100
-#define YOKAN_MODE_WAIT         0b00000001000
-#define YOKAN_MODE_NOTIFY       0b00000001000
-#define YOKAN_MODE_NEW_ONLY     0b00000010000
-#define YOKAN_MODE_EXIST_ONLY   0b00000100000
-#define YOKAN_MODE_NO_PREFIX    0b00001000000
-#define YOKAN_MODE_IGNORE_KEYS  0b00010000000
-#define YOKAN_MODE_KEEP_LAST    0b00110000000
-#define YOKAN_MODE_SUFFIX       0b01000000000
-#define YOKAN_MODE_LUA_FILTER   0b10000000000
+#define YOKAN_MODE_DEFAULT      0b000000000000
+#define YOKAN_MODE_INCLUSIVE    0b000000000001
+#define YOKAN_MODE_APPEND       0b000000000010
+#define YOKAN_MODE_CONSUME      0b000000000100
+#define YOKAN_MODE_WAIT         0b000000001000
+#define YOKAN_MODE_NOTIFY       0b000000001000
+#define YOKAN_MODE_NEW_ONLY     0b000000010000
+#define YOKAN_MODE_EXIST_ONLY   0b000000100000
+#define YOKAN_MODE_NO_PREFIX    0b000001000000
+#define YOKAN_MODE_IGNORE_KEYS  0b000010000000
+#define YOKAN_MODE_KEEP_LAST    0b000110000000
+#define YOKAN_MODE_SUFFIX       0b001000000000
+#define YOKAN_MODE_LUA_FILTER   0b010000000000
+#define YOKAN_MORE_IGNORE_DOCS  0b100000000000
 
 /**
  * @brief Identifier for a database.

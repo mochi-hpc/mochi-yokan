@@ -19,6 +19,7 @@ set (server-src-files
      server/doc_update.cpp
      server/doc_load.cpp
      server/doc_size.cpp
+     server/doc_list.cpp
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files
@@ -100,7 +101,8 @@ set (client-src-files
      client/doc_store.cpp
      client/doc_update.cpp
      client/doc_size.cpp
-     client/doc_load.cpp)
+     client/doc_load.cpp
+     client/doc_list.cpp)
 
 set (admin-src-files
      admin/admin.c)

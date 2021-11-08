@@ -240,6 +240,12 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_size_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_list",
+            doc_list_in_t, doc_list_out_t,
+            yk_doc_list_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_list_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
     if(provider)

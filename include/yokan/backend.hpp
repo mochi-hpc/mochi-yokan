@@ -556,6 +556,39 @@ class DatabaseInterface {
         (void)collection;
         return Status::NotSupported;
     }
+
+    /**
+     * @brief List documents from the collection.
+     *
+     * @param[in] collection Collection
+     * @param[in] mode Mode
+     * @param[in] packed Whether data is packed in the document buffer
+     * @param[in] from_id Starting document id
+     * @param[in] filter Filter
+     * @param[out] ids Resulting ids
+     * @param[out] documents Resulting documents
+     * @param[inout] doc_sizes Buffer sizes / Resulting document sizes
+     *
+     * @return Status.
+     */
+    virtual Status docList(const char* collection,
+                           int32_t mode, bool packed,
+                           yk_id_t from_id,
+                           const UserMem& filter,
+                           BasicUserMem<yk_id_t>& ids,
+                           UserMem& documents,
+                           BasicUserMem<size_t>& doc_sizes) {
+        (void)collection;
+        (void)mode;
+        (void)filter;
+        (void)from_id;
+        (void)packed;
+        (void)ids;
+        (void)documents;
+        (void)doc_sizes;
+        return Status::NotSupported;
+    }
+
 };
 
 /**

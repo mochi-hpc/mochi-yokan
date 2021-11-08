@@ -490,6 +490,101 @@ yk_return_t yk_doc_erase_multi(yk_database_handle_t dbh,
                                size_t count,
                                const yk_id_t* ids);
 
+/**
+ * @brief List up to max documents starting at start_id
+ * (excluded by default unless YOKAN_MODE_INCLUSIVE mode is used).
+ * Contrary to yk_list_keys and yk_list_keyvals, for which the
+ * filter is applied to the key, the filter here is applied to
+ * the document's content. By default, the filter is ignored.
+ * If fewer than max documents are returned, the extra doc_sizes
+ * are set to YOKAN_NO_MORE_DOCS.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] start_id Starting document id
+ * @param[in] filter Filter content
+ * @param[in] filter_size Filter size
+ * @param[in] max Maximum number of documents to return
+ * @param[out] ids Ids of the documents returned
+ * @param[out] docs Buffers in which to receive documents
+ * @param[inout] doc_sizes Buffers/document sizes
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_list(yk_database_handle_t dbh,
+                        const char* collection,
+                        int32_t mode,
+                        yk_id_t start_id,
+                        const void* filter,
+                        size_t filter_size,
+                        size_t max,
+                        yk_id_t* ids,
+                        void* const* docs,
+                        size_t* doc_sizes);
+
+/**
+ * Same as yk_doc_list but uses a single buffer to hold documents
+ * back to back.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] start_id Starting document id
+ * @param[in] filter Filter content
+ * @param[in] filter_size Filter size
+ * @param[in] max Maximum number of documents to return
+ * @param[out] ids Ids of the documents returned
+ * @param[in] bufsize Size of the document buffer
+ * @param[out] docs Buffers in which to receive documents
+ * @param[out] doc_sizes Document sizes
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_list_packed(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               yk_id_t start_id,
+                               const void* filter,
+                               size_t filter_size,
+                               size_t max,
+                               yk_id_t* ids,
+                               size_t bufsize,
+                               void* docs,
+                               size_t* doc_sizes);
+
+/**
+ * @brief Version of yk_doc_list that works on an already
+ * formed bulk handle. This bulk handle should expose the filter,
+ * then the array of doc sizes, then the array of ids,
+ * then the buffer in which to store the documents.
+ *
+ * @param dbh Database handle
+ * @param collection Collection
+ * @param mode Mode
+ * @param from_id Starting id
+ * @param filter_size Filter size
+ * @param origin Origina address (or NULL if calling process)
+ * @param data Bulk handle
+ * @param offset Offset in the bulk handle
+ * @param docs_buf_size Total buffer size to store documents
+ * @param packed Whether documents should be packed
+ * @param count Maximum number of documents to return
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
+                             const char* collection,
+                             int32_t mode,
+                             yk_id_t from_id,
+                             size_t filter_size,
+                             const char* origin,
+                             hg_bulk_t data,
+                             size_t offset,
+                             size_t docs_buf_size,
+                             bool packed,
+                             size_t count);
+
 #ifdef __cplusplus
 }
 #endif

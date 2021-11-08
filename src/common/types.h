@@ -297,6 +297,23 @@ MERCURY_GEN_PROC(doc_size_out_t,
         ((id_list)(sizes))\
         ((int32_t)(ret)))
 
+/* doc_list */
+MERCURY_GEN_PROC(doc_list_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((hg_bool_t)(packed))\
+        ((uint64_t)(count))\
+        ((yk_id_t)(from_id))\
+        ((uint64_t)(filter_size))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(docs_buf_size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(doc_list_out_t,
+        ((int32_t)(ret)))
+
+
 /* Extra hand-coded serialization functions */
 
 static inline hg_return_t hg_proc_yk_id_t(
