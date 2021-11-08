@@ -441,7 +441,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key_filter.check(key.data(), key.size())) {
+            auto val = iterator->value();
+            if(!key_filter.check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
@@ -510,11 +511,11 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key_filter.check(key.data(), key.size())) {
+            auto val = iterator->value();
+            if(!key_filter.check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
-            auto val = iterator->value();
             size_t key_usize = keySizes[i];
             size_t val_usize = valSizes[i];
             auto key_umem = static_cast<char*>(keys.data) + key_offset;

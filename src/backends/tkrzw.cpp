@@ -540,7 +540,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                      std::string_view value) override {
             (void)value;
 
-            if(!m_filter_checker.check(key.data(), key.size())) {
+            if(!m_filter_checker.check(key.data(), key.size(), value.data(), value.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
@@ -654,7 +654,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
-            if(!m_filter_checker.check(key.data(), key.size())) {
+            if(!m_filter_checker.check(key.data(), key.size(), val.data(), val.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }

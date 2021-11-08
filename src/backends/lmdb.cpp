@@ -443,7 +443,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size)) {
+            if(!key_filter.check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -565,7 +565,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size)) {
+            if(!key_filter.check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

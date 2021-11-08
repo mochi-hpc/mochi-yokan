@@ -347,7 +347,8 @@ class SetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
-    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
+    virtual Status listKeys(int32_t mode, bool packed,
+                            const UserMem& fromKey,
                             const UserMem& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         (void)mode;
@@ -372,7 +373,7 @@ class SetDatabase : public DatabaseInterface {
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size()))
+            if(!key_filter.check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto umem = static_cast<char*>(keys.data) + offset;
 
@@ -445,7 +446,7 @@ class SetDatabase : public DatabaseInterface {
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size()))
+            if(!key_filter.check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
 

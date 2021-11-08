@@ -451,7 +451,9 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size()))
+                // note: because this backend doesn't support Lua,
+                // we don't bother passing a value
+                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 
@@ -601,7 +603,9 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size()))
+                // note: because this backend doesn't support Lua, we don't
+                // bother passing a value
+                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 

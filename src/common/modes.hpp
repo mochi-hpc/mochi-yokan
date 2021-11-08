@@ -68,17 +68,18 @@ struct Filter {
 #endif
     }
 
-    bool check(const void* key, size_t ksize) const {
+    bool check(const void* key, size_t ksize, const void* val, size_t vsize) const {
 #ifdef YOKAN_HAS_LUA
         if(m_mode & YOKAN_MODE_LUA_FILTER) {
-            (*m_lua)["__key__"] = ksize > 0 ?
-                std::string_view(static_cast<const char*>(key), ksize)
-                : std::string_view();
+            (*m_lua)["__key__"] = std::string_view(static_cast<const char*>(key), ksize);
+            (*m_lua)["__value__"] = std::string_view(static_cast<const char*>(val), vsize);
             auto result = m_lua->do_string(std::string_view{ static_cast<const char*>(m_filter), m_fsize});
             if(!result.valid()) return false;
             return static_cast<bool>(result);
         }
 #endif
+        (void)val;
+        (void)vsize;
         if(m_fsize > ksize)
             return false;
         if(!(m_mode & YOKAN_MODE_SUFFIX)) {

@@ -399,14 +399,15 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     struct check_filter_args {
-        Filter filter_checker;
-        bool          filter_matches = false;
+        Filter      filter_checker;
+        bool        filter_matches = false;
+        std::string key = "";
     };
 
-    static int check_filter_callback(const void* key, unsigned int ksize, void* uargs) {
+    static int check_filter_callback(const void* val, unsigned int vsize, void* uargs) {
         auto args = static_cast<check_filter_args*>(uargs);
         args->filter_matches =
-            args->filter_checker.check(key, ksize);
+            args->filter_checker.check(args->key.data(), args->key.size(), val, vsize);
         return UNQLITE_OK;
     }
 
@@ -497,7 +498,12 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
             if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
+                unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                        auto* key = static_cast<std::string*>(args);
+                        key->assign((const char*)k, ksize);
+                        return UNQLITE_OK;
+                }, static_cast<void*>(&filter_args.key));
+                unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
                 if(!filter_args.filter_matches)
                     continue;
             }
@@ -641,7 +647,12 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
             if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
+                unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                        auto* key = static_cast<std::string*>(args);
+                        key->assign((const char*)k, ksize);
+                        return UNQLITE_OK;
+                }, static_cast<void*>(&filter_args.key));
+                unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
                 if(!filter_args.filter_matches)
                     continue;
             }
