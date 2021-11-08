@@ -60,7 +60,7 @@ extern "C" yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
     in.origin        = const_cast<char*>(origin);
     in.bulk          = data;
 
-    hret = margo_create(mid, dbh->addr, dbh->client->list_keyvals_id, &handle);
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_list_id, &handle);
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
@@ -92,7 +92,7 @@ extern "C" yk_return_t yk_doc_list(yk_database_handle_t dbh,
         return YOKAN_SUCCESS;
     if(filter == nullptr && filter_size > 0)
         return YOKAN_ERR_INVALID_ARGS;
-    if(ids == nullptr || docs == nullptr || doc_sizes)
+    if(ids == nullptr || docs == nullptr || doc_sizes == nullptr)
         return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -148,9 +148,10 @@ extern "C" yk_return_t yk_doc_list_packed(yk_database_handle_t dbh,
 {
     if(count == 0)
         return YOKAN_SUCCESS;
-    if(filter == nullptr && filter_size > 0)
+    if(filter == nullptr && filter_size > 0) {
         return YOKAN_ERR_INVALID_ARGS;
-    if(ids == nullptr || docs == nullptr || doc_sizes)
+    }
+    if(ids == nullptr || docs == nullptr || doc_sizes == nullptr)
         return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;

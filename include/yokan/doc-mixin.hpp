@@ -198,6 +198,73 @@ class DocumentStoreMixin : public DB {
         return erase(mode, keys, ksizes);
     }
 
+    Status docList(const char* collection,
+                   int32_t mode, bool packed,
+                   yk_id_t from_id,
+                   const UserMem& filter,
+                   BasicUserMem<yk_id_t>& ids,
+                   UserMem& documents,
+                   BasicUserMem<size_t>& docSizes) const override {
+        if(collection == nullptr || collection[0] == 0)
+            return Status::InvalidArg;
+        auto name_len = strlen(collection);
+        // the prefix is the collection name including the null-terminator
+        std::vector<char> prefix(collection, collection+name_len+1);
+        // first key is composed of collectio name followed by from_id
+        auto first_key = _keyFromId(collection, name_len, from_id);
+
+        auto count = ids.size;
+
+        auto key_len = name_len+1+sizeof(yk_id_t);
+        std::vector<char> keys(count*key_len);
+        std::vector<size_t> ksizes(count, key_len);
+        UserMem keys_umem{keys};
+        BasicUserMem<size_t> ksizes_umem{ksizes};
+        std::vector<size_t> original_doc_sizes;
+        original_doc_sizes = std::vector<size_t>(docSizes.data, docSizes.data+docSizes.size);
+
+        size_t docs_read = 0;   // number of docs already read
+        size_t docs_offset = 0; // offset at which we are in documents
+
+        while(docs_read < count) {
+            auto sub_keys_umem     = keys_umem.from(docs_read);
+            auto sub_ksizes_umem   = ksizes_umem.from(docs_read);
+            auto sub_docs_umem     = documents.from(docs_offset);
+            auto sub_docsizes_umem = docSizes.from(docs_read);
+            auto status = listKeyValues(
+                mode & YOKAN_MODE_INCLUSIVE, packed,
+                first_key, prefix,
+                sub_keys_umem, sub_ksizes_umem,
+                sub_docs_umem, sub_docsizes_umem);
+            if(status != Status::OK)
+                return status;
+            auto remaining = count - docs_read;
+            for(size_t i = 0; i < remaining; i++) {
+                if(ksizes[docs_read] == YOKAN_NO_MORE_DOCS) {
+                    ids[docs_read] = YOKAN_NO_MORE_DOCS;
+                    docSizes[docs_read] = YOKAN_NO_MORE_DOCS;
+                    docs_read += 1;
+                    goto done;
+                }
+                ids[docs_read] = _idFromKey(name_len, keys.data()+docs_read*key_len);
+                if(packed) {
+                    if(docSizes[docs_read] == YOKAN_SIZE_TOO_SMALL) {
+                        goto done;
+                    }
+                    docs_offset += docSizes[docs_read];
+                } else {
+                    docs_offset += original_doc_sizes[docs_read];
+                }
+                docs_read += 1;
+            }
+        }
+done:
+        ids.size = docs_read;
+        documents.size = docs_offset;
+        docSizes.size = docs_read;
+        return Status::OK;
+    }
+
     private:
 
     Status _collExists(const char* name, size_t name_size, bool* e) const {
@@ -253,6 +320,20 @@ class DocumentStoreMixin : public DB {
             auto be_id = _ensureBigEndian(ids[i]);
             std::memcpy(buffer.data()+offset, &be_id, sizeof(be_id));
         }
+        return buffer;
+    }
+
+    static yk_id_t _idFromKey(size_t coll_name_len, const char* key) {
+        yk_id_t be_id;
+        std::memcpy(&be_id, key+coll_name_len+1, sizeof(yk_id_t));
+        return _ensureBigEndian(be_id);
+    }
+
+    static std::vector<char> _keyFromId(const char* name, size_t name_len, yk_id_t id) {
+        std::vector<char> buffer(name_len+1+sizeof(yk_id_t));
+        auto be_id = _ensureBigEndian(id);
+        std::memcpy(buffer.data(), name, name_len+1);
+        std::memcpy(buffer.data()+name_len+1, &be_id, sizeof(be_id));
         return buffer;
     }
 

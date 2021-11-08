@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <stdexcept>
 #include <yokan/common.h>
 
 template <typename T> class __YOKANBackendRegistration;
@@ -45,6 +46,12 @@ struct BasicUserMem {
     BasicUserMem(T* d, size_t s)
     : data(d)
     , size(s) {}
+
+    auto from(size_t offset) const {
+        if(offset > size)
+            throw std::out_of_range("invalid offset passed to BasicUserMem::from()");
+        return BasicUserMem<T>{ data + offset, size - offset };
+    }
 };
 
 /**
@@ -577,7 +584,7 @@ class DatabaseInterface {
                            const UserMem& filter,
                            BasicUserMem<yk_id_t>& ids,
                            UserMem& documents,
-                           BasicUserMem<size_t>& doc_sizes) {
+                           BasicUserMem<size_t>& doc_sizes) const {
         (void)collection;
         (void)mode;
         (void)filter;

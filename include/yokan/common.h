@@ -112,7 +112,7 @@ typedef enum yk_return_t {
 #define YOKAN_MODE_KEEP_LAST    0b000110000000
 #define YOKAN_MODE_SUFFIX       0b001000000000
 #define YOKAN_MODE_LUA_FILTER   0b010000000000
-#define YOKAN_MORE_IGNORE_DOCS  0b100000000000
+#define YOKAN_MODE_IGNORE_DOCS  0b100000000000
 
 /**
  * @brief Identifier for a database.
