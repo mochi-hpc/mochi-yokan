@@ -223,8 +223,8 @@ static MunitTest test_suite_tests[] = {
     /* coll_create */
     { (char*) "/coll/list", test_coll_list,
         test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-    { (char*) "/coll/list_packed", test_coll_list_packed,
-        test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+//    { (char*) "/coll/list_packed", test_coll_list_packed,
+//        test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

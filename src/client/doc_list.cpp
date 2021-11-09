@@ -151,7 +151,7 @@ extern "C" yk_return_t yk_doc_list_packed(yk_database_handle_t dbh,
     if(filter == nullptr && filter_size > 0) {
         return YOKAN_ERR_INVALID_ARGS;
     }
-    if(ids == nullptr || docs == nullptr || doc_sizes == nullptr)
+    if(ids == nullptr || (docs == nullptr && bufsize != 0) || doc_sizes == nullptr)
         return YOKAN_ERR_INVALID_ARGS;
 
     hg_bulk_t bulk   = HG_BULK_NULL;

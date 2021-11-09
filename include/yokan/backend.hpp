@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <functional>
 #include <stdexcept>
+#include <memory>
 #include <yokan/common.h>
 
 template <typename T> class __YOKANBackendRegistration;
@@ -129,6 +130,42 @@ constexpr auto KeyNotFound = YOKAN_KEY_NOT_FOUND;
  * was too small to hold the value.
  */
 constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
+
+/**
+ * @brief Abstract class to represent a filter.
+ */
+class KeyValueFilter {
+
+    public:
+
+    virtual ~KeyValueFilter() = default;
+
+    virtual bool check(const void* key, size_t ksize, const void* val, size_t vsize) const {
+        (void)key;
+        (void)ksize;
+        (void)val;
+        (void)vsize;
+        return false;
+    }
+
+    static std::shared_ptr<KeyValueFilter> makeFilter(int32_t mode, const UserMem& filter_data);
+};
+
+class DocFilter {
+
+    public:
+
+    virtual ~DocFilter() = default;
+
+    virtual bool check(yk_id_t id, const void* doc, size_t docsize) const {
+        (void)id;
+        (void)doc;
+        (void)docsize;
+        return false;
+    }
+
+    static std::shared_ptr<DocFilter> makeFilter(int32_t mode, const UserMem& filter_data);
+};
 
 /**
  * @brief Abstract embedded database object.

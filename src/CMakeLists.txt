@@ -20,6 +20,7 @@ set (server-src-files
      server/doc_load.cpp
      server/doc_size.cpp
      server/doc_list.cpp
+     server/util/filters.cpp
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files

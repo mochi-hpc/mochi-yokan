@@ -15,13 +15,16 @@
 
 namespace yokan {
 
+#if 0
 /**
  * This class uses the provided mode to validate a key
- * against a prefix. If the mode does not match
- * YOKAN_MODE_SUFFIX, it considers "prefix" as a prefix and
- * checks if the key starts with that prefix. Otherwise it
- * considers "prefix" as a suffix and checks if the key ends
- * with that suffix.
+ * against a user-provided filter. By default it considers "filter"
+ * as a prefix and checks if the key starts with that prefix.
+ * If YOKAN_MODE_SUFFIX is provided, it considers "filter"
+ * as a suffix and checks if the key ends with that suffix.
+ * If YOKAN_MODE_LUA_FILTER is provided, it considers "filter"
+ * as Lua code and exposes the __key__ and __value__ variables
+ * to Lua.
  */
 struct Filter {
 
@@ -89,6 +92,78 @@ struct Filter {
         }
     }
 };
+
+/**
+ * This class uses the provided mode to validate a document
+ * against a user-provided filter. By default it considers "filter"
+ * as a prefix and checks if the key starts with that prefix.
+ * If YOKAN_MODE_SUFFIX is provided, it considers "filter"
+ * as a suffix and checks if the key ends with that suffix.
+ * If YOKAN_MODE_LUA_FILTER is provided, it considers "filter"
+ * as Lua code and exposes the __id__ and __doc__ variables
+ * to Lua.
+ */
+struct DocFilter {
+
+    int32_t     m_mode;
+    const void* m_filter;
+    size_t      m_fsize;
+#ifdef YOKAN_HAS_LUA
+    sol::state* m_lua = nullptr;
+#endif
+
+    DocFilter(int32_t mode, const void* filter, size_t fsize)
+    : m_mode(mode)
+    , m_filter(filter)
+    , m_fsize(fsize) {
+#ifdef YOKAN_HAS_LUA
+        if(m_mode & YOKAN_MODE_LUA_FILTER) {
+            m_lua = new sol::state{};
+            m_lua->open_libraries(sol::lib::base);
+            m_lua->open_libraries(sol::lib::string);
+            m_lua->open_libraries(sol::lib::math);
+        }
+#endif
+    }
+
+    DocFilter(const DocFilter&) = delete;
+
+    DocFilter(DocFilter&& other)
+    : m_mode(other.m_mode)
+    , m_filter(other.m_filter)
+    , m_fsize(other.m_fsize)
+#ifdef YOKAN_HAS_LUA
+    , m_lua(other.m_lua)
+#endif
+    {
+#ifdef YOKAN_HAS_LUA
+        other.m_lua = nullptr;
+#endif
+    }
+
+    ~DocFilter() {
+#ifdef YOKAN_HAS_LUA
+        if(m_lua) delete m_lua;
+#endif
+    }
+
+    bool check(yk_id_t id, const void* doc, size_t docsize) const {
+#ifdef YOKAN_HAS_LUA
+        if(m_mode & YOKAN_MODE_LUA_FILTER) {
+            (*m_lua)["__id__"] = id;
+            (*m_lua)["__doc__"] = std::string_view(static_cast<const char*>(doc), docsize);
+            auto result = m_lua->do_string(std::string_view{ static_cast<const char*>(m_filter), m_fsize});
+            if(!result.valid()) return false;
+            return static_cast<bool>(result);
+        }
+#endif
+        (void)id;
+        (void)doc;
+        (void)docsize;
+        return false;
+    }
+};
+#endif
 
 /**
  * This function will copy a key into a buffer according to the mode

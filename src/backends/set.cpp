@@ -369,11 +369,11 @@ class SetDatabase : public DatabaseInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size(), nullptr, 0))
+            if(!key_filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto umem = static_cast<char*>(keys.data) + offset;
 
@@ -442,11 +442,11 @@ class SetDatabase : public DatabaseInterface {
         size_t i = 0;
         size_t key_offset = 0;
         bool key_buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size(), nullptr, 0))
+            if(!key_filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
 

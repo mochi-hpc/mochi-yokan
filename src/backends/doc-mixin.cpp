@@ -205,7 +205,6 @@ class DocumentStoreMixin : public DB {
                    BasicUserMem<yk_id_t>& ids,
                    UserMem& documents,
                    BasicUserMem<size_t>& docSizes) const override {
-        (void)filter;
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
         auto name_len = strlen(collection);
@@ -233,7 +232,7 @@ class DocumentStoreMixin : public DB {
             auto sub_docs_umem     = documents.from(docs_offset);
             auto sub_docsizes_umem = docSizes.from(docs_read);
             auto status = listKeyValues(
-                YOKAN_MODE_INCLUSIVE, packed,
+                mode & YOKAN_MODE_INCLUSIVE, packed,
                 first_key, prefix,
                 sub_keys_umem, sub_ksizes_umem,
                 sub_docs_umem, sub_docsizes_umem);

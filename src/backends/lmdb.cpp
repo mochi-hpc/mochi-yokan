@@ -398,12 +398,22 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(ret);
         }
 
+        auto max = keySizes.size;
+
         if(fromKey.size == 0) {
             MDB_val k, v;
             ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
         } else {
             MDB_val k{ fromKey.size, fromKey.data };
@@ -411,7 +421,15 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
             if(!inclusive) {
                 if(k.mv_size == fromKey.size
@@ -425,25 +443,25 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
         bool key_buf_too_small = false;
 
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
-            if(ret == MDB_NOTFOUND)
+            if(ret == MDB_NOTFOUND) {
                 break;
+            }
             if(ret != MDB_SUCCESS) {
                 mdb_cursor_close(cursor);
                 mdb_txn_abort(txn);
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+            if(!key_filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -517,13 +535,24 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             mdb_txn_abort(txn);
             return convertStatus(ret);
         }
+        auto max = keySizes.size;
 
         if(fromKey.size == 0) {
             MDB_val k, v;
             ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    vals.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                        valSizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
         } else {
             MDB_val k{ fromKey.size, fromKey.data };
@@ -531,7 +560,17 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    vals.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                        valSizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
             if(!inclusive) {
                 if(k.mv_size == fromKey.size
@@ -545,14 +584,13 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
 
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(i < max) {
             MDB_val key, val;
@@ -565,7 +603,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+            if(!key_filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

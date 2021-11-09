@@ -376,7 +376,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool key_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
 
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         auto ret = Status::OK;
 
@@ -453,7 +453,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 // note: because this backend doesn't support Lua,
                 // we don't bother passing a value
-                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(key_filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 
@@ -528,7 +528,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool val_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
         auto ret = Status::OK;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         // this buffer is used in dummy_key so we can at least load the filter
         std::vector<char> filter_check_buffer(filter.size);
@@ -605,7 +605,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 // note: because this backend doesn't support Lua, we don't
                 // bother passing a value
-                if(key_filter.check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(key_filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 

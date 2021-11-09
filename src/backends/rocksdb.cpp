@@ -421,11 +421,20 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
 
+        auto max = keySizes.size;
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
             iterator->Seek(fromKeySlice);
+            if(!iterator->Valid()) {
+                keys.size = 0;
+                for(unsigned i=0; i < max; i++) {
+                    keySizes[i] = YOKAN_NO_MORE_KEYS;
+                }
+                delete iterator;
+                return Status::OK;
+            }
             if(!inclusive) {
                 if(iterator->key().compare(fromKeySlice) == 0) {
                     iterator->Next();
@@ -433,16 +442,15 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
             auto val = iterator->value();
-            if(!key_filter.check(key.data(), key.size(), val.data(), val.size())) {
+            if(!key_filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
@@ -489,11 +497,22 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
 
+        auto max = keySizes.size;
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
             iterator->Seek(fromKeySlice);
+            if(!iterator->Valid()) {
+                keys.size = 0;
+                vals.size = 0;
+                for(unsigned i=0; i < max; i++) {
+                    keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    valSizes[i] = YOKAN_NO_MORE_KEYS;
+                }
+                delete iterator;
+                return Status::OK;
+            }
             if(!inclusive) {
                 if(iterator->key().compare(fromKeySlice) == 0) {
                     iterator->Next();
@@ -501,18 +520,17 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
             auto val = iterator->value();
-            if(!key_filter.check(key.data(), key.size(), val.data(), val.size())) {
+            if(!key_filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }

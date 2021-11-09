@@ -399,7 +399,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     struct check_filter_args {
-        Filter      filter_checker;
+        std::shared_ptr<KeyValueFilter> filter;
         bool        filter_matches = false;
         std::string key = "";
     };
@@ -407,7 +407,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     static int check_filter_callback(const void* val, unsigned int vsize, void* uargs) {
         auto args = static_cast<check_filter_args*>(uargs);
         args->filter_matches =
-            args->filter_checker.check(args->key.data(), args->key.size(), val, vsize);
+            args->filter->check(args->key.data(), args->key.size(), val, vsize);
         return UNQLITE_OK;
     }
 
@@ -493,7 +493,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto max = keySizes.size;
         auto ctx = read_key_args{ mode, packed, keys, keySizes, filter };
 
-        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
+        auto filter_args = check_filter_args{ KeyValueFilter::makeFilter(mode, filter) };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
@@ -642,7 +642,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto max = keySizes.size;
         auto ctx = read_keyval_args{ mode, packed, keys, keySizes, vals, valSizes, filter };
 
-        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
+        auto filter_args = check_filter_args{ KeyValueFilter::makeFilter(mode, filter) };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 

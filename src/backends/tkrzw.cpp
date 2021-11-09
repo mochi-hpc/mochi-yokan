@@ -522,7 +522,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool                  m_packed;
         bool                  m_key_buf_too_small = false;
         size_t                m_key_offset = 0;
-        Filter         m_filter_checker;
+        std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeys(ssize_t& i,
                  int32_t mode,
@@ -534,13 +534,13 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_packed(packed)
-        , m_filter_checker(mode, filter.data, filter.size) {}
+        , m_filter(KeyValueFilter::makeFilter(mode, filter)) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view value) override {
             (void)value;
 
-            if(!m_filter_checker.check(key.data(), key.size(), value.data(), value.size())) {
+            if(!m_filter->check(key.data(), key.size(), value.data(), value.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
@@ -634,7 +634,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool                  m_val_buf_too_small = false;
         size_t                m_key_offset = 0;
         size_t                m_val_offset = 0;
-        Filter         m_filter_checker;
+        std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeyVals(ssize_t& i,
                     int32_t mode,
@@ -650,11 +650,11 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         , m_vsizes(vsizes)
         , m_vals(vals)
         , m_packed(packed)
-        , m_filter_checker(mode, filter.data, filter.size) {}
+        , m_filter(KeyValueFilter::makeFilter(mode, filter)) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
-            if(!m_filter_checker.check(key.data(), key.size(), val.data(), val.size())) {
+            if(!m_filter->check(key.data(), key.size(), val.data(), val.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
