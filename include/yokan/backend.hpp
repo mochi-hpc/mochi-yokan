@@ -172,10 +172,14 @@ class DocFilter {
         (void)id;
         (void)doc;
         (void)docsize;
-        return false;
+        return true;
     }
 
     static std::shared_ptr<DocFilter> makeFilter(int32_t mode, const UserMem& filter_data);
+
+    static std::shared_ptr<KeyValueFilter> toKeyValueFilter(
+            std::shared_ptr<DocFilter> filter,
+            const char* collection);
 };
 
 /**

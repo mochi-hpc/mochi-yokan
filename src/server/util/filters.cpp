@@ -183,6 +183,47 @@ struct LuaDocFilter : public DocFilter {
 };
 #endif
 
+struct CollectionFilterWrapper : public KeyPrefixFilter  {
+
+    std::shared_ptr<DocFilter> m_doc_filter;
+    size_t                     m_key_offset;
+
+    CollectionFilterWrapper(const char* coll_name,
+            std::shared_ptr<DocFilter> doc_filter)
+    : KeyPrefixFilter(0, UserMem{ const_cast<char*>(coll_name), strlen(coll_name)+1})
+    , m_doc_filter(std::move(doc_filter)) {
+        m_key_offset = m_prefix.size;
+    }
+
+    bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
+        auto b = KeyPrefixFilter::check(key, ksize, nullptr, 0);
+        if(!b) {
+            return false;
+        }
+        if(ksize != (m_key_offset+sizeof(yk_id_t))) {
+            return false;
+        }
+        if(!m_doc_filter) return true;
+        yk_id_t id;
+        std::memcpy(&id, (const char*)key + m_key_offset, sizeof(id));
+        id = _ensureBigEndian(id);
+        return m_doc_filter->check(id, val, vsize);
+    }
+
+    static yk_id_t _ensureBigEndian(yk_id_t id) {
+        #define IS_BIG_ENDIAN (*(uint16_t *)"\0\xff" < 0x100)
+        if(IS_BIG_ENDIAN) {
+            return id;
+        } else {
+            uint64_t x = id;
+            x = (x & 0x00000000FFFFFFFF) << 32 | (x & 0xFFFFFFFF00000000) >> 32;
+            x = (x & 0x0000FFFF0000FFFF) << 16 | (x & 0xFFFF0000FFFF0000) >> 16;
+            x = (x & 0x00FF00FF00FF00FF) << 8  | (x & 0xFF00FF00FF00FF00) >> 8;
+            return x;
+        }
+    }
+};
+
 std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(int32_t mode, const UserMem& filter_data) {
     if(mode & YOKAN_MODE_LUA_FILTER) {
 #ifdef YOKAN_HAS_LUA
@@ -204,6 +245,12 @@ std::shared_ptr<DocFilter> DocFilter::makeFilter(int32_t mode, const UserMem& fi
 #endif
     }
     return std::make_shared<DocFilter>();
+}
+
+std::shared_ptr<KeyValueFilter> DocFilter::toKeyValueFilter(
+            std::shared_ptr<DocFilter> filter,
+            const char* collection) {
+    return std::make_shared<CollectionFilterWrapper>(collection, std::move(filter));
 }
 
 }

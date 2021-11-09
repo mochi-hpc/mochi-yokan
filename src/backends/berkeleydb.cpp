@@ -50,7 +50,7 @@ static inline Status convertStatus(int bdb_status) {
     return Status::Other;
 }
 
-class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
+class BerkeleyDBDatabase : public DatabaseInterface {
 
     public:
 
@@ -387,7 +387,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         // dummy_key is a 0-sized key from user memory that expects
         // a partial write hence it is used to move the cursor
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter->size() };
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)(filter->size()) };
         dummy_key.set_ulen(filter->size());
         dummy_key.set_dlen(filter->size());
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
@@ -410,7 +410,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             // move the cursor to the beginning of the database
             status = cursor->get(&dummy_key, &dummy_val, DB_FIRST);
         } else {
-            // move the cursos to fromKeySlice, or right after if not found
+            // move the cursors to fromKeySlice, or right after if not found
             status = cursor->get(&fromKeySlice, &dummy_val, DB_SET_RANGE);
             if(status == 0) {
                 // move was correctly done, now check if the key we point to

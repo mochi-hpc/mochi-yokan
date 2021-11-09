@@ -211,9 +211,10 @@ class DocumentStoreMixin : public DB {
             return Status::InvalidArg;
         auto name_len = strlen(collection);
         // the prefix is the collection name including the null-terminator
-        std::vector<char> prefix(collection, collection+name_len+1);
-        auto prefix_filter = KeyValueFilter::makeFilter(0,
-                UserMem{const_cast<char*>(collection), name_len+1});
+        //std::vector<char> prefix(collection, collection+name_len+1);
+        //auto prefix_filter = KeyValueFilter::makeFilter(0,
+        //        UserMem{const_cast<char*>(collection), name_len+1});
+        auto kv_filter = DocFilter::toKeyValueFilter(filter, collection);
         // first key is composed of collectio name followed by from_id
         auto first_key = _keyFromId(collection, name_len, from_id);
 
@@ -237,7 +238,7 @@ class DocumentStoreMixin : public DB {
             auto sub_docsizes_umem = docSizes.from(docs_read);
             auto status = listKeyValues(
                 YOKAN_MODE_INCLUSIVE, packed,
-                first_key, prefix_filter,
+                first_key, kv_filter,
                 sub_keys_umem, sub_ksizes_umem,
                 sub_docs_umem, sub_docsizes_umem);
             if(status != Status::OK)
