@@ -349,7 +349,7 @@ class SetDatabase : public DatabaseInterface {
 
     virtual Status listKeys(int32_t mode, bool packed,
                             const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
@@ -369,11 +369,10 @@ class SetDatabase : public DatabaseInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = *it;
-            if(!key_filter->check(key.data(), key.size(), nullptr, 0))
+            if(!filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto umem = static_cast<char*>(keys.data) + offset;
 
@@ -387,9 +386,9 @@ class SetDatabase : public DatabaseInterface {
             if(!packed) {
 
                 size_t usize = keySizes[i];
-                keySizes[i] = keyCopy(mode, umem, usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
+                keySizes[i] = filter->keyCopy(umem, usize,
+                                              key.data(), key.size(),
+                                              is_last);
                 offset += usize;
 
             } else { // if packed
@@ -397,9 +396,9 @@ class SetDatabase : public DatabaseInterface {
                 if(buf_too_small)
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 else {
-                    keySizes[i] = keyCopy(mode, umem, keys.size - offset,
-                                          key.data(), key.size(), filter.size,
-                                          is_last);
+                    keySizes[i] = filter->keyCopy(umem, keys.size - offset,
+                                                  key.data(), key.size(),
+                                                  is_last);
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
                         buf_too_small = true;
                     else
@@ -421,7 +420,7 @@ class SetDatabase : public DatabaseInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -442,11 +441,10 @@ class SetDatabase : public DatabaseInterface {
         size_t i = 0;
         size_t key_offset = 0;
         bool key_buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
-            if(!key_filter->check(key.data(), key.size(), nullptr, 0))
+            if(!filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
 
@@ -460,9 +458,9 @@ class SetDatabase : public DatabaseInterface {
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
-                keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
+                keySizes[i] = filter->keyCopy(key_umem, key_usize,
+                                              key.data(), key.size(),
+                                              is_last);
                 key_offset += key_usize;
 
             } else { // not packed
@@ -470,9 +468,9 @@ class SetDatabase : public DatabaseInterface {
                 if(key_buf_too_small)
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 else {
-                    keySizes[i] = keyCopy(mode, key_umem, keys.size - key_offset,
-                                          key.data(), key.size(),
-                                          filter.size, is_last);
+                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
+                                                  key.data(), key.size(),
+                                                  is_last);
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
                         key_buf_too_small = true;
                     else

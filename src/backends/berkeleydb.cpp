@@ -363,7 +363,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         if(m_db_type != DB_BTREE)
             return Status::NotSupported;
@@ -376,12 +376,10 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool key_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
 
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
-
         auto ret = Status::OK;
 
         // this buffer is used in dummy_key so we can at least load the filter
-        std::vector<char> filter_check_buffer(filter.size);
+        std::vector<char> filter_check_buffer(filter->size());
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
@@ -389,9 +387,9 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         // dummy_key is a 0-sized key from user memory that expects
         // a partial write hence it is used to move the cursor
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter.size };
-        dummy_key.set_ulen(filter.size);
-        dummy_key.set_dlen(filter.size);
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter->size() };
+        dummy_key.set_ulen(filter->size());
+        dummy_key.set_dlen(filter->size());
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         // same a dummy_key
@@ -453,7 +451,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 // note: because this backend doesn't support Lua,
                 // we don't bother passing a value
-                if(key_filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 
@@ -510,7 +508,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -528,18 +526,17 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool val_buf_too_small = false;
         uint32_t flag = DB_CURRENT;
         auto ret = Status::OK;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         // this buffer is used in dummy_key so we can at least load the filter
-        std::vector<char> filter_check_buffer(filter.size);
+        std::vector<char> filter_check_buffer(filter->size());
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
         fromKeySlice.set_ulen(fromKey.size);
 
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter.size };
-        dummy_key.set_ulen(filter.size);
-        dummy_key.set_dlen(filter.size);
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter->size() };
+        dummy_key.set_ulen(filter->size());
+        dummy_key.set_dlen(filter->size());
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         auto dummy_val = Dbt{ nullptr, 0 };
@@ -605,7 +602,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 // note: because this backend doesn't support Lua, we don't
                 // bother passing a value
-                if(key_filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
                     break;
             }
 

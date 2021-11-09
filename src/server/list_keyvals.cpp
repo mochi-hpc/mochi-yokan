@@ -74,10 +74,11 @@ void yk_list_keyvals_ult(hg_handle_t h)
     }
 
     // build buffer wrappers
-    auto ptr      = buffer->data;
-    auto from_key = yokan::UserMem{ ptr, in.from_ksize };
-    auto filter   = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
-    auto ksizes   = yokan::BasicUserMem<size_t>{
+    auto ptr         = buffer->data;
+    auto from_key    = yokan::UserMem{ ptr, in.from_ksize };
+    auto filter_umem = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
+    auto filter      = yokan::KeyValueFilter::makeFilter(in.mode, filter_umem);
+    auto ksizes      = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
     };

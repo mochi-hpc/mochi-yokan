@@ -414,7 +414,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     public:
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         ScopedReadLock lock(m_lock);
@@ -456,7 +456,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             bool                  packed;
             UserMem&              keys;
             BasicUserMem<size_t>& keySizes;
-            const UserMem&        filter;
+            const std::shared_ptr<KeyValueFilter>& filter;
             size_t                key_offset = 0;
             size_t                i = 0;
             bool                  key_buf_too_small = false;
@@ -470,15 +470,15 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->filter.size, ctx->is_last);
+                ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
+                                                             ksize,  ctx->is_last);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->filter.size, ctx->is_last);
+                    ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
+                                                                 ksize, ctx->is_last);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -493,20 +493,18 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto max = keySizes.size;
         auto ctx = read_key_args{ mode, packed, keys, keySizes, filter };
 
-        auto filter_args = check_filter_args{ KeyValueFilter::makeFilter(mode, filter) };
+        auto filter_args = check_filter_args{ filter };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
-                        auto* key = static_cast<std::string*>(args);
-                        key->assign((const char*)k, ksize);
-                        return UNQLITE_OK;
-                }, static_cast<void*>(&filter_args.key));
-                unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
-                if(!filter_args.filter_matches)
-                    continue;
-            }
+            unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                    auto* key = static_cast<std::string*>(args);
+                    key->assign((const char*)k, ksize);
+                    return UNQLITE_OK;
+            }, static_cast<void*>(&filter_args.key));
+            unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(!filter_args.filter_matches)
+                continue;
 
             if(mode & YOKAN_MODE_KEEP_LAST) {
                 if(ctx.i + 1 == max) {
@@ -535,7 +533,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -578,7 +576,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             BasicUserMem<size_t>& keySizes;
             UserMem&              vals;
             BasicUserMem<size_t>& valSizes;
-            const UserMem&        filter;
+            const std::shared_ptr<KeyValueFilter>& filter;
             size_t                key_offset = 0;
             size_t                val_offset = 0;
             size_t                i = 0;
@@ -594,15 +592,15 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->filter.size, ctx->is_last);
+                ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
+                                                             ksize, ctx->is_last);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->filter.size, ctx->is_last);
+                    ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
+                                                                 ksize, ctx->is_last);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -642,20 +640,18 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto max = keySizes.size;
         auto ctx = read_keyval_args{ mode, packed, keys, keySizes, vals, valSizes, filter };
 
-        auto filter_args = check_filter_args{ KeyValueFilter::makeFilter(mode, filter) };
+        auto filter_args = check_filter_args{ filter };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
-                        auto* key = static_cast<std::string*>(args);
-                        key->assign((const char*)k, ksize);
-                        return UNQLITE_OK;
-                }, static_cast<void*>(&filter_args.key));
-                unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
-                if(!filter_args.filter_matches)
-                    continue;
-            }
+            unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                    auto* key = static_cast<std::string*>(args);
+                    key->assign((const char*)k, ksize);
+                    return UNQLITE_OK;
+            }, static_cast<void*>(&filter_args.key));
+            unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(!filter_args.filter_matches)
+                continue;
 
             if(mode & YOKAN_MODE_KEEP_LAST) {
                 if(ctx.i + 1 == max) {

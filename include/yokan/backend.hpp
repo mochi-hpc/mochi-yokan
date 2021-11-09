@@ -148,6 +148,17 @@ class KeyValueFilter {
         return false;
     }
 
+    virtual size_t keyCopy(
+        void* dst, size_t max_dst_size,
+        const void* key, size_t ksize,
+        bool is_last) const = 0;
+
+    virtual size_t valCopy(
+        void* dst, size_t max_dst_size,
+        const void* val, size_t vsize) const = 0;
+
+    virtual size_t size() const = 0;
+
     static std::shared_ptr<KeyValueFilter> makeFilter(int32_t mode, const UserMem& filter_data);
 };
 
@@ -377,7 +388,7 @@ class DatabaseInterface {
      * @return Status.
      */
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const {
         (void)mode;
         (void)packed;
@@ -393,7 +404,7 @@ class DatabaseInterface {
      */
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -618,7 +629,7 @@ class DatabaseInterface {
     virtual Status docList(const char* collection,
                            int32_t mode, bool packed,
                            yk_id_t from_id,
-                           const UserMem& filter,
+                           const std::shared_ptr<DocFilter>& filter,
                            BasicUserMem<yk_id_t>& ids,
                            UserMem& documents,
                            BasicUserMem<size_t>& doc_sizes) const {

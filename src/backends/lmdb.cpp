@@ -383,7 +383,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
@@ -447,8 +447,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t key_offset = 0;
         bool key_buf_too_small = false;
 
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
-
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
@@ -461,7 +459,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return convertStatus(ret);
             }
 
-            if(!key_filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+            if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -518,7 +516,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -590,8 +588,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
 
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
-
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
@@ -603,7 +599,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return convertStatus(ret);
             }
 
-            if(!key_filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+            if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

@@ -416,7 +416,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
@@ -445,12 +445,11 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
             auto val = iterator->value();
-            if(!key_filter->check(key.data(), key.size(), val.data(), val.size())) {
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
@@ -488,7 +487,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -525,12 +524,11 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
             auto val = iterator->value();
-            if(!key_filter->check(key.data(), key.size(), val.data(), val.size())) {
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }

@@ -74,7 +74,8 @@ void yk_doc_list_ult(hg_handle_t h)
 
     // build buffer wrappers
     auto ptr       = buffer->data;
-    auto filter    = yokan::UserMem{ ptr, in.filter_size };
+    auto filter_umem = yokan::UserMem{ ptr, in.filter_size };
+    auto filter      = yokan::DocFilter::makeFilter(in.mode, filter_umem);
     auto doc_sizes = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + doc_sizes_offset),
         in.count

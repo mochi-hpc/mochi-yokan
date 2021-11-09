@@ -525,8 +525,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeys(ssize_t& i,
-                 int32_t mode,
-                 const UserMem& filter,
+                 const std::shared_ptr<KeyValueFilter>& filter,
                  BasicUserMem<size_t>& ksizes,
                  UserMem& keys,
                  bool packed)
@@ -534,7 +533,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_packed(packed)
-        , m_filter(KeyValueFilter::makeFilter(mode, filter)) {}
+        , m_filter(filter) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view value) override {
@@ -580,7 +579,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     };
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
@@ -602,7 +601,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keys = ListKeys{i, mode, filter, keySizes, keys, packed};
+        auto list_keys = ListKeys{i, filter, keySizes, keys, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keys, false);
@@ -637,8 +636,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeyVals(ssize_t& i,
-                    int32_t mode,
-                    const UserMem& filter,
+                    const std::shared_ptr<KeyValueFilter>& filter,
                     BasicUserMem<size_t>& ksizes,
                     UserMem& keys,
                     BasicUserMem<size_t>& vsizes,
@@ -650,7 +648,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         , m_vsizes(vsizes)
         , m_vals(vals)
         , m_packed(packed)
-        , m_filter(KeyValueFilter::makeFilter(mode, filter)) {}
+        , m_filter(filter) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
@@ -716,7 +714,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -741,7 +739,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keyvals = ListKeyVals{i, mode, filter, keySizes, keys, valSizes, vals, packed};
+        auto list_keyvals = ListKeyVals{i, filter, keySizes, keys, valSizes, vals, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keyvals, false);

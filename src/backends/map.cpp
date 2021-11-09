@@ -468,7 +468,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
 
@@ -485,12 +485,11 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = it->first;
             auto& val = it->second;
-            if(!key_filter->check(key.data(), key.size(), val.data(), val.size()))
+            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
                 continue;
 
             size_t usize = packed ? (keys.size - offset) : keySizes[i];
@@ -504,15 +503,15 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
 
             if(!packed) {
-                keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                      key.size(), filter.size, is_last);
+                keySizes[i] = filter->keyCopy(umem, usize, key.data(),
+                                              key.size(), is_last);
                 offset += usize;
             } else {
                 if(buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                          key.size(), filter.size, is_last);
+                    keySizes[i] = filter->keyCopy(umem, usize, key.data(),
+                                                  key.size(), is_last);
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
@@ -534,7 +533,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -557,12 +556,11 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-        auto key_filter = KeyValueFilter::makeFilter(mode, filter);
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = it->first;
             auto& val = it->second;
-            if(!key_filter->check(key.data(), key.size(), val.data(), val.size()))
+            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
                 continue;
 
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
@@ -575,16 +573,15 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 is_last = (i+1 == max) || (next == end);
             }
 
-
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
                 size_t val_usize = valSizes[i];
-                keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
-                valSizes[i] = valCopy(mode, val_umem, val_usize,
-                                      val.data(), val.size());
+                keySizes[i] = filter->keyCopy(key_umem, key_usize,
+                                              key.data(), key.size(),
+                                              is_last);
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.data(), val.size());
                 key_offset += key_usize;
                 val_offset += val_usize;
 
@@ -596,9 +593,9 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                          key.data(), key.size(),
-                                          filter.size, is_last);
+                    keySizes[i] = filter->keyCopy(key_umem, key_usize,
+                                                  key.data(), key.size(),
+                                                  is_last);
                     if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
                         key_offset += keySizes[i];
                     else
@@ -607,8 +604,8 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    valSizes[i] = valCopy(mode, val_umem, val_usize,
-                                          val.data(), val.size());
+                    valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                                  val.data(), val.size());
                     if(valSizes[i] != YOKAN_SIZE_TOO_SMALL)
                         val_offset += valSizes[i];
                     else
