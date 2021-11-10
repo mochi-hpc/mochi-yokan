@@ -153,9 +153,9 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
@@ -445,7 +445,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         size_t i = 0;
         size_t key_offset = 0;
-        bool key_buf_too_small = false;
 
         while(i < max) {
             MDB_val key, val;
@@ -474,23 +473,20 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             size_t key_usize = keySizes[i];
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             if(packed) {
-                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
+                auto dst_max_size = keys.size - key_offset;
+                keySizes[i] = filter->keyCopy(key_umem, dst_max_size, key.mv_data, key.mv_size, i == max-1);
+                if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key.mv_size;
+                    key_offset += keySizes[i];
                 }
             } else {
-                if(key_usize < key.mv_size) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key_usize;
-                }
+                keySizes[i] = filter->keyCopy(key_umem, key_usize, key.mv_data, key.mv_size, i == max-1);
+                key_offset += key_usize;
             }
             i += 1;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
@@ -616,39 +612,43 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
-                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
+                if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
                 } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key.mv_size;
+                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
+                                                  key.mv_data, key.mv_size, i == max-1);
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        key_buf_too_small = true;
+                    } else {
+                        key_offset += keySizes[i];
+                    }
                 }
-                if(vals.size - val_offset < val.mv_size || val_buf_too_small) {
+                if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.mv_data, val.mv_size);
-                    valSizes[i] = val.mv_size;
-                    val_offset += val.mv_size;
+                    valSizes[i] = filter->valCopy(val_umem, vals.size - val_offset,
+                                                  val.mv_data, val.mv_size);
+                    if(valSizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        val_buf_too_small = true;
+                    } else {
+                        val_offset += valSizes[i];
+                    }
+                }
+                if(val_buf_too_small && key_buf_too_small) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 }
             } else {
-                if(key_usize < key.mv_size) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key_usize;
-                }
-                if(val_usize < val.mv_size) {
-                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_offset += val_usize;
-                } else {
-                    std::memcpy(val_umem, val.mv_data, val.mv_size);
-                    valSizes[i] = val.mv_size;
-                    val_offset += val_usize;
-                }
+                keySizes[i] = filter->keyCopy(key_umem, key_usize,
+                                              key.mv_data, key.mv_size, i == max-1);
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.mv_data, val.mv_size);
+                key_offset += key_usize;
+                val_offset += val_usize;
             }
             i += 1;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);

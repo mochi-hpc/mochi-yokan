@@ -289,9 +289,9 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         //            |YOKAN_MODE_NOTIFY
                     |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
@@ -517,6 +517,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     struct ListKeys : public tkrzw::DBM::RecordProcessor {
 
         ssize_t&              m_index;
+        size_t                m_max;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
         bool                  m_packed;
@@ -525,11 +526,13 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeys(ssize_t& i,
+                 size_t max,
                  const std::shared_ptr<KeyValueFilter>& filter,
                  BasicUserMem<size_t>& ksizes,
                  UserMem& keys,
                  bool packed)
         : m_index(i)
+        , m_max(max)
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_packed(packed)
@@ -544,6 +547,28 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
 
+            if(m_packed) {
+                m_ksizes[m_index] = m_filter->keyCopy(
+                        m_keys.data + m_key_offset,
+                        m_keys.size - m_key_offset,
+                        key.data(), key.size(),
+                        (size_t)m_index == m_max-1);
+                if(m_ksizes[m_index] == BufTooSmall) {
+                    while(m_index < (ssize_t)m_max) {
+                        m_ksizes[m_index] = BufTooSmall;
+                        m_index += 1;
+                    }
+                } else {
+                    m_key_offset += m_ksizes[m_index];
+                }
+            } else {
+                auto available_ksize = m_ksizes[m_index];
+                m_ksizes[m_index] = m_filter->keyCopy(
+                    m_keys.data + m_key_offset, available_ksize,
+                     key.data(), key.size(), (size_t)m_index == m_max-1);
+                m_key_offset += available_ksize;
+            }
+            /*
             if(m_packed) {
 
                 if(m_key_buf_too_small) {
@@ -569,6 +594,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
 
             }
+            */
             return tkrzw::DBM::RecordProcessor::NOOP;
         }
 
@@ -601,7 +627,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keys = ListKeys{i, filter, keySizes, keys, packed};
+        auto list_keys = ListKeys{i, max, filter, keySizes, keys, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keys, false);
@@ -624,6 +650,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     struct ListKeyVals : public tkrzw::DBM::RecordProcessor {
 
         ssize_t&              m_index;
+        size_t                m_max;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
         BasicUserMem<size_t>& m_vsizes;
@@ -636,6 +663,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::shared_ptr<KeyValueFilter> m_filter;
 
         ListKeyVals(ssize_t& i,
+                    size_t max,
                     const std::shared_ptr<KeyValueFilter>& filter,
                     BasicUserMem<size_t>& ksizes,
                     UserMem& keys,
@@ -643,6 +671,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     UserMem& vals,
                     bool packed)
         : m_index(i)
+        , m_max(max)
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_vsizes(vsizes)
@@ -658,49 +687,46 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
 
             if(m_packed) {
-
                 if(m_key_buf_too_small) {
                     m_ksizes[m_index] = BufTooSmall;
-                } else if(m_keys.size - m_key_offset < key.size()) {
-                    m_ksizes[m_index] = BufTooSmall;
-                    m_key_buf_too_small = true;
                 } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_ksizes[m_index] = key.size();
-                    m_key_offset += key.size();
+                    m_ksizes[m_index] = m_filter->keyCopy(
+                        m_keys.data + m_key_offset,
+                        m_keys.size - m_key_offset,
+                        key.data(), key.size(),
+                        (size_t)m_index == m_max-1);
+                    if(m_ksizes[m_index] == BufTooSmall) {
+                        m_ksizes[m_index] = BufTooSmall;
+                        m_key_buf_too_small = true;
+                    } else {
+                        m_key_offset += m_ksizes[m_index];
+                    }
                 }
-
                 if(m_val_buf_too_small) {
                     m_vsizes[m_index] = BufTooSmall;
-                } else if(m_vals.size - m_val_offset < val.size()) {
-                    m_vsizes[m_index] = BufTooSmall;
-                    m_val_buf_too_small = true;
                 } else {
-                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
-                    m_vsizes[m_index] = val.size();
-                    m_val_offset += val.size();
+                    m_vsizes[m_index] = m_filter->valCopy(
+                        m_vals.data + m_val_offset,
+                        m_vals.size - m_val_offset,
+                        val.data(), val.size());
+                    if(m_vsizes[m_index] == BufTooSmall) {
+                        m_vsizes[m_index] = BufTooSmall;
+                        m_val_buf_too_small = true;
+                    } else {
+                        m_val_offset += m_vsizes[m_index];
+                    }
                 }
-
             } else {
-
-                if(m_ksizes[m_index] < key.size()) {
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = BufTooSmall;
-                } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = key.size();
-                }
-
-                if(m_vsizes[m_index] < val.size()) {
-                    m_val_offset += m_vsizes[m_index];
-                    m_vsizes[m_index] = BufTooSmall;
-                } else {
-                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
-                    m_val_offset += m_vsizes[m_index];
-                    m_vsizes[m_index] = val.size();
-                }
-
+                auto available_ksize = m_ksizes[m_index];
+                auto available_vsize = m_vsizes[m_index];
+                m_ksizes[m_index] = m_filter->keyCopy(
+                    m_keys.data + m_key_offset, available_ksize,
+                     key.data(), key.size(), (size_t)m_index == m_max-1);
+                m_vsizes[m_index] = m_filter->valCopy(
+                    m_vals.data + m_val_offset, available_vsize,
+                     val.data(), val.size());
+                m_key_offset += available_ksize;
+                m_val_offset += available_vsize;
             }
             return tkrzw::DBM::RecordProcessor::NOOP;
         }
@@ -739,7 +765,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keyvals = ListKeyVals{i, filter, keySizes, keys, valSizes, vals, packed};
+        auto list_keyvals = ListKeyVals{i, max, filter, keySizes, keys, valSizes, vals, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keyvals, false);
