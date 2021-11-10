@@ -44,6 +44,7 @@ class DocumentStoreMixin : public DB {
     DocumentStoreMixin& operator=(const DocumentStoreMixin&) = default;
     DocumentStoreMixin& operator=(DocumentStoreMixin&&) = default;
 
+    using DB::supportsMode;
     using DB::count;
     using DB::exists;
     using DB::length;
@@ -209,65 +210,27 @@ class DocumentStoreMixin : public DB {
         (void)mode;
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
+        if(!supportsMode(YOKAN_MODE_NO_PREFIX))
+            return Status::NotSupported;
+
         auto name_len = strlen(collection);
-        // the prefix is the collection name including the null-terminator
-        //std::vector<char> prefix(collection, collection+name_len+1);
-        //auto prefix_filter = KeyValueFilter::makeFilter(0,
-        //        UserMem{const_cast<char*>(collection), name_len+1});
+        auto count = ids.size;
         auto kv_filter = DocFilter::toKeyValueFilter(filter, collection);
-        // first key is composed of collectio name followed by from_id
         auto first_key = _keyFromId(collection, name_len, from_id);
 
-        auto count = ids.size;
+        auto keys_umem = UserMem{ reinterpret_cast<char*>(ids.data), ids.size*sizeof(yk_id_t) };
+        std::vector<size_t> ksizes(count, sizeof(yk_id_t));
+        auto ksizes_umem = BasicUserMem<size_t> {ksizes};
 
-        auto key_len = name_len+1+sizeof(yk_id_t);
-        std::vector<char> keys(count*key_len);
-        std::vector<size_t> ksizes(count, key_len);
-        UserMem keys_umem{keys};
-        BasicUserMem<size_t> ksizes_umem{ksizes};
-        std::vector<size_t> original_doc_sizes;
-        original_doc_sizes = std::vector<size_t>(docSizes.data, docSizes.data+docSizes.size);
+        auto new_mode = (mode & YOKAN_MODE_INCLUSIVE)|YOKAN_MODE_NO_PREFIX;
 
-        size_t docs_read = 0;   // number of docs already read
-        size_t docs_offset = 0; // offset at which we are in documents
-
-        while(docs_read < count) {
-            auto sub_keys_umem     = keys_umem.from(docs_read);
-            auto sub_ksizes_umem   = ksizes_umem.from(docs_read);
-            auto sub_docs_umem     = documents.from(docs_offset);
-            auto sub_docsizes_umem = docSizes.from(docs_read);
-            auto status = listKeyValues(
-                YOKAN_MODE_INCLUSIVE, packed,
-                first_key, kv_filter,
-                sub_keys_umem, sub_ksizes_umem,
-                sub_docs_umem, sub_docsizes_umem);
-            if(status != Status::OK)
-                return status;
-            auto remaining = count - docs_read;
-            for(size_t i = 0; i < remaining; i++) {
-                if(ksizes[docs_read] == YOKAN_NO_MORE_DOCS) {
-                    ids[docs_read] = YOKAN_NO_MORE_DOCS;
-                    docSizes[docs_read] = YOKAN_NO_MORE_DOCS;
-                    docs_read += 1;
-                    goto done;
-                }
-                ids[docs_read] = _idFromKey(name_len, keys.data()+docs_read*key_len);
-                if(packed) {
-                    if(docSizes[docs_read] == YOKAN_SIZE_TOO_SMALL) {
-                        goto done;
-                    }
-                    docs_offset += docSizes[docs_read];
-                } else {
-                    docs_offset += original_doc_sizes[docs_read];
-                }
-                docs_read += 1;
-            }
-        }
-done:
-        ids.size = docs_read;
-        documents.size = docs_offset;
-        docSizes.size = docs_read;
-        return Status::OK;
+        auto status = listKeyValues(new_mode, packed, first_key, kv_filter,
+                             keys_umem, ksizes_umem, documents, docSizes);
+        if(status == Status::OK)
+            for(size_t i=0; i < count; i++)
+                if(ksizes[i] == YOKAN_NO_MORE_KEYS)
+                    ids[i] = YOKAN_NO_MORE_DOCS;
+        return status;
     }
 
     private:
