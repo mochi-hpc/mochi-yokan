@@ -226,10 +226,14 @@ class DocumentStoreMixin : public DB {
 
         auto status = listKeyValues(new_mode, packed, first_key, kv_filter,
                              keys_umem, ksizes_umem, documents, docSizes);
-        if(status == Status::OK)
-            for(size_t i=0; i < count; i++)
+        if(status == Status::OK) {
+            for(size_t i=0; i < count; i++) {
                 if(ksizes[i] == YOKAN_NO_MORE_KEYS)
                     ids[i] = YOKAN_NO_MORE_DOCS;
+                else
+                    ids[i] = _ensureBigEndian(ids[i]);
+            }
+        }
         return status;
     }
 

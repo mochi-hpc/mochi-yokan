@@ -209,6 +209,103 @@ static MunitResult test_coll_list_packed(const MunitParameter params[], void* da
     return MUNIT_OK;
 }
 
+static MunitResult test_coll_list_lua(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
+
+    std::vector<std::vector<char>> buffers(g_items_per_op);
+    for(auto& v : buffers) v.resize(g_max_val_size);
+
+    std::vector<void*> buf_ptrs;
+    std::vector<size_t> buf_sizes;
+    buf_ptrs.reserve(g_items_per_op);
+    buf_sizes.reserve(g_items_per_op);
+    for(auto& v : buffers) {
+        buf_ptrs.push_back(v.data());
+        buf_sizes.push_back(g_max_val_size);
+    }
+    std::vector<yk_id_t> ids(g_items_per_op);
+
+    yk_id_t start_id = 0;
+
+    const char* lua_code =
+        "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
+    size_t code_size = strlen(lua_code);
+
+    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER;
+    while(start_id != YOKAN_NO_MORE_DOCS) {
+        ret = yk_doc_list(dbh, "abcd", mode, start_id,
+                          lua_code, code_size,
+                          g_items_per_op, ids.data(),
+                          buf_ptrs.data(), buf_sizes.data());
+        SKIP_IF_NOT_IMPLEMENTED(ret);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        for(unsigned i=0; i < g_items_per_op; i++) {
+            if(ids[i] == YOKAN_NO_MORE_DOCS) {
+                start_id = YOKAN_NO_MORE_DOCS;
+                break;
+            }
+            auto& ref = context->reference[ids[i]];
+            munit_assert_long(buf_sizes[i], ==, ref.size());
+            munit_assert_memory_equal(ref.size(), buffers[i].data(), ref.data());
+            munit_assert_true((ids[i] % 3 == 0) || (buf_sizes[i] > 0 && ref[0] < 100));
+            start_id = ids[i]+1;
+            buf_sizes[i] = g_max_val_size;
+        }
+    }
+
+    return MUNIT_OK;
+}
+
+static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
+
+    std::vector<char> buffer(g_items_per_op*g_max_val_size);
+    std::vector<size_t> buf_sizes(g_items_per_op);
+    std::vector<yk_id_t> ids(g_items_per_op);
+
+    yk_id_t start_id = 0;
+
+    const char* lua_code =
+        "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
+    size_t code_size = strlen(lua_code);
+
+    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER;
+    while(start_id != YOKAN_NO_MORE_DOCS) {
+        ret = yk_doc_list_packed(dbh, "abcd", mode, start_id,
+                          lua_code, code_size,
+                          g_items_per_op, ids.data(),
+                          buffer.size(), buffer.data(), buf_sizes.data());
+        SKIP_IF_NOT_IMPLEMENTED(ret);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        size_t offset = 0;
+        for(unsigned i=0; i < g_items_per_op; i++) {
+            if(ids[i] == YOKAN_NO_MORE_DOCS) {
+                start_id = YOKAN_NO_MORE_DOCS;
+                break;
+            }
+            auto& ref = context->reference[ids[i]];
+            munit_assert_long(buf_sizes[i], ==, ref.size());
+            munit_assert_memory_equal(ref.size(), buffer.data()+offset, ref.data());
+            munit_assert_true((ids[i] % 3 == 0) || (buf_sizes[i] > 0 && ref[0] < 100));
+            start_id = ids[i]+1;
+            offset += buf_sizes[i];
+            buf_sizes[i] = g_max_val_size;
+        }
+    }
+
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
@@ -223,7 +320,11 @@ static MunitTest test_suite_tests[] = {
     /* coll_create */
     { (char*) "/coll/list", test_coll_list,
         test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/coll/list/lua", test_coll_list_lua,
+        test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/coll/list_packed", test_coll_list_packed,
+        test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/coll/list_packed/lua", test_coll_list_packed_lua,
         test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

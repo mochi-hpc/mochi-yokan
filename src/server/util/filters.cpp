@@ -10,6 +10,7 @@
 #include "yokan/backend.hpp"
 #include "config.h"
 #include <cstring>
+#include <iostream>
 #ifdef YOKAN_HAS_LUA
 #include <sol/sol.hpp>
 #endif
@@ -214,7 +215,7 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
 
     CollectionFilterWrapper(const char* coll_name,
             std::shared_ptr<DocFilter> doc_filter)
-    : KeyPrefixFilter(0, UserMem{ const_cast<char*>(coll_name), strlen(coll_name)+1})
+    : KeyPrefixFilter(YOKAN_MODE_NO_PREFIX, UserMem{ const_cast<char*>(coll_name), strlen(coll_name)+1})
     , m_doc_filter(std::move(doc_filter)) {
         m_key_offset = m_prefix.size;
     }
