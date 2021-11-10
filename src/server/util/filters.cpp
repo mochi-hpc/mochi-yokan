@@ -24,6 +24,18 @@ struct KeyPrefixFilter : public KeyValueFilter {
     KeyPrefixFilter(int32_t mode, UserMem prefix)
     : m_mode(mode), m_prefix(std::move(prefix)) {}
 
+    bool requiresValue() const override {
+        return false;
+    }
+
+    size_t minRequiredKeySize() const override {
+        return m_prefix.size;
+    }
+
+    bool requiresFullKey() const override {
+        return false;
+    }
+
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         (void)val;
         (void)vsize;
@@ -58,10 +70,6 @@ struct KeyPrefixFilter : public KeyValueFilter {
         std::memcpy(dst, val, vsize);
         return vsize;
     }
-
-    size_t size() const override {
-        return m_prefix.size;
-    }
 };
 
 struct KeySuffixFilter : public KeyValueFilter {
@@ -71,6 +79,18 @@ struct KeySuffixFilter : public KeyValueFilter {
 
     KeySuffixFilter(int32_t mode, UserMem suffix)
     : m_mode(mode), m_suffix(std::move(suffix)) {}
+
+    bool requiresValue() const override {
+        return false;
+    }
+
+    size_t minRequiredKeySize() const override {
+        return 0;
+    }
+
+    bool requiresFullKey() const override {
+        return true;
+    }
 
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         (void)val;
@@ -106,10 +126,6 @@ struct KeySuffixFilter : public KeyValueFilter {
         std::memcpy(dst, val, vsize);
         return vsize;
     }
-
-    size_t size() const override {
-        return m_suffix.size;
-    }
 };
 
 #ifdef YOKAN_HAS_LUA
@@ -124,6 +140,18 @@ struct LuaKeyValueFilter : public KeyValueFilter {
         m_lua.open_libraries(sol::lib::base);
         m_lua.open_libraries(sol::lib::string);
         m_lua.open_libraries(sol::lib::math);
+    }
+
+    bool requiresValue() const override {
+        return true;
+    }
+
+    size_t minRequiredKeySize() const override {
+        return 0;
+    }
+
+    bool requiresFullKey() const override {
+        return true;
     }
 
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
@@ -151,10 +179,6 @@ struct LuaKeyValueFilter : public KeyValueFilter {
         if(max_dst_size < vsize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, val, vsize);
         return vsize;
-    }
-
-    size_t size() const override {
-        return m_code.size;
     }
 };
 #endif
@@ -193,6 +217,18 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
     : KeyPrefixFilter(0, UserMem{ const_cast<char*>(coll_name), strlen(coll_name)+1})
     , m_doc_filter(std::move(doc_filter)) {
         m_key_offset = m_prefix.size;
+    }
+
+    bool requiresValue() const override {
+        return static_cast<bool>(m_doc_filter);
+    }
+
+    size_t minRequiredKeySize() const override {
+        return KeyPrefixFilter::minRequiredKeySize() + sizeof(yk_id_t) + 1;
+    }
+
+    bool requiresFullKey() const override {
+        return true;
     }
 
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {

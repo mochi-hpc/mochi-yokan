@@ -50,7 +50,7 @@ static inline Status convertStatus(int bdb_status) {
     return Status::Other;
 }
 
-class BerkeleyDBDatabase : public DatabaseInterface {
+class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
@@ -379,7 +379,8 @@ class BerkeleyDBDatabase : public DatabaseInterface {
         auto ret = Status::OK;
 
         // this buffer is used in dummy_key so we can at least load the filter
-        std::vector<char> filter_check_buffer(filter->size());
+        size_t minReqKeySize = filter->minRequiredKeySize();
+        std::vector<char> filter_check_buffer(minReqKeySize);
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
@@ -387,9 +388,9 @@ class BerkeleyDBDatabase : public DatabaseInterface {
 
         // dummy_key is a 0-sized key from user memory that expects
         // a partial write hence it is used to move the cursor
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)(filter->size()) };
-        dummy_key.set_ulen(filter->size());
-        dummy_key.set_dlen(filter->size());
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)(minReqKeySize) };
+        dummy_key.set_ulen(minReqKeySize);
+        dummy_key.set_dlen(minReqKeySize);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         // same a dummy_key
@@ -528,15 +529,16 @@ class BerkeleyDBDatabase : public DatabaseInterface {
         auto ret = Status::OK;
 
         // this buffer is used in dummy_key so we can at least load the filter
-        std::vector<char> filter_check_buffer(filter->size());
+        auto minReqKeySize = filter->minRequiredKeySize();
+        std::vector<char> filter_check_buffer(minReqKeySize);
 
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
         fromKeySlice.set_ulen(fromKey.size);
 
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)filter->size() };
-        dummy_key.set_ulen(filter->size());
-        dummy_key.set_dlen(filter->size());
+        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)minReqKeySize };
+        dummy_key.set_ulen(minReqKeySize);
+        dummy_key.set_dlen(minReqKeySize);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         auto dummy_val = Dbt{ nullptr, 0 };

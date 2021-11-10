@@ -140,13 +140,11 @@ class KeyValueFilter {
 
     virtual ~KeyValueFilter() = default;
 
-    virtual bool check(const void* key, size_t ksize, const void* val, size_t vsize) const {
-        (void)key;
-        (void)ksize;
-        (void)val;
-        (void)vsize;
-        return false;
-    }
+    virtual bool requiresValue() const = 0;
+    virtual bool requiresFullKey() const = 0;
+    virtual size_t minRequiredKeySize() const = 0;
+
+    virtual bool check(const void* key, size_t ksize, const void* val, size_t vsize) const = 0;
 
     virtual size_t keyCopy(
         void* dst, size_t max_dst_size,
@@ -156,8 +154,6 @@ class KeyValueFilter {
     virtual size_t valCopy(
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
-
-    virtual size_t size() const = 0;
 
     static std::shared_ptr<KeyValueFilter> makeFilter(int32_t mode, const UserMem& filter_data);
 };

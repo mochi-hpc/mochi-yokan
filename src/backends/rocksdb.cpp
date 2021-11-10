@@ -222,9 +222,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
@@ -444,7 +444,6 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         size_t i = 0;
         size_t offset = 0;
-        bool buf_too_small = false;
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
@@ -456,23 +455,21 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             size_t usize = keySizes[i];
             auto umem = static_cast<char*>(keys.data) + offset;
             if(packed) {
-                if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    buf_too_small = true;
+                auto dst_max_size = keys.size - offset;
+                keySizes[i] = filter->keyCopy(umem, dst_max_size, key.data(), key.size(), i == max-1);
+                if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
+                    offset += keySizes[i];
                 }
             } else {
-                if(usize < key.size()) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    offset += usize;
-                } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += usize;
-                }
+                auto dst_max_size = usize;
+                keySizes[i] = filter->keyCopy(umem, dst_max_size, key.data(), key.size(), i == max-1);
+                offset += usize;
             }
             i += 1;
             iterator->Next();
@@ -522,6 +519,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t i = 0;
         size_t key_offset = 0;
         size_t val_offset = 0;
+
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
 
@@ -537,39 +535,43 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
-                if(keys.size - key_offset < key.size() || key_buf_too_small) {
+                if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
                 } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
+                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
+                                              key.data(), key.size(), i == max-1);
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        key_buf_too_small = true;
+                    } else {
+                        key_offset += keySizes[i];
+                    }
                 }
-                if(vals.size - val_offset < val.size() || val_buf_too_small) {
+                if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
+                    valSizes[i] = filter->valCopy(val_umem, vals.size - val_offset,
+                                                  val.data(), val.size());
+                    if(valSizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        val_buf_too_small = true;
+                    } else {
+                        val_offset += valSizes[i];
+                    }
+                }
+                if(val_buf_too_small && key_buf_too_small) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 }
             } else {
-                if(key_usize < key.size()) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key_usize;
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_offset += val_usize;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val_usize;
-                }
+                keySizes[i] = filter->keyCopy(key_umem, key_usize,
+                                              key.data(), key.size(), i == max-1);
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.data(), val.size());
+                key_offset += key_usize;
+                val_offset += val_usize;
             }
             i += 1;
             iterator->Next();

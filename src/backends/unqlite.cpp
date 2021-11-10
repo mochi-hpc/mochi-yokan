@@ -145,12 +145,13 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_APPEND
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
-        //            |YOKAN_MODE_SUFFIX
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif

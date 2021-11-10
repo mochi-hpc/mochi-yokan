@@ -149,7 +149,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             (mode & (
                      YOKAN_MODE_INCLUSIVE
                     |YOKAN_MODE_APPEND
-        //            |YOKAN_MODE_CONSUME
+                    |YOKAN_MODE_CONSUME
                     |YOKAN_MODE_WAIT
                     |YOKAN_MODE_NOTIFY
                     |YOKAN_MODE_NEW_ONLY
