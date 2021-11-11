@@ -413,7 +413,7 @@ class Database {
     bool collectionExists(const char* name,
                           int32_t mode = YOKAN_MODE_DEFAULT) const {
         uint8_t flag;
-        auto err = yk_collection_drop(m_db, name, mode);
+        auto err = yk_collection_exists(m_db, name, mode, &flag);
         YOKAN_CONVERT_AND_THROW(err);
         return static_cast<bool>(flag);
     }

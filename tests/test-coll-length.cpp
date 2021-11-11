@@ -36,7 +36,7 @@ static void* test_coll_size_context_setup(const MunitParameter params[], void* u
     return context;
 }
 
-static MunitResult test_coll_doc_size(const MunitParameter params[], void* data)
+static MunitResult test_coll_doc_length(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
@@ -47,7 +47,7 @@ static MunitResult test_coll_doc_size(const MunitParameter params[], void* data)
     for(unsigned i=0; i < g_num_items; i++) {
         yk_id_t id = (yk_id_t)i;
         size_t size;
-        ret = yk_doc_size(dbh, "abcd", 0, id, &size);
+        ret = yk_doc_length(dbh, "abcd", 0, id, &size);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         auto& ref = context->reference[i];
@@ -59,24 +59,24 @@ static MunitResult test_coll_doc_size(const MunitParameter params[], void* data)
     size_t size;
 
     /* tries to get the size using nullptr */
-    ret = yk_doc_size(dbh, "abcd", 0, 0, nullptr);
+    ret = yk_doc_length(dbh, "abcd", 0, 0, nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries get size of a document from a collection that does not exist */
-    ret = yk_doc_size(dbh, "efgh", 0, 0, &size);
+    ret = yk_doc_length(dbh, "efgh", 0, 0, &size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     /* tries to get size with an invalid id */
-    ret = yk_doc_size(dbh, "abcd", 0, g_num_items+1, &size);
+    ret = yk_doc_length(dbh, "abcd", 0, g_num_items+1, &size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     return MUNIT_OK;
 }
 
-static MunitResult test_coll_doc_size_multi(const MunitParameter params[], void* data)
+static MunitResult test_coll_doc_length_multi(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
@@ -89,7 +89,7 @@ static MunitResult test_coll_doc_size_multi(const MunitParameter params[], void*
     for(unsigned i=0; i < g_num_items+1; i++) /* id g_num_items does not exist */
         ids.push_back(i);
 
-    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), buf_sizes.data());
+    ret = yk_doc_length_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -105,17 +105,17 @@ static MunitResult test_coll_doc_size_multi(const MunitParameter params[], void*
     /* erroneous cases */
 
     /* tries to load with nullptr as ids */
-    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, nullptr, buf_sizes.data());
+    ret = yk_doc_length_multi(dbh, "abcd", 0, g_num_items+1, nullptr, buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to get size with nullptr as size */
-    ret = yk_doc_size_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), nullptr);
+    ret = yk_doc_length_multi(dbh, "abcd", 0, g_num_items+1, ids.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to get size of doc from a collection that does not exist */
-    ret = yk_doc_size_multi(dbh, "efgh", 0, g_num_items+1, ids.data(), buf_sizes.data());
+    ret = yk_doc_length_multi(dbh, "efgh", 0, g_num_items+1, ids.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     for(unsigned i=0; i < g_num_items+1; i++)
@@ -134,9 +134,9 @@ static MunitParameterEnum test_params[] = {
 
 static MunitTest test_suite_tests[] = {
     /* coll_create */
-    { (char*) "/coll/doc_size", test_coll_doc_size,
+    { (char*) "/coll/doc_length", test_coll_doc_length,
         test_coll_size_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
-    { (char*) "/coll/doc_size_multi", test_coll_doc_size_multi,
+    { (char*) "/coll/doc_length_multi", test_coll_doc_length_multi,
         test_coll_size_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

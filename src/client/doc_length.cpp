@@ -12,7 +12,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
+extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
                                          const char* collection,
                                          int32_t mode,
                                          size_t count,
@@ -28,8 +28,8 @@ extern "C" yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
     margo_instance_id mid = dbh->client->mid;
     yk_return_t ret = YOKAN_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
-    doc_size_in_t in;
-    doc_size_out_t out;
+    doc_length_in_t in;
+    doc_length_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.db_id     = dbh->database_id;
@@ -38,7 +38,7 @@ extern "C" yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
     in.ids.count = count;
     in.ids.ids   = (yk_id_t*)ids;
 
-    hret = margo_create(mid, dbh->addr, dbh->client->doc_size_id, &handle);
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_length_id, &handle);
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
@@ -62,13 +62,13 @@ extern "C" yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
     return ret;
 }
 
-extern "C" yk_return_t yk_doc_size(yk_database_handle_t dbh,
+extern "C" yk_return_t yk_doc_length(yk_database_handle_t dbh,
                                    const char* collection,
                                    int32_t mode,
                                    yk_id_t id,
                                    size_t* size) {
     if(size == nullptr) return YOKAN_ERR_INVALID_ARGS;
-    auto ret = yk_doc_size_multi(dbh, collection, mode, 1, &id, size);
+    auto ret = yk_doc_length_multi(dbh, collection, mode, 1, &id, size);
     if(ret == YOKAN_SUCCESS && *size == YOKAN_KEY_NOT_FOUND)
         return YOKAN_ERR_KEY_NOT_FOUND;
     return ret;

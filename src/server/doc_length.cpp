@@ -11,12 +11,12 @@
 #include "../common/checks.h"
 #include <numeric>
 
-void yk_doc_size_ult(hg_handle_t h)
+void yk_doc_length_ult(hg_handle_t h)
 {
     std::vector<size_t> sizes;
     hg_return_t hret;
-    doc_size_in_t in;
-    doc_size_out_t out;
+    doc_length_in_t in;
+    doc_length_out_t out;
 
     out.ret = YOKAN_SUCCESS;
     out.sizes.sizes = NULL;
@@ -50,4 +50,4 @@ void yk_doc_size_ult(hg_handle_t h)
         out.sizes.count = sizes.size();
     }
 }
-DEFINE_MARGO_RPC_HANDLER(yk_doc_size_ult)
+DEFINE_MARGO_RPC_HANDLER(yk_doc_length_ult)

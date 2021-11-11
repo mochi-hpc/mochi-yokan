@@ -301,11 +301,11 @@ yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_doc_size(yk_database_handle_t dbh,
-                        const char* collection,
-                        int32_t mode,
-                        yk_id_t id,
-                        size_t* size);
+yk_return_t yk_doc_length(yk_database_handle_t dbh,
+                          const char* collection,
+                          int32_t mode,
+                          yk_id_t id,
+                          size_t* size);
 
 /**
  * @brief Get the size of multiple documents from the collection.
@@ -319,12 +319,12 @@ yk_return_t yk_doc_size(yk_database_handle_t dbh,
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
-yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
-                              const char* collection,
-                              int32_t mode,
-                              size_t count,
-                              const yk_id_t* ids,
-                              size_t* rsizes);
+yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
+                                const char* collection,
+                                int32_t mode,
+                                size_t count,
+                                const yk_id_t* ids,
+                                size_t* rsizes);
 
 /**
  * @brief Update a document from the collection.

@@ -26,6 +26,21 @@ class Collection {
     Collection& operator=(Collection&&) = default;
     ~Collection() = default;
 
+    size_t size(int32_t mode = YOKAN_MODE_DEFAULT) const {
+        size_t s;
+        auto err = yk_collection_size(m_db.handle(), m_name.c_str(), mode, &s);
+        YOKAN_CONVERT_AND_THROW(err);
+        return s;
+    }
+
+    yk_id_t last_id(int32_t mode = YOKAN_MODE_DEFAULT) const {
+        yk_id_t last;
+        auto err = yk_collection_last_id(m_db.handle(), m_name.c_str(),
+                                         mode, &last);
+        YOKAN_CONVERT_AND_THROW(err);
+        return last;
+    }
+
     yk_id_t store(const void* doc, size_t docsize,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
         yk_id_t id;
@@ -107,19 +122,19 @@ class Collection {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
-    size_t size(yk_id_t id,
-                int32_t mode = YOKAN_MODE_DEFAULT) const {
+    size_t length(yk_id_t id,
+                  int32_t mode = YOKAN_MODE_DEFAULT) const {
         size_t size;
-        auto err = yk_doc_size(m_db.handle(), m_name.c_str(),
-                               mode, id, &size);
+        auto err = yk_doc_length(m_db.handle(), m_name.c_str(),
+                                 mode, id, &size);
         YOKAN_CONVERT_AND_THROW(err);
         return size;
     }
 
-    void sizeMulti(size_t count, const yk_id_t* ids,
-                   size_t* sizes, int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_doc_size_multi(m_db.handle(), m_name.c_str(),
-                                     mode, count, ids, sizes);
+    void lengthMulti(size_t count, const yk_id_t* ids,
+                     size_t* sizes, int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_length_multi(m_db.handle(), m_name.c_str(),
+                                       mode, count, ids, sizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
 

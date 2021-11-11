@@ -287,13 +287,13 @@ MERCURY_GEN_PROC(doc_load_in_t,
 MERCURY_GEN_PROC(doc_load_out_t,
         ((int32_t)(ret)))
 
-/* doc_size */
-MERCURY_GEN_PROC(doc_size_in_t,
+/* doc_length */
+MERCURY_GEN_PROC(doc_length_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((id_list)(ids)))
-MERCURY_GEN_PROC(doc_size_out_t,
+MERCURY_GEN_PROC(doc_length_out_t,
         ((id_list)(sizes))\
         ((int32_t)(ret)))
 
