@@ -58,6 +58,39 @@ yk_return_t yk_collection_exists(yk_database_handle_t dbh,
                                  uint8_t* flag);
 
 /**
+ * @brief Get the number of documents currently stored in the
+ * collection.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[out] count Number of documents stored
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_collection_size(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t* count);
+
+/**
+ * @brief Get the last document id of the collection.
+ * This value corresponds to the id of the next document
+ * that will be stored in the collection.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[out] id Last document id
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_collection_last_id(yk_database_handle_t dbh,
+                                  const char* collection,
+                                  int32_t mode,
+                                  yk_id_t* id);
+
+/**
  * @brief Store a document into the collection.
  *
  * @param[in] dbh Database handle
@@ -118,6 +151,34 @@ yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
                                 const void* documents,
                                 const size_t* rsizes,
                                 yk_id_t* ids);
+
+/**
+ * @brief Store a document using the low-level bulk handle.
+ * The payload is considered from offset to offset+size in
+ * the bulk handle. See src/client/doc_store.cpp for
+ * information on how data in this buffer should be structured.
+ *
+ * @param dbh Database handle
+ * @param collection Collection
+ * @param mode Mode
+ * @param count Number of records
+ * @param origin Origin address
+ * @param data Bulk handle
+ * @param offset Offset in the bulk handle
+ * @param size Size of the payload
+ * @param ids Resulting document ids
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
+                              const char* collection,
+                              int32_t mode,
+                              size_t count,
+                              const char* origin,
+                              hg_bulk_t data,
+                              size_t offset,
+                              size_t size,
+                              yk_id_t* ids);
 
 /**
  * @brief Load a document from the collection.
@@ -219,15 +280,15 @@ yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
 yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
-                              const char* collection,
-                              int32_t mode,
-                              size_t count,
-                              const yk_id_t* ids,
-                              const char* origin,
-                              hg_bulk_t data,
-                              size_t offset,
-                              size_t size,
-                              bool packed);
+                             const char* collection,
+                             int32_t mode,
+                             size_t count,
+                             const yk_id_t* ids,
+                             const char* origin,
+                             hg_bulk_t data,
+                             size_t offset,
+                             size_t size,
+                             bool packed);
 
 /**
  * @brief Get the size of a document from the collection.
@@ -264,111 +325,6 @@ yk_return_t yk_doc_size_multi(yk_database_handle_t dbh,
                               size_t count,
                               const yk_id_t* ids,
                               size_t* rsizes);
-
-/**
- * @brief Get the number of documents currently stored in the
- * collection.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[out] count Number of documents stored
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_collection_size(yk_database_handle_t dbh,
-                               const char* collection,
-                               int32_t mode,
-                               size_t* count);
-
-/**
- * @brief Get the last document id of the collection.
- * This value corresponds to the id of the next document
- * that will be stored in the collection.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[out] id Last document id
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_collection_last_id(yk_database_handle_t dbh,
-                                  const char* collection,
-                                  int32_t mode,
-                                  yk_id_t* id);
-
-#if 0
-/**
- * @brief Fetch a document from the collection. The response
- * argument must have been allocated using yk_response_alloc.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[in] id Id of the document to fetch
- * @param[in] response Response from which to extract the document
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
-                         const char* collection,
-                         int32_t mode,
-                         yk_id_t id,
-                         yk_response_t response);
-
-/**
- * @brief Fetch multiple documents from the collection.
- * The response argument must have been allocated using
- * yk_response_alloc.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[in] count Number of documents to fetch
- * @param[in] ids Ids of the documents to fetch
- * @param[in] response Response from which to extract the documents
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
-                               const char* collection,
-                               int32_t mode,
-                               size_t count,
-                               const yk_id_t* ids,
-                               yk_response_t response);
-
-/**
- * @brief Filter the collection, returning up to max documents
- * that match specified filter, starting from the given start_id.
- * The type of filter used is specified by the mode parameter.
- * By default (YOKAN_MODE_DEFAULT), or if filter is NULL and
- * fsize is 0, all the documents are returned (same as
- * yk_doc_fetch_multi for the range of ids
- * [ start_id, start_id + max_documents ]).
- * The response argument must have been allocated using
- * yk_response_alloc.
- *
- * @param[in] dbh Database handle
- * @param[in] collection Collection
- * @param[in] mode Mode
- * @param[in] start_id Start document id
- * @param[in] max_documents Max number of documents to return
- * @param[in] filter Filter data
- * @param[in] fsize Size of the filter
- * @param[in] response Resulting response handle
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_doc_filter(yk_database_handle_t dbh,
-                          const char* collection,
-                          int32_t mode,
-                          yk_id_t start_id,
-                          size_t max_documents,
-                          const void* filter,
-                          size_t fsize,
-                          yk_response_t response);
-#endif
 
 /**
  * @brief Update a document from the collection.
