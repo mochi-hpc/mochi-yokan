@@ -75,7 +75,7 @@ static MunitResult test_coll_erase(const MunitParameter params[], void* data)
     /* tries to erase from an invalid collection */
     ret = yk_doc_erase(dbh, "efgh", 0, 0);
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     return MUNIT_OK;
 }
@@ -122,7 +122,7 @@ static MunitResult test_coll_erase_multi(const MunitParameter params[], void* da
     /* tried to erase from an invalid collection */
     ret = yk_doc_erase_multi(dbh, "efgh", 0, ids_to_erase.size(), ids_to_erase.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     return MUNIT_OK;
 }

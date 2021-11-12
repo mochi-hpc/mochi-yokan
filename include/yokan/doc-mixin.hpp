@@ -23,6 +23,7 @@ template <typename DB>
 class DocumentStoreMixin : public DB {
 
     struct CollectionMetadata {
+        yk_id_t size    = 0;
         yk_id_t last_id = 0;
     };
 
@@ -110,7 +111,7 @@ class DocumentStoreMixin : public DB {
         CollectionMetadata metadata;
         auto status = _collGetMetadata(collection, strlen(collection), &metadata);
         if(status == Status::OK)
-            *size = metadata.last_id;
+            *size = metadata.size;
         return status;
     }
 
@@ -134,17 +135,24 @@ class DocumentStoreMixin : public DB {
         auto count = ids.size;
         CollectionMetadata metadata;
         auto name_len = strlen(collection);
-        ScopedWriteLock lock(m_lock);
-        auto status = _collGetMetadata(collection, name_len, &metadata);
-        if(status != Status::OK) return status;
-        for(uint64_t i = 0; i < count; i++) {
-            ids[i] = metadata.last_id + i;
+        {
+            ScopedWriteLock lock(m_lock);
+            auto status = _collGetMetadata(collection, name_len, &metadata);
+            if(status != Status::OK) return status;
+            for(uint64_t i = 0; i < count; i++) {
+                ids[i] = metadata.last_id + i;
+            }
+            metadata.last_id += count;
+            status = _collPutMetadata(collection, name_len, &metadata);
+            if(status != Status::OK) return status;
         }
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
-        status = put(mode, keys, ksizes, documents, sizes);
+        auto status = put(mode, keys, ksizes, documents, sizes);
         if(status != Status::OK) return status;
-        metadata.last_id += count;
+        ScopedWriteLock lock(m_lock);
+        _collGetMetadata(collection, name_len, &metadata);
+        metadata.size += count;
         return _collPutMetadata(collection, name_len, &metadata);
     }
 
@@ -196,7 +204,21 @@ class DocumentStoreMixin : public DB {
         auto name_len = strlen(collection);
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
-        return erase(mode, keys, ksizes);
+        std::vector<uint8_t> docs_exist(1+ids.size/8);
+        auto docs_exist_bf = BitField{docs_exist.data(), ids.size};
+        ScopedWriteLock lock(m_lock);
+        auto status = exists(mode, keys, ksizes, docs_exist_bf);
+        if(status != Status::OK) return status;
+        size_t num_keys_to_erase = 0;
+        for(size_t i=0; i < ids.size; i++) {
+            if(docs_exist_bf[i]) num_keys_to_erase += 1;
+        }
+        status = _collGetMetadata(collection, name_len, &metadata);
+        if(status != Status::OK) return status;
+        status = erase(mode, keys, ksizes);
+        if(status != Status::OK) return status;
+        metadata.size -= num_keys_to_erase;
+        return _collPutMetadata(collection, name_len, &metadata);
     }
 
     Status docList(const char* collection,
