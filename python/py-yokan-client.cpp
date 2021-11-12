@@ -489,6 +489,80 @@ static auto doc_load_multi_helper(const yokan::Collection& coll,
     return result;
 }
 
+template<typename FilterType>
+static auto list_docs_helper(const yokan::Collection& coll,
+                             yk_id_t start_id,
+                             std::vector<py::buffer>& buffers,
+                             const FilterType& filter,
+                             int32_t mode) {
+    auto count = buffers.size();
+    std::vector<void*>  buf_data(count);
+    std::vector<size_t> buf_size(count);
+    auto filter_info = get_buffer_info(filter);
+    CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+    for(size_t i = 0; i < count; i++) {
+        auto buf_info = get_buffer_info(buffers[i]);
+        CHECK_BUFFER_IS_CONTIGUOUS(buf_info);
+        CHECK_BUFFER_IS_WRITABLE(buf_info);
+        buf_data[i] = buf_info.ptr;
+        buf_size[i] = buf_info.itemsize*buf_info.size;
+    }
+    std::vector<yk_id_t> ids(count);
+    coll.list(start_id,
+              filter_info.ptr,
+              filter_info.itemsize*filter_info.size,
+              count, ids.data(),
+              buf_data.data(),
+              buf_size.data(),
+              mode);
+    py::list result;
+    for(size_t i=0; i < count; i++) {
+        if(buf_size[i] == YOKAN_NO_MORE_DOCS)
+            break;
+        else if(buf_size[i] == YOKAN_SIZE_TOO_SMALL)
+            result.append(std::make_pair(ids[i], -1));
+        else
+            result.append(std::make_pair(ids[i], buf_size[i]));
+    }
+    return result;
+}
+
+template<typename FilterType>
+static auto list_docs_packed_helper(const yokan::Collection& coll,
+                                    yk_id_t start_id,
+                                    py::buffer& buffer,
+                                    size_t count,
+                                    const FilterType& filter,
+                                    int32_t mode) {
+    auto filter_info = get_buffer_info(filter);
+    CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+    auto buf_info = get_buffer_info(buffer);
+    CHECK_BUFFER_IS_CONTIGUOUS(buf_info);
+    CHECK_BUFFER_IS_WRITABLE(buf_info);
+    size_t buf_size = (size_t)buf_info.itemsize*buf_info.size;
+    std::vector<size_t> doc_sizes(count);
+    std::vector<yk_id_t> ids(count);
+    coll.listPacked(start_id,
+            filter_info.ptr,
+            filter_info.itemsize*filter_info.size,
+            count, ids.data(),
+            buf_size,
+            buf_info.ptr,
+            doc_sizes.data(),
+            mode);
+    py::list result;
+    for(size_t i=0; i < count; i++) {
+        if(doc_sizes[i] == YOKAN_NO_MORE_DOCS)
+            break;
+        else if(doc_sizes[i] == YOKAN_SIZE_TOO_SMALL)
+            result.append(std::make_pair(ids[i], -1));
+        else
+            result.append(std::make_pair(ids[i], doc_sizes[i]));
+    }
+    return result;
+}
+
+
 PYBIND11_MODULE(pyyokan_client, m) {
     m.doc() = "Python binding for the YOKAN client library";
 
@@ -1090,136 +1164,40 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 coll.eraseMulti(ids.size(), ids.data(), mode);
              },
              "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-#if 0
         // --------------------------------------------------------------
         // LIST_DOCS
         // --------------------------------------------------------------
-        .def("list_keys",
-             static_cast<py::list(*)(const yokan::Database&,
+        .def("list_docs",
+             static_cast<py::list(*)(const yokan::Collection&,
+                yk_id_t,
                 std::vector<py::buffer>&,
                 const py::buffer&,
-                const py::buffer&,
-                int32_t)>(&list_keys_helper),
-             "keys"_a, "from_key"_a,
+                int32_t)>(&list_docs_helper),
+             "start_id"_a, "buffers"_a,
              "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("list_keys",
-             static_cast<py::list(*)(const yokan::Database&,
-                std::vector<py::buffer>&,
-                const py::buffer&,
-                const std::string&,
-                int32_t)>(&list_keys_helper),
-             "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys",
-             static_cast<py::list(*)(const yokan::Database&,
+             static_cast<py::list(*)(const yokan::Collection&,
+                yk_id_t,
                 std::vector<py::buffer>&,
                 const std::string&,
-                const py::buffer&,
-                int32_t)>(&list_keys_helper),
-             "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys",
-             static_cast<py::list(*)(const yokan::Database&,
-                std::vector<py::buffer>&,
-                const std::string&,
-                const std::string&,
-                int32_t)>(&list_keys_helper),
-             "keys"_a, "from_key"_a,
+                int32_t)>(&list_docs_helper),
+             "start_id"_a, "buffers"_a,
              "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
-        // LIST_KEYS_PACKED
+        // LIST_DOCS_PACKED
         // --------------------------------------------------------------
-        .def("list_keys_packed",
-             static_cast<py::list(*)(const yokan::Database&,
-                py::buffer&, size_t, const py::buffer&,
-                const py::buffer&, int32_t)>(&list_keys_packed_helper),
-             "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys_packed",
-             static_cast<py::list(*)(const yokan::Database&,
-                py::buffer&, size_t, const std::string&,
-                const py::buffer&, int32_t)>(&list_keys_packed_helper),
-             "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys_packed",
-             static_cast<py::list(*)(const yokan::Database&,
-                py::buffer&, size_t, const py::buffer&,
-                const std::string&, int32_t)>(&list_keys_packed_helper),
-             "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys_packed",
-             static_cast<py::list(*)(const yokan::Database&,
-                py::buffer&, size_t, const std::string&,
-                const std::string&, int32_t)>(&list_keys_packed_helper),
-             "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        // --------------------------------------------------------------
-        // LIST_KEYVALS
-        // --------------------------------------------------------------
-        .def("list_keyvals",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&,
-                std::vector<std::pair<py::buffer, py::buffer>>&,
-                const py::buffer&, const py::buffer&,
-                int32_t)>(&list_keyvals_helper),
-             "pairs"_a, "from_key"_a,
+        .def("list_docs_packed",
+             static_cast<py::list(*)(const yokan::Collection&,
+                yk_id_t, py::buffer&, size_t, const py::buffer&,
+                int32_t)>(&list_docs_packed_helper),
+             "start_id"_a, "buffer"_a, "count"_a,
              "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&,
-                std::vector<std::pair<py::buffer, py::buffer>>&,
-                const std::string&, const py::buffer&,
-                int32_t)>(&list_keyvals_helper),
-             "pairs"_a, "from_key"_a,
+        .def("list_docs_packed",
+             static_cast<py::list(*)(const yokan::Collection&,
+                yk_id_t, py::buffer&, size_t, const std::string&,
+                int32_t)>(&list_docs_packed_helper),
+             "start_id"_a, "buffer"_a, "count"_a,
              "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&,
-                std::vector<std::pair<py::buffer, py::buffer>>&,
-                const py::buffer&, const std::string&,
-                int32_t)>(&list_keyvals_helper),
-             "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&,
-                std::vector<std::pair<py::buffer, py::buffer>>&,
-                const std::string&, const std::string&,
-                int32_t)>(&list_keyvals_helper),
-             "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        // --------------------------------------------------------------
-        // LIST_KEYVALS_PACKED
-        // --------------------------------------------------------------
-        .def("list_keyvals_packed",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&, py::buffer&, py::buffer&, size_t,
-                const py::buffer&, const py::buffer&,
-                int32_t)>(&list_keyvals_packed_helper),
-             "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals_packed",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&, py::buffer&, py::buffer&, size_t,
-                const std::string&, const py::buffer&,
-                int32_t)>(&list_keyvals_packed_helper),
-             "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals_packed",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&, py::buffer&, py::buffer&, size_t,
-                const py::buffer&, const std::string&,
-                int32_t)>(&list_keyvals_packed_helper),
-             "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keyvals_packed",
-             static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
-                const yokan::Database&, py::buffer&, py::buffer&, size_t,
-                const std::string&, const std::string&,
-                int32_t)>(&list_keyvals_packed_helper),
-             "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-#endif
         ;
 }
 
