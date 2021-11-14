@@ -73,6 +73,52 @@ struct KeyPrefixFilter : public KeyValueFilter {
     }
 };
 
+struct FalseKeyValueFilter : public KeyValueFilter {
+
+
+    FalseKeyValueFilter() = default;
+
+    bool requiresValue() const override {
+        return false;
+    }
+
+    size_t minRequiredKeySize() const override {
+        return 0;
+    }
+
+    bool requiresFullKey() const override {
+        return false;
+    }
+
+    bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
+        (void)key;
+        (void)ksize;
+        (void)val;
+        (void)vsize;
+        return false;
+    }
+
+    size_t keyCopy(void* dst, size_t max_dst_size,
+                   const void* key, size_t ksize,
+                   bool is_last) const override {
+        (void)dst;
+        (void)max_dst_size;
+        (void)key;
+        (void)ksize;
+        (void)is_last;
+        return 0;
+    }
+
+    size_t valCopy(void* dst, size_t max_dst_size,
+                   const void* val, size_t vsize) const override {
+        (void)dst;
+        (void)max_dst_size;
+        (void)val;
+        (void)vsize;
+        return 0;
+    }
+};
+
 struct KeySuffixFilter : public KeyValueFilter {
 
     int32_t m_mode;
@@ -144,7 +190,7 @@ struct LuaKeyValueFilter : public KeyValueFilter {
     }
 
     bool requiresValue() const override {
-        return true;
+        return m_mode & YOKAN_MODE_FILTER_VALUE;
     }
 
     size_t minRequiredKeySize() const override {
@@ -157,7 +203,8 @@ struct LuaKeyValueFilter : public KeyValueFilter {
 
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         m_lua["__key__"] = std::string_view(static_cast<const char*>(key), ksize);
-        m_lua["__value__"] = std::string_view(static_cast<const char*>(val), vsize);
+        if(m_mode & YOKAN_MODE_FILTER_VALUE)
+            m_lua["__value__"] = std::string_view(static_cast<const char*>(val), vsize);
         auto result = m_lua.do_string(std::string_view{ m_code.data, m_code.size });
         if(!result.valid()) return false;
         return static_cast<bool>(result);
@@ -184,6 +231,17 @@ struct LuaKeyValueFilter : public KeyValueFilter {
 };
 #endif
 
+struct FalseDocFilter : public DocFilter {
+
+    FalseDocFilter() = default;
+
+    bool check(yk_id_t id, const void* val, size_t vsize) const override {
+        (void)id;
+        (void)val;
+        (void)vsize;
+        return false;
+    }
+};
 #ifdef YOKAN_HAS_LUA
 struct LuaDocFilter : public DocFilter {
 
@@ -261,13 +319,17 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
     }
 };
 
-std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(int32_t mode, const UserMem& filter_data) {
+std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(
+        margo_instance_id mid, int32_t mode, const UserMem& filter_data) {
     if(mode & YOKAN_MODE_LUA_FILTER) {
 #ifdef YOKAN_HAS_LUA
+        (void)mid;
         return std::make_shared<LuaKeyValueFilter>(mode, filter_data);
+#else
+        YOKAN_LOG_ERROR(mid, "Yokan wasn't compiled with Lua support!");
+        return std::make_shared<FalseKeyValueFilter>();
 #endif
-    }
-    if(mode & YOKAN_MODE_SUFFIX) {
+    } else if(mode & YOKAN_MODE_SUFFIX) {
         return std::make_shared<KeySuffixFilter>(mode, filter_data);
     } else {
         return std::make_shared<KeyPrefixFilter>(mode, filter_data);
@@ -275,10 +337,15 @@ std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(int32_t mode, const U
 }
 
 
-std::shared_ptr<DocFilter> DocFilter::makeFilter(int32_t mode, const UserMem& filter_data) {
+std::shared_ptr<DocFilter> DocFilter::makeFilter(
+        margo_instance_id mid, int32_t mode, const UserMem& filter_data) {
     if(mode & YOKAN_MODE_LUA_FILTER) {
 #ifdef YOKAN_HAS_LUA
+        (void)mid;
         return std::make_shared<LuaDocFilter>(mode, filter_data);
+#else
+        YOKAN_LOG_ERROR(mid, "Yokan wasn't compiled with Lua support!");
+        return std::make_shared<FalseDocFilter>();
 #endif
     }
     return std::make_shared<DocFilter>();

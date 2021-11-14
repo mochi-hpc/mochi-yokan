@@ -155,7 +155,8 @@ class KeyValueFilter {
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
 
-    static std::shared_ptr<KeyValueFilter> makeFilter(int32_t mode, const UserMem& filter_data);
+    static std::shared_ptr<KeyValueFilter> makeFilter(
+            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
 };
 
 class DocFilter {
@@ -171,7 +172,8 @@ class DocFilter {
         return true;
     }
 
-    static std::shared_ptr<DocFilter> makeFilter(int32_t mode, const UserMem& filter_data);
+    static std::shared_ptr<DocFilter> makeFilter(
+            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
 
     static std::shared_ptr<KeyValueFilter> toKeyValueFilter(
             std::shared_ptr<DocFilter> filter,

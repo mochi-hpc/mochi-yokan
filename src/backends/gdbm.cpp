@@ -83,8 +83,11 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
-                    |YOKAN_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER   // not actually used
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS  // not actually used
+                    |YOKAN_MODE_FILTER_VALUE // not actually used
+                    |YOKAN_MODE_LIB_FILTER   // not actually used
                     )
             );
     }

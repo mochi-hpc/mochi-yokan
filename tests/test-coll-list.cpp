@@ -279,7 +279,7 @@ static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void
         "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
     size_t code_size = strlen(lua_code);
 
-    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER;
+    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER|YOKAN_MODE_FILTER_VALUE;
     while(start_id != YOKAN_NO_MORE_DOCS) {
         ret = yk_doc_list_packed(dbh, "abcd", mode, start_id,
                           lua_code, code_size,
