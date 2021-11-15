@@ -7,7 +7,7 @@
 #define __YOKAN_FILTERS_HPP
 
 #include "yokan/common.h"
-#include "yokan/backend.hpp"
+#include "yokan/filters.hpp"
 #include "config.h"
 #include <cstring>
 #include <iostream>

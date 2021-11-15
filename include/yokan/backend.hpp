@@ -14,53 +14,12 @@
 #include <stdexcept>
 #include <memory>
 #include <yokan/common.h>
+#include <yokan/usermem.hpp>
+#include <yokan/filters.hpp>
 
 template <typename T> class __YOKANBackendRegistration;
 
 namespace yokan {
-
-/**
- * @brief Wrapper for user memory (equivalent to
- * some backend's notion of Slice, or to a C++17 std::string_view)
- *
- * @tparam T Type of data held.
- */
-template<typename T>
-struct BasicUserMem {
-    T*     data = nullptr; /*!< Pointer to the data */
-    size_t size = 0;       /*!< Number of elements of type T in the buffer */
-
-    template<typename I>
-    inline T& operator[](I index) {
-        return data[index];
-    }
-
-    template<typename I>
-    inline const T& operator[](I index) const {
-        return data[index];
-    }
-
-    BasicUserMem(std::vector<T>& v)
-    : data(v.data())
-    , size(v.size()) {}
-
-    BasicUserMem(T* d, size_t s)
-    : data(d)
-    , size(s) {}
-
-    auto from(size_t offset) const {
-        if(offset > size)
-            throw std::out_of_range("invalid offset passed to BasicUserMem::from()");
-        return BasicUserMem<T>{ data + offset, size - offset };
-    }
-};
-
-/**
- * @brief UserMem is short for BasicUserMem<void>.
- * Its size field represents a number of bytes for
- * a buffer of unspecified type.
- */
-using UserMem = BasicUserMem<char>;
 
 /**
  * @brief The BitField class is used for the "exists" operations
@@ -130,55 +89,6 @@ constexpr auto KeyNotFound = YOKAN_KEY_NOT_FOUND;
  * was too small to hold the value.
  */
 constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
-
-/**
- * @brief Abstract class to represent a filter.
- */
-class KeyValueFilter {
-
-    public:
-
-    virtual ~KeyValueFilter() = default;
-
-    virtual bool requiresValue() const = 0;
-    virtual bool requiresFullKey() const = 0;
-    virtual size_t minRequiredKeySize() const = 0;
-
-    virtual bool check(const void* key, size_t ksize, const void* val, size_t vsize) const = 0;
-
-    virtual size_t keyCopy(
-        void* dst, size_t max_dst_size,
-        const void* key, size_t ksize,
-        bool is_last) const = 0;
-
-    virtual size_t valCopy(
-        void* dst, size_t max_dst_size,
-        const void* val, size_t vsize) const = 0;
-
-    static std::shared_ptr<KeyValueFilter> makeFilter(
-            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
-};
-
-class DocFilter {
-
-    public:
-
-    virtual ~DocFilter() = default;
-
-    virtual bool check(yk_id_t id, const void* doc, size_t docsize) const {
-        (void)id;
-        (void)doc;
-        (void)docsize;
-        return true;
-    }
-
-    static std::shared_ptr<DocFilter> makeFilter(
-            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
-
-    static std::shared_ptr<KeyValueFilter> toKeyValueFilter(
-            std::shared_ptr<DocFilter> filter,
-            const char* collection);
-};
 
 /**
  * @brief Abstract embedded database object.
