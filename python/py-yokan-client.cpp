@@ -519,10 +519,12 @@ static auto list_docs_helper(const yokan::Collection& coll,
     for(size_t i=0; i < count; i++) {
         if(buf_size[i] == YOKAN_NO_MORE_DOCS)
             break;
-        else if(buf_size[i] == YOKAN_SIZE_TOO_SMALL)
+        else if(buf_size[i] == YOKAN_SIZE_TOO_SMALL) {
             result.append(std::make_pair(ids[i], -1));
-        else
+        }
+        else {
             result.append(std::make_pair(ids[i], buf_size[i]));
+        }
     }
     return result;
 }
@@ -567,20 +569,6 @@ PYBIND11_MODULE(pyyokan_client, m) {
     m.doc() = "Python binding for the YOKAN client library";
 
     py::module::import("pyyokan_common");
-
-    m.attr("YOKAN_MODE_DEFAULT")     = YOKAN_MODE_DEFAULT;
-    m.attr("YOKAN_MODE_INCLUSIVE")   = YOKAN_MODE_INCLUSIVE;
-    m.attr("YOKAN_MODE_APPEND")      = YOKAN_MODE_APPEND;
-    m.attr("YOKAN_MODE_CONSUME")     = YOKAN_MODE_CONSUME;
-    m.attr("YOKAN_MODE_WAIT")        = YOKAN_MODE_WAIT;
-    m.attr("YOKAN_MODE_NOTIFY")      = YOKAN_MODE_NOTIFY;
-    m.attr("YOKAN_MODE_NEW_ONLY")    = YOKAN_MODE_NEW_ONLY;
-    m.attr("YOKAN_MODE_EXIST_ONLY")  = YOKAN_MODE_EXIST_ONLY;
-    m.attr("YOKAN_MODE_NO_PREFIX")   = YOKAN_MODE_NO_PREFIX;
-    m.attr("YOKAN_MODE_IGNORE_KEYS") = YOKAN_MODE_IGNORE_KEYS;
-    m.attr("YOKAN_MODE_KEEP_LAST")   = YOKAN_MODE_KEEP_LAST;
-    m.attr("YOKAN_MODE_SUFFIX")      = YOKAN_MODE_SUFFIX;
-    m.attr("YOKAN_MODE_LUA_FILTER")  = YOKAN_MODE_LUA_FILTER;
 
     py::class_<yokan::Client>(m, "Client")
 
@@ -1188,14 +1176,14 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 int32_t)>(&list_docs_helper),
              "start_id"_a, "buffers"_a,
              "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("list_keys",
+        .def("list_docs",
              static_cast<py::list(*)(const yokan::Collection&,
                 yk_id_t,
                 std::vector<py::buffer>&,
                 const std::string&,
                 int32_t)>(&list_docs_helper),
              "start_id"_a, "buffers"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a=std::string(), "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LIST_DOCS_PACKED
         // --------------------------------------------------------------
@@ -1210,7 +1198,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_id_t, py::buffer&, size_t, const std::string&,
                 int32_t)>(&list_docs_packed_helper),
              "start_id"_a, "buffer"_a, "count"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a=std::string(), "mode"_a=YOKAN_MODE_DEFAULT)
         ;
 }
 
