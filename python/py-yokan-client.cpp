@@ -977,8 +977,14 @@ PYBIND11_MODULE(pyyokan_client, m) {
         .def("create_collection",
              [](const yokan::Database& db, const std::string& name, int32_t mode) {
                 db.createCollection(name.c_str(), mode);
+                return yokan::Collection(name.c_str(), db);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        .def("__getitem__",
+             [](const yokan::Database& db, const std::string& name) {
+                return yokan::Collection(name.c_str(), db);
+             },
+             "name"_a)
         .def("drop_collection",
              [](const yokan::Database& db, const std::string& name, int32_t mode) {
                 db.dropCollection(name.c_str(), mode);
