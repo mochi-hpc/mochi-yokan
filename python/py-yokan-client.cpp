@@ -1151,7 +1151,14 @@ PYBIND11_MODULE(pyyokan_client, m) {
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids, int32_t mode) {
                 std::vector<size_t> len(ids.size());
                 coll.lengthMulti(ids.size(), ids.data(), len.data(), mode);
-                return len;
+                py::list result;
+                for(size_t i = 0; i < ids.size(); i++) {
+                    if(len[i] != YOKAN_KEY_NOT_FOUND)
+                        result.append(len[i]);
+                    else
+                        result.append(py::none());
+                }
+                return result;
              },
              "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
