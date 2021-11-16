@@ -624,13 +624,13 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto val_umem = ctx->vals.data + ctx->val_offset;
 
             if(!ctx->packed) {
-                ctx->valSizes[ctx->i] = valCopy(ctx->mode, val_umem, val_usize, val, vsize);
+                ctx->valSizes[ctx->i] = ctx->filter->valCopy(val_umem, val_usize, val, vsize);
                 ctx->val_offset += val_usize;
             } else {
                 if(ctx->val_buf_too_small) {
                     ctx->valSizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->valSizes[ctx->i] = valCopy(ctx->mode, val_umem, val_usize, val, vsize);
+                    ctx->valSizes[ctx->i] = ctx->filter->valCopy(val_umem, val_usize, val, vsize);
                     if(ctx->valSizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->val_buf_too_small = true;
                     } else {

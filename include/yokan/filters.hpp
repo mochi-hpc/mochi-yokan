@@ -91,6 +91,11 @@ class DocFilter {
  */
 class FilterFactory {
 
+    template<typename T>
+        friend class ::__YOKANKeyValueFilterRegistration;
+    template<typename T>
+        friend class ::__YOKANDocFilterRegistration;
+
     public:
 
     FilterFactory() = delete;
@@ -128,11 +133,11 @@ class FilterFactory {
 /**
  * @brief These macro should be used to register new filter types.
  */
-#define YOKAN_REGISTER_KV_FILER(__filter_name, __filter_type) \
+#define YOKAN_REGISTER_KV_FILTER(__filter_name, __filter_type) \
     static __YOKANKeyValueFilterRegistration<__filter_type>   \
     __yk_##__filter_name##_kv_filter(#__filter_name)
 
-#define YOKAN_REGISTER_DOC_FILER(__filter_name, __filter_type) \
+#define YOKAN_REGISTER_DOC_FILTER(__filter_name, __filter_type) \
     static __YOKANDocFilterRegistration<__filter_type>         \
     __yk_##__filter_name##_doc_filter(#__filter_name)
 

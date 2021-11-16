@@ -442,13 +442,16 @@ class SetDatabase : public DatabaseInterface {
         auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
+        size_t val_offset = 0;
         bool key_buf_too_small = false;
+        bool val_buf_too_small = false;
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
             if(!filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
+            auto val_umem = static_cast<char*>(vals.data) + val_offset;
 
             bool is_last = false;
             if(mode & YOKAN_MODE_KEEP_LAST) {
@@ -460,25 +463,38 @@ class SetDatabase : public DatabaseInterface {
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
+                size_t val_usize = valSizes[i];
                 keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
                                       key.data(), key.size());
+                valSizes[i] = filter->valCopy(val_umem, val_usize, "", 0);
                 key_offset += key_usize;
+                val_offset += val_usize;
 
             } else { // not packed
 
-                if(key_buf_too_small)
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                else {
-                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, keys.size - key_offset,
-                                          key.data(), key.size());
-                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
-                        key_buf_too_small = true;
-                    else
-                        key_offset += key.size();
-                }
+                size_t key_usize = keys.size - key_offset;
+                size_t val_usize = vals.size - val_offset;
 
+                if(key_buf_too_small) {
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                } else {
+                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                          key.data(), key.size());
+                    if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
+                        key_offset += keySizes[i];
+                    else
+                        key_buf_too_small = true;
+                }
+                if(val_buf_too_small) {
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                } else {
+                    valSizes[i] = filter->valCopy(val_umem, val_usize, "", 0);
+                    if(valSizes[i] != YOKAN_SIZE_TOO_SMALL)
+                        val_offset += valSizes[i];
+                    else
+                        val_buf_too_small = true;
+                }
             }
-            valSizes[i] = 0;
             i += 1;
         }
         keys.size = key_offset;

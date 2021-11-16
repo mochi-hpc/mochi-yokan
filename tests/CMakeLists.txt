@@ -26,3 +26,7 @@ if (ENABLE_PYTHON)
         add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE} ${test-python-source})
     endforeach ()
 endif ()
+
+add_library (custom-filters SHARED
+             ${CMAKE_CURRENT_SOURCE_DIR}/extra/custom-filters.cpp)
+target_link_libraries (custom-filters yokan-server)

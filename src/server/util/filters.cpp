@@ -238,8 +238,8 @@ std::shared_ptr<KeyValueFilter> FilterFactory::makeKeyValueFilter(
             YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
             return nullptr;
         }
-        auto lib_name = std::string(filter_data.data, filter_data.data - c1);
-        auto filter_name = std::string(c1+1, c2-c1);
+        auto lib_name = std::string(filter_data.data, c1 - filter_data.data);
+        auto filter_name = std::string(c1+1, c2-c1-1);
         auto filter_args = UserMem{
             const_cast<char*>(c2)+1,
             filter_data.size - (c2+1-filter_data.data)
@@ -280,8 +280,8 @@ std::shared_ptr<DocFilter> FilterFactory::makeDocFilter(
             YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
             return nullptr;
         }
-        auto lib_name = std::string(filter_data.data, filter_data.data - c1);
-        auto filter_name = std::string(c1+1, c2-c1);
+        auto lib_name = std::string(filter_data.data, c1-filter_data.data);
+        auto filter_name = std::string(c1+1, c2-c1-1);
         auto filter_args = UserMem{
             const_cast<char*>(c2)+1,
             filter_data.size - (c2+1-filter_data.data)
