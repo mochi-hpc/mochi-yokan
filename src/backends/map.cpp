@@ -10,6 +10,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
@@ -506,15 +507,13 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
 
             if(!packed) {
-                keySizes[i] = filter->keyCopy(umem, usize, key.data(),
-                                              key.size(), is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, umem, usize, key.data(), key.size());
                 offset += usize;
             } else {
                 if(buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = filter->keyCopy(umem, usize, key.data(),
-                                                  key.size(), is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, umem, usize, key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
@@ -580,9 +579,8 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
                 size_t key_usize = keySizes[i];
                 size_t val_usize = valSizes[i];
-                keySizes[i] = filter->keyCopy(key_umem, key_usize,
-                                              key.data(), key.size(),
-                                              is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                      key.data(), key.size());
                 valSizes[i] = filter->valCopy(val_umem, val_usize,
                                               val.data(), val.size());
                 key_offset += key_usize;
@@ -596,9 +594,8 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = filter->keyCopy(key_umem, key_usize,
-                                                  key.data(), key.size(),
-                                                  is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                          key.data(), key.size());
                     if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
                         key_offset += keySizes[i];
                     else

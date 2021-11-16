@@ -9,6 +9,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <set>
@@ -389,9 +390,8 @@ class SetDatabase : public DatabaseInterface {
             if(!packed) {
 
                 size_t usize = keySizes[i];
-                keySizes[i] = filter->keyCopy(umem, usize,
-                                              key.data(), key.size(),
-                                              is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, umem, usize,
+                                      key.data(), key.size());
                 offset += usize;
 
             } else { // if packed
@@ -399,9 +399,8 @@ class SetDatabase : public DatabaseInterface {
                 if(buf_too_small)
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 else {
-                    keySizes[i] = filter->keyCopy(umem, keys.size - offset,
-                                                  key.data(), key.size(),
-                                                  is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, umem, keys.size - offset,
+                                          key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
                         buf_too_small = true;
                     else
@@ -461,9 +460,8 @@ class SetDatabase : public DatabaseInterface {
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
-                keySizes[i] = filter->keyCopy(key_umem, key_usize,
-                                              key.data(), key.size(),
-                                              is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                      key.data(), key.size());
                 key_offset += key_usize;
 
             } else { // not packed
@@ -471,9 +469,8 @@ class SetDatabase : public DatabaseInterface {
                 if(key_buf_too_small)
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 else {
-                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
-                                                  key.data(), key.size(),
-                                                  is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, keys.size - key_offset,
+                                          key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
                         key_buf_too_small = true;
                     else

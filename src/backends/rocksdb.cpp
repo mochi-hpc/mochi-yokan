@@ -6,6 +6,7 @@
 #include "yokan/backend.hpp"
 #include "yokan/doc-mixin.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <rocksdb/db.h>
@@ -459,7 +460,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto umem = static_cast<char*>(keys.data) + offset;
             if(packed) {
                 auto dst_max_size = keys.size - offset;
-                keySizes[i] = filter->keyCopy(umem, dst_max_size, key.data(), key.size(), i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      umem, dst_max_size,
+                                      key.data(), key.size());
                 if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                     while(i < max) {
                         keySizes[i] = YOKAN_SIZE_TOO_SMALL;
@@ -471,7 +474,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
             } else {
                 auto dst_max_size = usize;
-                keySizes[i] = filter->keyCopy(umem, dst_max_size, key.data(), key.size(), i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      umem, dst_max_size,
+                                      key.data(), key.size());
                 offset += usize;
             }
             i += 1;
@@ -541,8 +546,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
-                                              key.data(), key.size(), i == max-1);
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, keys.size - key_offset,
+                                          key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         key_buf_too_small = true;
                     } else {
@@ -569,8 +575,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     break;
                 }
             } else {
-                keySizes[i] = filter->keyCopy(key_umem, key_usize,
-                                              key.data(), key.size(), i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize,
+                                      key.data(), key.size());
                 valSizes[i] = filter->valCopy(val_umem, val_usize,
                                               val.data(), val.size());
                 key_offset += key_usize;

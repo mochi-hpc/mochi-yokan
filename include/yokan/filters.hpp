@@ -16,10 +16,13 @@
 #include <yokan/common.h>
 #include <yokan/usermem.hpp>
 
+template <typename T> class __YOKANKeyValueFilterRegistration;
+template <typename T> class __YOKANDocFilterRegistration;
+
 namespace yokan {
 
 /**
- * @brief Abstract class to represent a filter.
+ * @brief Abstract class to represent a key/value filter.
  */
 class KeyValueFilter {
 
@@ -27,46 +30,136 @@ class KeyValueFilter {
 
     virtual ~KeyValueFilter() = default;
 
+    /**
+     * @brief Returns whether the filter requires the value to be loaded
+     * when calling check. If not, some backends may chose to call check
+     * with a nullptr value and vsize of 0 to avoid loading a value
+     * unnecessarily.
+     */
     virtual bool requiresValue() const = 0;
-    virtual bool requiresFullKey() const = 0;
-    virtual size_t minRequiredKeySize() const = 0;
 
-    virtual bool check(const void* key, size_t ksize, const void* val, size_t vsize) const = 0;
+    /**
+     * @brief Checks whether a key (or key/value pair) passes the filter.
+     */
+    virtual bool check(const void* key, size_t ksize,
+                       const void* val, size_t vsize) const = 0;
 
+    /**
+     * @brief Copy the key to the target destination. This copy may
+     * be implemented differently depending on the mode, and may alter
+     * the content of the key.
+     * This function should return the size actually copied.
+     */
     virtual size_t keyCopy(
         void* dst, size_t max_dst_size,
-        const void* key, size_t ksize,
-        bool is_last) const = 0;
+        const void* key, size_t ksize) const = 0;
 
+    /**
+     * @brief Copy the value to the target destination. This copy may
+     * be implemented differently depending on the mode, and may alter
+     * the content of the value.
+     * This function should return the size actually copied.
+     */
     virtual size_t valCopy(
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
-
-    static std::shared_ptr<KeyValueFilter> makeFilter(
-            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
 };
 
+/**
+ * @brief Abstract class representing a document filter.
+ */
 class DocFilter {
 
     public:
 
     virtual ~DocFilter() = default;
 
+    /**
+     * @brief Checks whether the document passes the filter.
+     */
     virtual bool check(yk_id_t id, const void* doc, size_t docsize) const {
         (void)id;
         (void)doc;
         (void)docsize;
         return true;
     }
+};
 
-    static std::shared_ptr<DocFilter> makeFilter(
-            margo_instance_id mid, int32_t mode, const UserMem& filter_data);
+/**
+ * @brief This class is used to register new filters and for the provider
+ * to create filters depending on the mode passed.
+ */
+class FilterFactory {
 
-    static std::shared_ptr<KeyValueFilter> toKeyValueFilter(
+    public:
+
+    FilterFactory() = delete;
+
+    static std::shared_ptr<KeyValueFilter> makeKeyValueFilter(
+        margo_instance_id mid, int32_t mode, const UserMem& filter_data);
+
+    static std::shared_ptr<DocFilter> makeDocFilter(
+        margo_instance_id mid, int32_t mode, const UserMem& filter_data);
+
+    static std::shared_ptr<KeyValueFilter> docToKeyValueFilter(
             std::shared_ptr<DocFilter> filter,
             const char* collection);
+
+    private:
+
+    static std::unordered_map<
+        std::string,
+        std::function<
+            std::shared_ptr<KeyValueFilter>(margo_instance_id, int32_t, const UserMem&)
+        >
+    > s_make_kv_filter;
+
+    static std::unordered_map<
+        std::string,
+        std::function<
+            std::shared_ptr<DocFilter>(margo_instance_id, int32_t, const UserMem&)
+        >
+    > s_make_doc_filter;
+
 };
 
 }
+
+/**
+ * @brief These macro should be used to register new filter types.
+ */
+#define YOKAN_REGISTER_KV_FILER(__filter_name, __filter_type) \
+    static __YOKANKeyValueFilterRegistration<__filter_type>   \
+    __yk_##__filter_name##_kv_filter(#__filter_name)
+
+#define YOKAN_REGISTER_DOC_FILER(__filter_name, __filter_type) \
+    static __YOKANDocFilterRegistration<__filter_type>         \
+    __yk_##__filter_name##_doc_filter(#__filter_name)
+
+template <typename T>
+class __YOKANKeyValueFilterRegistration {
+
+    public:
+
+    __YOKANKeyValueFilterRegistration(const std::string &filter_name) {
+        ::yokan::FilterFactory::s_make_kv_filter[filter_name] =
+            [](margo_instance_id mid, int32_t mode, const ::yokan::UserMem& filter_data) {
+                return std::make_shared<T>(mid, mode, filter_data);
+            };
+    }
+};
+
+template <typename T>
+class __YOKANDocFilterRegistration {
+
+    public:
+
+    __YOKANDocFilterRegistration(const std::string &filter_name) {
+        ::yokan::FilterFactory::s_make_doc_filter[filter_name] =
+            [](margo_instance_id mid, int32_t mode, const ::yokan::UserMem& filter_data) {
+                return std::make_shared<T>(mid, mode, filter_data);
+            };
+    }
+};
 
 #endif

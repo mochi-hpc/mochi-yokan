@@ -237,7 +237,7 @@ class DocumentStoreMixin : public DB {
 
         auto name_len = strlen(collection);
         auto count = ids.size;
-        auto kv_filter = DocFilter::toKeyValueFilter(filter, collection);
+        auto kv_filter = FilterFactory::docToKeyValueFilter(filter, collection);
         auto first_key = _keyFromId(collection, name_len, from_id);
 
         auto keys_umem = UserMem{ reinterpret_cast<char*>(ids.data), ids.size*sizeof(yk_id_t) };

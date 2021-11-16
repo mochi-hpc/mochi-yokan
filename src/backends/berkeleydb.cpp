@@ -8,6 +8,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <db_cxx.h>
 #include <dbstl_map.h>
@@ -152,15 +153,15 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         //            |YOKAN_MODE_NOTIFY
                     |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
-        //            |YOKAN_MODE_SUFFIX
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
-        //            |YOKAN_MODE_LUA_FILTER
+                    |YOKAN_MODE_LUA_FILTER
 #endif
                     |YOKAN_MODE_IGNORE_DOCS
-        //            |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_FILTER_VALUE
                     |YOKAN_MODE_LIB_FILTER
                     )
             );
@@ -381,31 +382,36 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         auto ret = Status::OK;
 
-        // this buffer is used in dummy_key so we can at least load the filter
-        size_t minReqKeySize = filter->minRequiredKeySize();
-        std::vector<char> filter_check_buffer(minReqKeySize);
-
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
         fromKeySlice.set_ulen(fromKey.size);
 
-        // dummy_key is a 0-sized key from user memory that expects
-        // a partial write hence it is used to move the cursor
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)(minReqKeySize) };
-        dummy_key.set_ulen(minReqKeySize);
-        dummy_key.set_dlen(minReqKeySize);
+        auto key = Dbt{ nullptr, 0};
+        key.set_flags(DB_DBT_REALLOC);
+
+        // dummy key used to move the cursor
+        auto dummy_key = Dbt{ nullptr, 0 };
+        dummy_key.set_ulen(0);
+        dummy_key.set_dlen(0);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
-        // same a dummy_key
+        // dummy value to prevent berkeleydb from reading values,
+        // or actual reallocatable value if the filter needs the value.
         auto dummy_val = Dbt{ nullptr, 0 };
         dummy_val.set_ulen(0);
         dummy_val.set_dlen(0);
         dummy_val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
-        // Dbt key used to retrieve actual keys
-        auto key = Dbt{ nullptr, 0 };
-        key.set_ulen(0);
-        key.set_flags(DB_DBT_USERMEM);
+        // if the filter requires a value, we need somewhere to store it.
+        auto val = Dbt{ nullptr, 0 };
+        if(filter->requiresValue()) {
+            val.set_flags(DB_DBT_REALLOC);
+        } else {
+            val.set_ulen(0);
+            val.set_dlen(0);
+            val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+        }
+
 
         Dbc* cursor = nullptr;
         int status = m_db->cursor(nullptr, &cursor, 0);
@@ -444,7 +450,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
             // find the next key that matches the filter
             while(true) {
-                status = cursor->get(&dummy_key, &dummy_val, flag);
+                status = cursor->get(&key, &val, flag);
                 flag = DB_NEXT;
                 if(status == DB_NOTFOUND) {
                     goto complete;
@@ -453,9 +459,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                // note: because this backend doesn't support Lua,
-                // we don't bother passing a value
-                if(filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(filter->check(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
                     break;
             }
 
@@ -464,36 +468,19 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 continue;
             }
 
-            // compute available size in current key buffer
             auto key_ulen = packed ? (keys.size - key_offset) : keySizes[i];
-            key.set_data(keys.data + key_offset);
-            key.set_ulen(key_ulen);
+            auto key_umem = keys.data + key_offset;
 
-            // here we know the cursor points to the right element,
-            // se we can get it in key, this time
-
-            if(key_ulen < dummy_key.get_size()) { // early easy check
-                keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+            keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                  key_umem, key_ulen,
+                                  key.get_data(), key.get_size());
+            if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                 key_buf_too_small = true;
+                if(!packed) key_offset += key_ulen;
                 continue;
-            }
-
-            status = cursor->get(&key, &dummy_val, DB_CURRENT);
-            if(status == 0) {
-
-                if(packed) key_offset += key.get_size();
-                else       key_offset += keySizes[i];
-                keySizes[i] = key.get_size();
-
-            } else if(status == DB_BUFFER_SMALL) {
-
-                if(!packed) key_offset += keySizes[i];
-                keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                key_buf_too_small = true;
-
             } else {
-                ret = convertStatus(status);
-                goto complete;
+                if(packed) key_offset += keySizes[i];
+                else       key_offset += key_ulen;
             }
         }
 
@@ -504,6 +491,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 keySizes[i] = YOKAN_NO_MORE_KEYS;
             }
         }
+        free(key.get_data());
+        free(val.get_data());
         cursor->close();
 
         return ret;
@@ -531,17 +520,13 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         uint32_t flag = DB_CURRENT;
         auto ret = Status::OK;
 
-        // this buffer is used in dummy_key so we can at least load the filter
-        auto minReqKeySize = filter->minRequiredKeySize();
-        std::vector<char> filter_check_buffer(minReqKeySize);
-
         auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
         fromKeySlice.set_flags(DB_DBT_USERMEM);
         fromKeySlice.set_ulen(fromKey.size);
 
-        auto dummy_key = Dbt{ filter_check_buffer.data(), (u_int32_t)minReqKeySize };
-        dummy_key.set_ulen(minReqKeySize);
-        dummy_key.set_dlen(minReqKeySize);
+        auto dummy_key = Dbt{ nullptr, 0 };
+        dummy_key.set_ulen(0);
+        dummy_key.set_dlen(0);
         dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
 
         auto dummy_val = Dbt{ nullptr, 0 };
@@ -551,13 +536,11 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         // Dbt key used to retrieve actual keys
         auto key = Dbt{ nullptr, 0 };
-        key.set_ulen(0);
-        key.set_flags(DB_DBT_USERMEM);
+        key.set_flags(DB_DBT_REALLOC);
 
         // Dbt val used to retrieve actual values
         auto val = Dbt{ nullptr, 0 };
-        val.set_ulen(0);
-        val.set_flags(DB_DBT_USERMEM);
+        val.set_flags(DB_DBT_REALLOC);
 
         Dbc* cursor = nullptr;
         int status = m_db->cursor(nullptr, &cursor, 0);
@@ -596,7 +579,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
             // find the next key that matches the filter
             while(true) {
-                status = cursor->get(&dummy_key, &dummy_val, flag);
+                status = cursor->get(&key, &val, flag);
                 flag = DB_NEXT;
                 if(status == DB_NOTFOUND) {
                     goto complete;
@@ -605,81 +588,58 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     ret = convertStatus(status);
                     goto complete;
                 }
-                // note: because this backend doesn't support Lua, we don't
-                // bother passing a value
-                if(filter->check(dummy_key.get_data(), dummy_key.get_size(), nullptr, 0))
+                if(filter->check(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
                     break;
             }
 
             // compute available size in current key buffer
             auto key_ulen = packed ? (keys.size - key_offset) : keySizes[i];
-            key.set_data(keys.data + key_offset);
-            key.set_ulen(key_ulen);
+            auto key_umem = keys.data + key_offset;
 
             // compute available size in current val buffer
             auto val_ulen = packed ? (vals.size - val_offset) : valSizes[i];
-            val.set_data(vals.data + val_offset);
-            val.set_ulen(val_ulen);
+            auto val_umem = vals.data + val_offset;
 
-            // here we know the cursor points to the right element,
-            // se we can get it in key/val, this time
-
-            status = cursor->get(&key, &val, DB_CURRENT);
-            if(status == 0 || status == DB_BUFFER_SMALL) {
-
-                bool key_was_too_small = key.get_size() > key.get_ulen();
-                key_buf_too_small = key_buf_too_small || key_was_too_small;
-
-                if(key_was_too_small) {
-                    // berkeleydb is annoying and won't load
-                    // the value if the key was too small
-                    key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
-                    status = cursor->get(&key, &val, DB_CURRENT);
-                    key.set_flags(DB_DBT_USERMEM);
-                    if(status != 0 && status != DB_BUFFER_SMALL) {
-                        ret = convertStatus(status);
-                        goto complete;
-                    }
-                }
-
-                bool val_was_too_small = val.get_size() > val.get_ulen();
-                val_buf_too_small = val_buf_too_small || val_was_too_small;
-
-                if(packed) {
-                    if(key_buf_too_small) {
-                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    } else {
-                        key_offset += key.get_size();
-                        keySizes[i] = key.get_size();
-                    }
+            if(packed) {
+                if(key_buf_too_small) {
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    key_offset += keySizes[i];
-                    if(key_was_too_small) {
-                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, key_ulen,
+                                          key.get_data(), key.get_size());
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        key_buf_too_small = true;
                     } else {
-                        keySizes[i] = key.get_size();
+                        key_offset += keySizes[i];
                     }
                 }
-
-                if(packed) {
-                    if(val_buf_too_small) {
-                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    } else {
-                        val_offset += val.get_size();
-                        valSizes[i] = val.get_size();
-                    }
+                if(val_buf_too_small) {
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    val_offset += valSizes[i];
-                    if(val_was_too_small) {
-                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                    valSizes[i] = filter->valCopy(val_umem, val_ulen,
+                                                  val.get_data(), val.get_size());
+                    if(valSizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        val_buf_too_small = true;
                     } else {
-                        valSizes[i] = val.get_size();
+                        val_offset += valSizes[i];
                     }
                 }
-
+                if(val_buf_too_small && key_buf_too_small) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
+                }
             } else {
-                ret = convertStatus(status);
-                goto complete;
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, key_ulen,
+                                          key.get_data(), key.get_size());
+                    valSizes[i] = filter->valCopy(val_umem, val_ulen,
+                                                  val.get_data(), val.get_size());
+                    key_offset += key_ulen;
+                    val_offset += val_ulen;
             }
         }
 
@@ -692,6 +652,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 valSizes[i] = YOKAN_NO_MORE_KEYS;
             }
         }
+        free(key.get_data());
+        free(val.get_data());
         cursor->close();
 
         return ret;

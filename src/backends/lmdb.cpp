@@ -6,6 +6,7 @@
 #include "yokan/backend.hpp"
 #include "yokan/doc-mixin.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <lmdb.h>
@@ -477,7 +478,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             if(packed) {
                 auto dst_max_size = keys.size - key_offset;
-                keySizes[i] = filter->keyCopy(key_umem, dst_max_size, key.mv_data, key.mv_size, i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                    key_umem, dst_max_size, key.mv_data, key.mv_size);
                 if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                     while(i < max) {
                         keySizes[i] = YOKAN_SIZE_TOO_SMALL;
@@ -488,7 +490,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     key_offset += keySizes[i];
                 }
             } else {
-                keySizes[i] = filter->keyCopy(key_umem, key_usize, key.mv_data, key.mv_size, i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize, key.mv_data, key.mv_size);
                 key_offset += key_usize;
             }
             i += 1;
@@ -618,8 +621,9 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = filter->keyCopy(key_umem, keys.size - key_offset,
-                                                  key.mv_data, key.mv_size, i == max-1);
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, keys.size - key_offset,
+                                          key.mv_data, key.mv_size);
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         key_buf_too_small = true;
                     } else {
@@ -646,8 +650,9 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     break;
                 }
             } else {
-                keySizes[i] = filter->keyCopy(key_umem, key_usize,
-                                              key.mv_data, key.mv_size, i == max-1);
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize,
+                                      key.mv_data, key.mv_size);
                 valSizes[i] = filter->valCopy(val_umem, val_usize,
                                               val.mv_data, val.mv_size);
                 key_offset += key_usize;

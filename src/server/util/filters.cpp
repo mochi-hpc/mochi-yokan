@@ -8,6 +8,8 @@
 
 #include "yokan/common.h"
 #include "yokan/filters.hpp"
+#include "../../common/linker.hpp"
+#include "../../common/logging.h"
 #include "config.h"
 #include <cstring>
 #include <iostream>
@@ -29,14 +31,6 @@ struct KeyPrefixFilter : public KeyValueFilter {
         return false;
     }
 
-    size_t minRequiredKeySize() const override {
-        return m_prefix.size;
-    }
-
-    bool requiresFullKey() const override {
-        return false;
-    }
-
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         (void)val;
         (void)vsize;
@@ -46,12 +40,7 @@ struct KeyPrefixFilter : public KeyValueFilter {
     }
 
     size_t keyCopy(void* dst, size_t max_dst_size,
-                   const void* key, size_t ksize,
-                   bool is_last) const override {
-        if(m_mode & YOKAN_MODE_IGNORE_KEYS) {
-            if(!(is_last && (m_mode & YOKAN_MODE_KEEP_LAST)))
-                return 0;
-        }
+                   const void* key, size_t ksize) const override {
         if(!(m_mode & YOKAN_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
             if(max_dst_size < ksize) return YOKAN_SIZE_TOO_SMALL;
             std::memcpy(dst, key, ksize);
@@ -73,52 +62,6 @@ struct KeyPrefixFilter : public KeyValueFilter {
     }
 };
 
-struct FalseKeyValueFilter : public KeyValueFilter {
-
-
-    FalseKeyValueFilter() = default;
-
-    bool requiresValue() const override {
-        return false;
-    }
-
-    size_t minRequiredKeySize() const override {
-        return 0;
-    }
-
-    bool requiresFullKey() const override {
-        return false;
-    }
-
-    bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
-        (void)key;
-        (void)ksize;
-        (void)val;
-        (void)vsize;
-        return false;
-    }
-
-    size_t keyCopy(void* dst, size_t max_dst_size,
-                   const void* key, size_t ksize,
-                   bool is_last) const override {
-        (void)dst;
-        (void)max_dst_size;
-        (void)key;
-        (void)ksize;
-        (void)is_last;
-        return 0;
-    }
-
-    size_t valCopy(void* dst, size_t max_dst_size,
-                   const void* val, size_t vsize) const override {
-        (void)dst;
-        (void)max_dst_size;
-        (void)val;
-        (void)vsize;
-        return 0;
-    }
-};
-
 struct KeySuffixFilter : public KeyValueFilter {
 
     int32_t m_mode;
@@ -131,14 +74,6 @@ struct KeySuffixFilter : public KeyValueFilter {
         return false;
     }
 
-    size_t minRequiredKeySize() const override {
-        return 0;
-    }
-
-    bool requiresFullKey() const override {
-        return true;
-    }
-
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         (void)val;
         (void)vsize;
@@ -148,12 +83,7 @@ struct KeySuffixFilter : public KeyValueFilter {
     }
 
     size_t keyCopy(void* dst, size_t max_dst_size,
-                   const void* key, size_t ksize,
-                   bool is_last) const override {
-        if(m_mode & YOKAN_MODE_IGNORE_KEYS) {
-            if(!(is_last && (m_mode & YOKAN_MODE_KEEP_LAST)))
-                return 0;
-        }
+                   const void* key, size_t ksize) const override {
         if(!(m_mode & YOKAN_MODE_NO_PREFIX)) { // don't eliminate suffix
             if(max_dst_size < ksize) return YOKAN_SIZE_TOO_SMALL;
             std::memcpy(dst, key, ksize);
@@ -193,14 +123,6 @@ struct LuaKeyValueFilter : public KeyValueFilter {
         return m_mode & YOKAN_MODE_FILTER_VALUE;
     }
 
-    size_t minRequiredKeySize() const override {
-        return 0;
-    }
-
-    bool requiresFullKey() const override {
-        return true;
-    }
-
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         m_lua["__key__"] = std::string_view(static_cast<const char*>(key), ksize);
         if(m_mode & YOKAN_MODE_FILTER_VALUE)
@@ -211,12 +133,7 @@ struct LuaKeyValueFilter : public KeyValueFilter {
     }
 
     size_t keyCopy(void* dst, size_t max_dst_size,
-                   const void* key, size_t ksize,
-                   bool is_last) const override {
-        if(m_mode & YOKAN_MODE_IGNORE_KEYS) {
-            if(!(is_last && (m_mode & YOKAN_MODE_KEEP_LAST)))
-                return 0;
-        }
+                   const void* key, size_t ksize) const override {
         if(max_dst_size < ksize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, key, ksize);
         return ksize;
@@ -231,17 +148,6 @@ struct LuaKeyValueFilter : public KeyValueFilter {
 };
 #endif
 
-struct FalseDocFilter : public DocFilter {
-
-    FalseDocFilter() = default;
-
-    bool check(yk_id_t id, const void* val, size_t vsize) const override {
-        (void)id;
-        (void)val;
-        (void)vsize;
-        return false;
-    }
-};
 #ifdef YOKAN_HAS_LUA
 struct LuaDocFilter : public DocFilter {
 
@@ -282,14 +188,6 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
         return static_cast<bool>(m_doc_filter);
     }
 
-    size_t minRequiredKeySize() const override {
-        return KeyPrefixFilter::minRequiredKeySize() + sizeof(yk_id_t) + 1;
-    }
-
-    bool requiresFullKey() const override {
-        return true;
-    }
-
     bool check(const void* key, size_t ksize, const void* val, size_t vsize) const override {
         auto b = KeyPrefixFilter::check(key, ksize, nullptr, 0);
         if(!b) {
@@ -319,7 +217,7 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
     }
 };
 
-std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(
+std::shared_ptr<KeyValueFilter> FilterFactory::makeKeyValueFilter(
         margo_instance_id mid, int32_t mode, const UserMem& filter_data) {
     if(mode & YOKAN_MODE_LUA_FILTER) {
 #ifdef YOKAN_HAS_LUA
@@ -327,17 +225,41 @@ std::shared_ptr<KeyValueFilter> KeyValueFilter::makeFilter(
         return std::make_shared<LuaKeyValueFilter>(mode, filter_data);
 #else
         YOKAN_LOG_ERROR(mid, "Yokan wasn't compiled with Lua support!");
-        return std::make_shared<FalseKeyValueFilter>();
+        return nullptr;
 #endif
+    } else if(mode & YOKAN_MODE_LIB_FILTER) {
+        const char* c1 = std::find(filter_data.data, filter_data.data + filter_data.size, ':');
+        if(c1 == filter_data.data + filter_data.size) {
+            YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
+            return nullptr;
+        }
+        auto c2 = std::find(c1+1, (const char*)(filter_data.data + filter_data.size), ':');
+        if(c2 == filter_data.data + filter_data.size) {
+            YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
+            return nullptr;
+        }
+        auto lib_name = std::string(filter_data.data, filter_data.data - c1);
+        auto filter_name = std::string(c1+1, c2-c1);
+        auto filter_args = UserMem{
+            const_cast<char*>(c2)+1,
+            filter_data.size - (c2+1-filter_data.data)
+        };
+        if(!lib_name.empty()) Linker::open(lib_name);
+        auto it = s_make_kv_filter.find(filter_name);
+        if(it == s_make_kv_filter.end()) {
+            YOKAN_LOG_ERROR(mid, "Could not find filter with name %s in FilterFactory", filter_name.c_str());
+            return nullptr;
+        }
+        return (it->second)(mid, mode, filter_args);
     } else if(mode & YOKAN_MODE_SUFFIX) {
         return std::make_shared<KeySuffixFilter>(mode, filter_data);
-    } else {
+    } else { // default is a prefix filter
         return std::make_shared<KeyPrefixFilter>(mode, filter_data);
     }
 }
 
 
-std::shared_ptr<DocFilter> DocFilter::makeFilter(
+std::shared_ptr<DocFilter> FilterFactory::makeDocFilter(
         margo_instance_id mid, int32_t mode, const UserMem& filter_data) {
     if(mode & YOKAN_MODE_LUA_FILTER) {
 #ifdef YOKAN_HAS_LUA
@@ -347,15 +269,53 @@ std::shared_ptr<DocFilter> DocFilter::makeFilter(
         YOKAN_LOG_ERROR(mid, "Yokan wasn't compiled with Lua support!");
         return std::make_shared<FalseDocFilter>();
 #endif
+    } else if(mode & YOKAN_MODE_LIB_FILTER) {
+        const char* c1 = std::find(filter_data.data, filter_data.data + filter_data.size, ':');
+        if(c1 == filter_data.data + filter_data.size) {
+            YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
+            return nullptr;
+        }
+        auto c2 = std::find(c1+1, (const char*)(filter_data.data + filter_data.size), ':');
+        if(c2 == filter_data.data + filter_data.size) {
+            YOKAN_LOG_ERROR(mid, "Invalid filter descriptor (should be \"<libname>:<filter>:<args>\")");
+            return nullptr;
+        }
+        auto lib_name = std::string(filter_data.data, filter_data.data - c1);
+        auto filter_name = std::string(c1+1, c2-c1);
+        auto filter_args = UserMem{
+            const_cast<char*>(c2)+1,
+            filter_data.size - (c2+1-filter_data.data)
+        };
+        if(!lib_name.empty()) Linker::open(lib_name);
+        auto it = s_make_doc_filter.find(filter_name);
+        if(it == s_make_doc_filter.end()) {
+            YOKAN_LOG_ERROR(mid, "Could not find filter with name %s in FilterFactory", filter_name.c_str());
+            return nullptr;
+        }
+        return (it->second)(mid, mode, filter_args);
     }
     return std::make_shared<DocFilter>();
 }
 
-std::shared_ptr<KeyValueFilter> DocFilter::toKeyValueFilter(
+std::shared_ptr<KeyValueFilter> FilterFactory::docToKeyValueFilter(
             std::shared_ptr<DocFilter> filter,
             const char* collection) {
     return std::make_shared<CollectionFilterWrapper>(collection, std::move(filter));
 }
+
+std::unordered_map<
+        std::string,
+        std::function<
+            std::shared_ptr<KeyValueFilter>(margo_instance_id, int32_t, const UserMem&)
+        >
+    > FilterFactory::s_make_kv_filter;
+
+std::unordered_map<
+        std::string,
+        std::function<
+            std::shared_ptr<DocFilter>(margo_instance_id, int32_t, const UserMem&)
+        >
+    > FilterFactory::s_make_doc_filter;
 
 }
 #endif

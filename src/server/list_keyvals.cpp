@@ -77,7 +77,7 @@ void yk_list_keyvals_ult(hg_handle_t h)
     auto ptr         = buffer->data;
     auto from_key    = yokan::UserMem{ ptr, in.from_ksize };
     auto filter_umem = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
-    auto filter      = yokan::KeyValueFilter::makeFilter(mid, in.mode, filter_umem);
+    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
     auto ksizes      = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
@@ -88,6 +88,11 @@ void yk_list_keyvals_ult(hg_handle_t h)
     };
     auto keys = yokan::UserMem{ ptr + keys_offset, in.keys_buf_size };
     auto vals = yokan::UserMem{ ptr + vals_offset, in.vals_buf_size };
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
 
     out.ret = static_cast<yk_return_t>(
             database->listKeyValues(

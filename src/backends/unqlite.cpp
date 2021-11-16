@@ -7,6 +7,7 @@
 #include "yokan/doc-mixin.hpp"
 #include "yokan/util/locks.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <unqlite.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
@@ -474,15 +475,15 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
-                                                             ksize,  ctx->is_last);
+                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                key_umem, key_usize, key, ksize);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
-                                                                 ksize, ctx->is_last);
+                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                    key_umem, key_usize, key, ksize);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -596,15 +597,15 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
-                                                             ksize, ctx->is_last);
+                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                key_umem, key_usize, key, ksize);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = ctx->filter->keyCopy(key_umem, key_usize, key,
-                                                                 ksize, ctx->is_last);
+                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                    key_umem, key_usize, key, ksize);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
