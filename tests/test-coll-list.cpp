@@ -306,6 +306,51 @@ static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void
     return MUNIT_OK;
 }
 
+static MunitResult test_coll_list_custom_filter(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
+
+    auto count = g_num_items;
+
+    std::vector<std::vector<char>> buffers(count);
+    for(auto& v : buffers) v.resize(g_max_val_size);
+
+    std::vector<void*> buf_ptrs;
+    std::vector<size_t> buf_sizes;
+    buf_ptrs.reserve(count);
+    buf_sizes.reserve(count);
+    for(auto& v : buffers) {
+        buf_ptrs.push_back(v.data());
+        buf_sizes.push_back(g_max_val_size);
+    }
+    std::vector<yk_id_t> ids(count);
+
+    yk_id_t start_id = 0;
+    std::string filter = "libcustom-filters.so:custom_doc:";
+
+    ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LIB_FILTER, start_id,
+            filter.data(), filter.size(), count, ids.data(), buf_ptrs.data(), buf_sizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    for(unsigned i=0; i < count; i++) {
+        if(2*i >= g_num_items) {
+            munit_assert_long(buf_sizes[i], ==, YOKAN_NO_MORE_DOCS);
+            continue;;
+        }
+        munit_assert_long(ids[i], ==, 2*i);
+        auto& ref = context->reference[2*i];
+        munit_assert_long(buf_sizes[i], ==, ref.size());
+        munit_assert_memory_equal(ref.size(), buffers[i].data(), ref.data());
+    }
+
+    return MUNIT_OK;
+}
+
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
@@ -325,6 +370,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/coll/list_packed", test_coll_list_packed,
         test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/coll/list_packed/lua", test_coll_list_packed_lua,
+        test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/coll/list/custom_filter", test_coll_list_custom_filter,
         test_coll_list_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
