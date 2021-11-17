@@ -7,16 +7,19 @@
 #define __YOKAN_DATABASE_HPP
 
 #include <yokan/database.h>
+#include <yokan/collection.h>
 #include <yokan/cxx/exception.hpp>
 #include <vector>
 
 namespace yokan {
 
 class Client;
+class Collection;
 
 class Database {
 
     friend class Client;
+    friend class Collection;
 
     public:
 
@@ -393,6 +396,26 @@ class Database {
             filter_size, origin, data, offset, keys_buf_size,
             vals_buf_size, packed, count);
         YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void createCollection(const char* name,
+                          int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_collection_create(m_db, name, mode);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void dropCollection(const char* name,
+                        int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_collection_drop(m_db, name, mode);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    bool collectionExists(const char* name,
+                          int32_t mode = YOKAN_MODE_DEFAULT) const {
+        uint8_t flag;
+        auto err = yk_collection_exists(m_db, name, mode, &flag);
+        YOKAN_CONVERT_AND_THROW(err);
+        return static_cast<bool>(flag);
     }
 
     auto handle() const {

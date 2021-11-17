@@ -5,10 +5,12 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
+#include "yokan/doc-mixin.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <map>
@@ -21,7 +23,7 @@ namespace yokan {
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct MapKeyValueStoreCompare {
+struct MapDatabaseCompare {
 
     // LCOV_EXCL_START
     static bool DefaultMemCmp(const void* lhs, size_t lhsize,
@@ -39,9 +41,9 @@ struct MapKeyValueStoreCompare {
 
     cmp_type cmp = &DefaultMemCmp;
 
-    MapKeyValueStoreCompare() = default;
+    MapDatabaseCompare() = default;
 
-    MapKeyValueStoreCompare(cmp_type comparator)
+    MapDatabaseCompare(cmp_type comparator)
     : cmp(comparator) {}
 
     bool operator()(const KeyType& lhs, const KeyType& rhs) const {
@@ -63,11 +65,11 @@ struct MapKeyValueStoreCompare {
     using is_transparent = int;
 };
 
-class MapKeyValueStore : public KeyValueStoreInterface {
+class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
@@ -139,7 +141,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapKeyValueStore(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new MapDatabase(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -171,6 +173,9 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -467,7 +472,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
 
@@ -484,11 +489,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = it->first;
-            if(!key_filter.check(key.data(), key.size()))
+            auto& val = it->second;
+            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
                 continue;
 
             size_t usize = packed ? (keys.size - offset) : keySizes[i];
@@ -502,15 +507,13 @@ class MapKeyValueStore : public KeyValueStoreInterface {
             }
 
             if(!packed) {
-                keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                      key.size(), filter.size, is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, umem, usize, key.data(), key.size());
                 offset += usize;
             } else {
                 if(buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, umem, usize, key.data(),
-                                          key.size(), filter.size, is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, umem, usize, key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
                         buf_too_small = true;
                     } else {
@@ -532,7 +535,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -555,12 +558,11 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = it->first;
             auto& val = it->second;
-            if(!key_filter.check(key.data(), key.size()))
+            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
                 continue;
 
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
@@ -573,16 +575,14 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 is_last = (i+1 == max) || (next == end);
             }
 
-
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
                 size_t val_usize = valSizes[i];
-                keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
-                valSizes[i] = valCopy(mode, val_umem, val_usize,
-                                      val.data(), val.size());
+                keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                      key.data(), key.size());
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.data(), val.size());
                 key_offset += key_usize;
                 val_offset += val_usize;
 
@@ -594,9 +594,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                          key.data(), key.size(),
-                                          filter.size, is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                          key.data(), key.size());
                     if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
                         key_offset += keySizes[i];
                     else
@@ -605,8 +604,8 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                 if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    valSizes[i] = valCopy(mode, val_umem, val_usize,
-                                          val.data(), val.size());
+                    valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                                  val.data(), val.size());
                     if(valSizes[i] != YOKAN_SIZE_TOO_SMALL)
                         val_offset += valSizes[i];
                     else
@@ -626,7 +625,7 @@ class MapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~MapKeyValueStore() {
+    ~MapDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -641,12 +640,12 @@ class MapKeyValueStore : public KeyValueStoreInterface {
                                        Allocator<char>>;
     using value_type = std::basic_string<char, std::char_traits<char>,
                                          Allocator<char>>;
-    using comparator = MapKeyValueStoreCompare<key_type>;
+    using comparator = MapDatabaseCompare<key_type>;
     using cmp_type = comparator::cmp_type;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
     using map_type = std::map<key_type, value_type, comparator, allocator>;
 
-    MapKeyValueStore(json cfg,
+    MapDatabase(json cfg,
                      cmp_type cmp_fun,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator,
@@ -672,4 +671,4 @@ class MapKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(map, yokan::MapKeyValueStore);
+YOKAN_REGISTER_BACKEND(map, yokan::MapDatabase);

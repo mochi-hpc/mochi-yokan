@@ -15,7 +15,19 @@
 
 // LCOV_EXCL_START
 
+// id_list is used for both arrays of ids and
+// arrays of sizes (ids are uint64_t anyway).
+typedef struct id_list {
+    size_t count;
+    union {
+        yk_id_t* ids;
+        uint64_t* sizes;
+    };
+} id_list;
+
 static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
+static inline hg_return_t hg_proc_yk_id_t(hg_proc_t proc, yk_id_t *id);
+static inline hg_return_t hg_proc_id_list(hg_proc_t proc, id_list* list);
 
 /* Admin RPC types */
 
@@ -182,12 +194,164 @@ MERCURY_GEN_PROC(list_keyvals_out_t,
         ((int32_t)(ret)))
 
 
+/* coll_create */
+MERCURY_GEN_PROC(coll_create_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name)))
+MERCURY_GEN_PROC(coll_create_out_t,
+        ((int32_t)(ret)))
+
+/* coll_drop */
+MERCURY_GEN_PROC(coll_drop_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name)))
+MERCURY_GEN_PROC(coll_drop_out_t,
+        ((int32_t)(ret)))
+
+/* coll_exists */
+MERCURY_GEN_PROC(coll_exists_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name)))
+MERCURY_GEN_PROC(coll_exists_out_t,
+        ((int32_t)(ret))\
+        ((uint8_t)(exists)))
+
+/* coll_last_id */
+MERCURY_GEN_PROC(coll_last_id_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name)))
+MERCURY_GEN_PROC(coll_last_id_out_t,
+        ((int32_t)(ret))\
+        ((yk_id_t)(last_id)))
+
+/* coll_size */
+MERCURY_GEN_PROC(coll_size_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name)))
+MERCURY_GEN_PROC(coll_size_out_t,
+        ((int32_t)(ret))\
+        ((uint64_t)(size)))
+
+/* doc_erase */
+MERCURY_GEN_PROC(doc_erase_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids)))
+MERCURY_GEN_PROC(doc_erase_out_t,
+        ((int32_t)(ret)))
+
+/* doc_store */
+MERCURY_GEN_PROC(doc_store_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((uint64_t)(count))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(doc_store_out_t,
+        ((int32_t)(ret))\
+        ((id_list)(ids)))
+
+/* doc_update */
+MERCURY_GEN_PROC(doc_update_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(doc_update_out_t,
+        ((int32_t)(ret)))
+
+/* doc_load */
+MERCURY_GEN_PROC(doc_load_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk))\
+        ((hg_bool_t)(packed)))
+MERCURY_GEN_PROC(doc_load_out_t,
+        ((int32_t)(ret)))
+
+/* doc_length */
+MERCURY_GEN_PROC(doc_length_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((id_list)(ids)))
+MERCURY_GEN_PROC(doc_length_out_t,
+        ((id_list)(sizes))\
+        ((int32_t)(ret)))
+
+/* doc_list */
+MERCURY_GEN_PROC(doc_list_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((hg_bool_t)(packed))\
+        ((uint64_t)(count))\
+        ((yk_id_t)(from_id))\
+        ((uint64_t)(filter_size))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(docs_buf_size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(doc_list_out_t,
+        ((int32_t)(ret)))
+
+
 /* Extra hand-coded serialization functions */
+
+static inline hg_return_t hg_proc_yk_id_t(
+        hg_proc_t proc, yk_id_t* id)
+{
+    return hg_proc_uint64_t(proc, id);
+}
 
 static inline hg_return_t hg_proc_yk_database_id_t(
         hg_proc_t proc, yk_database_id_t *id)
 {
     return hg_proc_memcpy(proc, id, sizeof(*id));
+}
+
+static inline hg_return_t hg_proc_id_list(hg_proc_t proc, id_list* in)
+{
+    hg_return_t ret;
+    ret = hg_proc_hg_size_t(proc, &in->count);
+    if(ret != HG_SUCCESS) return ret;
+    if(in->count) {
+        switch(hg_proc_get_op(proc)) {
+        case HG_ENCODE:
+            ret = hg_proc_raw(proc, in->ids, in->count*sizeof(*(in->ids)));
+            if (ret != HG_SUCCESS) return ret;
+            break;
+        case HG_DECODE:
+            in->ids  = (yk_id_t*)malloc(in->count*sizeof(*(in->ids)));
+            ret      = hg_proc_raw(proc, in->ids, in->count*sizeof(*(in->ids)));
+            if(ret != HG_SUCCESS) return ret;
+            break;
+        case HG_FREE:
+            free(in->ids);
+            break;
+        default:
+            break;
+        }
+    }
+    return HG_SUCCESS;
 }
 
 // LCOV_EXCL_STOP

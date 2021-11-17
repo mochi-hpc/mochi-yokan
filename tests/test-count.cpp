@@ -10,8 +10,8 @@
 
 static void* test_get_context_setup(const MunitParameter params[], void* user_data)
 {
-    auto context = static_cast<test_context*>(
-        test_common_context_setup(params, user_data));
+    auto context = static_cast<kv_test_context*>(
+        kv_test_common_context_setup(params, user_data));
 
     auto count = context->reference.size();
     std::vector<const void*> kptrs;
@@ -45,7 +45,7 @@ static MunitResult test_count(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -63,13 +63,13 @@ static MunitParameterEnum test_params[] = {
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
-  { (char*)"num-keyvals", NULL },
+  { (char*)"num-itemss", NULL },
   { NULL, NULL }
 };
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/count", test_count,
-        test_get_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_get_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

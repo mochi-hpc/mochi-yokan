@@ -5,9 +5,10 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
+#include "yokan/doc-mixin.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include "../common/modes.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
@@ -27,7 +28,7 @@ using json = nlohmann::json;
 
 // TODO we could dependency-inject a hash function (and the to_equal<T> function)
 template<typename KeyType>
-struct UnorderedMapKeyValueStoreHash {
+struct UnorderedMapDatabaseHash {
 
 #if __cplusplus >= 201703L
     using sv = std::string_view;
@@ -41,11 +42,11 @@ struct UnorderedMapKeyValueStoreHash {
     }
 };
 
-class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
+class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, val_alloc, node_alloc;
@@ -124,7 +125,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapKeyValueStore(std::move(cfg), node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapDatabase(std::move(cfg), node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
@@ -148,7 +149,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
             (mode & (
                      YOKAN_MODE_INCLUSIVE
                     |YOKAN_MODE_APPEND
-        //            |YOKAN_MODE_CONSUME
+                    |YOKAN_MODE_CONSUME
                     |YOKAN_MODE_WAIT
                     |YOKAN_MODE_NOTIFY
                     |YOKAN_MODE_NEW_ONLY
@@ -160,6 +161,9 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -472,7 +476,7 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~UnorderedMapKeyValueStore() {
+    ~UnorderedMapDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -489,10 +493,10 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
                                          Allocator<char>>;
     using equal_type = std::equal_to<key_type>;
     using allocator = Allocator<std::pair<const key_type, value_type>>;
-    using hash_type = UnorderedMapKeyValueStoreHash<key_type>;
+    using hash_type = UnorderedMapDatabaseHash<key_type>;
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
-    UnorderedMapKeyValueStore(json cfg,
+    UnorderedMapDatabase(json cfg,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator,
                      const yk_allocator_t& val_allocator)
@@ -521,4 +525,4 @@ class UnorderedMapKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(unordered_map, yokan::UnorderedMapKeyValueStore);
+YOKAN_REGISTER_BACKEND(unordered_map, yokan::UnorderedMapDatabase);

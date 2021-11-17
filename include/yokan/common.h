@@ -9,6 +9,7 @@
 #include <uuid.h>
 #include <stdint.h>
 #include <limits.h>
+#include <margo.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +28,8 @@ extern "C" {
     X(YOKAN_ERR_INVALID_BACKEND, "Invalid backend type") \
     X(YOKAN_ERR_INVALID_CONFIG, "Invalid configuration") \
     X(YOKAN_ERR_INVALID_TOKEN, "Invalid token")          \
+    X(YOKAN_ERR_INVALID_ID, "Invalid document id")       \
+    X(YOKAN_ERR_INVALID_FILTER, "Invalid filter")        \
     X(YOKAN_ERR_FROM_MERCURY, "Mercury error")           \
     X(YOKAN_ERR_FROM_ARGOBOTS, "Argobots error")         \
     X(YOKAN_ERR_OP_UNSUPPORTED, "Unsupported operation") \
@@ -64,6 +67,7 @@ typedef enum yk_return_t {
 #define YOKAN_KEY_NOT_FOUND  (ULLONG_MAX)
 #define YOKAN_SIZE_TOO_SMALL (ULLONG_MAX-1)
 #define YOKAN_NO_MORE_KEYS   (ULLONG_MAX-2)
+#define YOKAN_NO_MORE_DOCS   (ULLONG_MAX-2) /* same as YOKAN_NO_MORE_KEYS */
 
 /**
  * @brief Modes can be passed to many functions to alter the
@@ -92,22 +96,29 @@ typedef enum yk_return_t {
  *   YOKAN_MODE_NO_PREFIX, if provided, will be re-interpreted
  *   accordingly, removing the suffix from the resulting keys.
  * - YOKAN_MODE_LUA_FILTER: interpret the filter as Lua code.
+ * - YOKAN_MODE_IGNORE_DOCS: only return IDs of documents matching a filter.
+ * - YOKAN_MODE_FILTER_VALUE: filter requires value to be provided.
+ * - YOKAN_MODE_LIB_FILTER: filter is the name of a library and a function,
+ *   separated by a column character.
  *
  * Important: not all backends support all modes.
  */
-#define YOKAN_MODE_DEFAULT      0b00000000000
-#define YOKAN_MODE_INCLUSIVE    0b00000000001
-#define YOKAN_MODE_APPEND       0b00000000010
-#define YOKAN_MODE_CONSUME      0b00000000100
-#define YOKAN_MODE_WAIT         0b00000001000
-#define YOKAN_MODE_NOTIFY       0b00000001000
-#define YOKAN_MODE_NEW_ONLY     0b00000010000
-#define YOKAN_MODE_EXIST_ONLY   0b00000100000
-#define YOKAN_MODE_NO_PREFIX    0b00001000000
-#define YOKAN_MODE_IGNORE_KEYS  0b00010000000
-#define YOKAN_MODE_KEEP_LAST    0b00110000000
-#define YOKAN_MODE_SUFFIX       0b01000000000
-#define YOKAN_MODE_LUA_FILTER   0b10000000000
+#define YOKAN_MODE_DEFAULT      0b00000000000000
+#define YOKAN_MODE_INCLUSIVE    0b00000000000001
+#define YOKAN_MODE_APPEND       0b00000000000010
+#define YOKAN_MODE_CONSUME      0b00000000000100
+#define YOKAN_MODE_WAIT         0b00000000001000
+#define YOKAN_MODE_NOTIFY       0b00000000001000
+#define YOKAN_MODE_NEW_ONLY     0b00000000010000
+#define YOKAN_MODE_EXIST_ONLY   0b00000000100000
+#define YOKAN_MODE_NO_PREFIX    0b00000001000000
+#define YOKAN_MODE_IGNORE_KEYS  0b00000010000000
+#define YOKAN_MODE_KEEP_LAST    0b00000110000000
+#define YOKAN_MODE_SUFFIX       0b00001000000000
+#define YOKAN_MODE_LUA_FILTER   0b00010000000000
+#define YOKAN_MODE_IGNORE_DOCS  0b00100000000000
+#define YOKAN_MODE_FILTER_VALUE 0b01000000000000
+#define YOKAN_MODE_LIB_FILTER   0b10000000000000
 
 /**
  * @brief Identifier for a database.
@@ -140,6 +151,11 @@ static inline void yk_database_id_from_string(
         yk_database_id_t* id) {
     uuid_parse(in, id->uuid);
 }
+
+/**
+ * @brief Record when working with collections.
+ */
+typedef uint64_t yk_id_t;
 
 #ifdef __cplusplus
 }

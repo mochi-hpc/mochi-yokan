@@ -9,6 +9,18 @@ set (server-src-files
      server/exists.cpp
      server/list_keys.cpp
      server/list_keyvals.cpp
+     server/coll_create.cpp
+     server/coll_drop.cpp
+     server/coll_exists.cpp
+     server/coll_last_id.cpp
+     server/coll_size.cpp
+     server/doc_erase.cpp
+     server/doc_store.cpp
+     server/doc_update.cpp
+     server/doc_load.cpp
+     server/doc_length.cpp
+     server/doc_list.cpp
+     server/util/filters.cpp
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files
@@ -80,7 +92,18 @@ set (client-src-files
      client/length.cpp
      client/exists.cpp
      client/list_keys.cpp
-     client/list_keyvals.cpp)
+     client/list_keyvals.cpp
+     client/coll_create.cpp
+     client/coll_drop.cpp
+     client/coll_exists.cpp
+     client/coll_last_id.cpp
+     client/coll_size.cpp
+     client/doc_erase.cpp
+     client/doc_store.cpp
+     client/doc_update.cpp
+     client/doc_length.cpp
+     client/doc_load.cpp
+     client/doc_list.cpp)
 
 set (admin-src-files
      admin/admin.c)

@@ -28,7 +28,7 @@ inline bool starts_with(const std::string& s, const std::string& prefix) {
 }
 
 struct list_keyvals_context {
-    test_context*                     base;
+    kv_test_context*                     base;
     std::map<std::string,std::string> ordered_ref;
     std::string                       prefix;
     int32_t                           mode;
@@ -37,8 +37,8 @@ struct list_keyvals_context {
 
 static void* test_list_keyvals_context_setup(const MunitParameter params[], void* user_data)
 {
-    auto base_context = static_cast<test_context*>(
-        test_common_context_setup(params, user_data));
+    auto base_context = static_cast<kv_test_context*>(
+        kv_test_common_context_setup(params, user_data));
 
     auto context = new list_keyvals_context;
     context->base = base_context;
@@ -92,7 +92,7 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
 static void test_list_keyvals_context_tear_down(void* user_data)
 {
     auto context = static_cast<list_keyvals_context*>(user_data);
-    test_common_context_tear_down(context->base);
+    kv_test_common_context_tear_down(context->base);
     delete context;
 }
 
@@ -747,6 +747,75 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
     return MUNIT_OK;
 }
 
+static MunitResult test_custom_filter(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    auto context = static_cast<list_keyvals_context*>(data);
+    yk_database_handle_t dbh = context->base->dbh;
+    yk_return_t ret;
+
+    auto count = context->ordered_ref.size();
+    std::vector<size_t> ksizes(count, g_max_key_size);
+    std::vector<size_t> vsizes(count, g_max_val_size+10);
+    std::vector<std::string> keys(count, std::string(g_max_key_size, '\0'));
+    std::vector<std::string> vals(count, std::string(g_max_val_size+10, '\0'));
+    std::vector<void*> kptrs(count, nullptr);
+    std::vector<void*> vptrs(count, nullptr);
+    for(unsigned i = 0; i < count; i++) {
+        kptrs[i] = const_cast<char*>(keys[i].data());
+        vptrs[i] = const_cast<char*>(vals[i].data());
+    }
+    std::vector<std::string> expected_keys;
+    std::vector<std::string> expected_vals;
+
+    for(auto& p : context->ordered_ref) {
+        auto key = p.first;
+        auto& val = p.second;
+        // see extra/custom-filters.cpp
+        if(val.size() % 2 == ((key.size() % 2 == 0) ? 1 : 0)) {
+            for(unsigned i=0; i < key.size()/2; i++) std::swap(key[i], key[key.size()-i-1]);
+            expected_keys.push_back(key);
+            expected_vals.push_back(val+"I am groot");
+        }
+    }
+
+    std::string filter = "libcustom-filters.so:custom_kv:I am groot";
+
+    ret = yk_list_keyvals(dbh,
+                context->mode|YOKAN_MODE_LIB_FILTER,
+                nullptr,
+                0,
+                filter.data(),
+                filter.size(),
+                count,
+                kptrs.data(),
+                ksizes.data(),
+                vptrs.data(),
+                vsizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    for(unsigned i = 0; i < count; i++) {
+        if(i < expected_keys.size()) {
+            auto& exp_key = expected_keys[i];
+            munit_assert_long(ksizes[i], ==, exp_key.size());
+            munit_assert_memory_equal(ksizes[i], kptrs[i], exp_key.data());
+        } else {
+            munit_assert_long(ksizes[i], ==, YOKAN_NO_MORE_KEYS);
+        }
+        if(i < expected_vals.size()) {
+            auto& exp_val = expected_vals[i];
+            munit_assert_long(vsizes[i], ==, exp_val.size());
+            munit_assert_memory_equal(vsizes[i], vptrs[i], exp_val.data());
+        } else {
+            munit_assert_long(vsizes[i], ==, YOKAN_NO_MORE_KEYS);
+        }
+    }
+
+    return MUNIT_OK;
+}
+
 static char* mode_params[] = {
     (char*)"0", (char*)"1", NULL
 };
@@ -763,7 +832,7 @@ static MunitParameterEnum test_params[] = {
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
-  { (char*)"num-keyvals", NULL },
+  { (char*)"num-items", NULL },
   { (char*)"keys-per-op", NULL },
   { NULL, NULL }
 };
@@ -780,6 +849,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/list_keyvals_packed/vals_too_small", test_list_keyvals_packed_val_too_small,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/list_keyvals_bulk", test_list_keyvals_bulk,
+        test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/list_custom_filter", test_custom_filter,
         test_list_keyvals_context_setup, test_list_keyvals_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

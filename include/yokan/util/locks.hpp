@@ -64,5 +64,33 @@ struct ScopedReadLock {
     ABT_rwlock m_lock = ABT_RWLOCK_NULL;
 };
 
+struct ScopedMutex {
+
+    ScopedMutex() = default;
+
+    ScopedMutex(ABT_mutex m)
+    : m_mutex(m) {
+        if(m_mutex != ABT_MUTEX_NULL)
+            ABT_mutex_lock(m_mutex);
+    }
+
+    ~ScopedMutex() {
+        if(m_mutex != ABT_MUTEX_NULL)
+            ABT_mutex_unlock(m_mutex);
+    }
+
+    void unlock() {
+        if(m_mutex != ABT_MUTEX_NULL)
+            ABT_mutex_unlock(m_mutex);
+    }
+
+    void lock() {
+        if(m_mutex != ABT_MUTEX_NULL)
+            ABT_mutex_lock(m_mutex);
+    }
+
+    ABT_mutex m_mutex = ABT_MUTEX_NULL;
+};
+
 }
 #endif

@@ -11,40 +11,15 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <stdexcept>
+#include <memory>
 #include <yokan/common.h>
+#include <yokan/usermem.hpp>
+#include <yokan/filters.hpp>
 
 template <typename T> class __YOKANBackendRegistration;
 
 namespace yokan {
-
-/**
- * @brief Wrapper for user memory (equivalent to
- * some backend's notion of Slice, or to a C++17 std::string_view)
- *
- * @tparam T Type of data held.
- */
-template<typename T>
-struct BasicUserMem {
-    T*     data = nullptr; /*!< Pointer to the data */
-    size_t size = 0;       /*!< Number of elements of type T in the buffer */
-
-    template<typename I>
-    inline T& operator[](I index) {
-        return data[index];
-    }
-
-    template<typename I>
-    inline const T& operator[](I index) const {
-        return data[index];
-    }
-};
-
-/**
- * @brief UserMem is short for BasicUserMem<void>.
- * Its size field represents a number of bytes for
- * a buffer of unspecified type.
- */
-using UserMem = BasicUserMem<char>;
 
 /**
  * @brief The BitField class is used for the "exists" operations
@@ -84,6 +59,7 @@ enum class Status : uint8_t {
     InvalidType  = YOKAN_ERR_INVALID_BACKEND,
     InvalidConf  = YOKAN_ERR_INVALID_CONFIG,
     InvalidArg   = YOKAN_ERR_INVALID_ARGS,
+    InvalidID    = YOKAN_ERR_INVALID_ID,
     NotFound     = YOKAN_ERR_KEY_NOT_FOUND,
     SizeError    = YOKAN_ERR_BUFFER_SIZE,
     KeyExists    = YOKAN_ERR_KEY_EXISTS,
@@ -115,18 +91,18 @@ constexpr auto KeyNotFound = YOKAN_KEY_NOT_FOUND;
 constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
 
 /**
- * @brief Abstract embedded key/value storage object.
+ * @brief Abstract embedded database object.
  */
-class KeyValueStoreInterface {
+class DatabaseInterface {
 
     public:
 
-    KeyValueStoreInterface() = default;
-    virtual ~KeyValueStoreInterface() = default;
-    KeyValueStoreInterface(const KeyValueStoreInterface&) = default;
-    KeyValueStoreInterface(KeyValueStoreInterface&&) = default;
-    KeyValueStoreInterface& operator=(const KeyValueStoreInterface&) = default;
-    KeyValueStoreInterface& operator=(KeyValueStoreInterface&&) = default;
+    DatabaseInterface() = default;
+    virtual ~DatabaseInterface() = default;
+    DatabaseInterface(const DatabaseInterface&) = default;
+    DatabaseInterface(DatabaseInterface&&) = default;
+    DatabaseInterface& operator=(const DatabaseInterface&) = default;
+    DatabaseInterface& operator=(DatabaseInterface&&) = default;
 
     /**
      * @brief Get the name of the backend (e.g. "map").
@@ -197,6 +173,7 @@ class KeyValueStoreInterface {
         (void)b;
         return Status::NotSupported;
     }
+
     /**
      * @brief Get the size of values associated with the keys. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory holding the
@@ -260,6 +237,9 @@ class KeyValueStoreInterface {
      * - the sum of ksizes <= keys.size
      * - the sum of vsizes <= vals.size
      *
+     * Note: this function is not const because it can potentially
+     * call erase() if a YOKAN_MODE_CONSUME is specified, for instance.
+     *
      * @param mode Mode.
      * @param packed whether data is packed.
      * @param keys Keys to get.
@@ -320,7 +300,7 @@ class KeyValueStoreInterface {
      * @return Status.
      */
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const {
         (void)mode;
         (void)packed;
@@ -336,7 +316,7 @@ class KeyValueStoreInterface {
      */
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -351,22 +331,247 @@ class KeyValueStoreInterface {
         (void)valSizes;
         return Status::NotSupported;
     }
+
+    /**
+     * @brief Create a collection in the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     *
+     * @return Status
+     */
+    virtual Status collCreate(int32_t mode, const char* name) {
+        (void)mode;
+        (void)name;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Erase a collection from the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     *
+     * @return Status
+     */
+    virtual Status collDrop(int32_t mode, const char* name) {
+        (void)mode;
+        (void)name;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Check if a collection exists in the underlying database.
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param flag Set to true if the collection exists
+     *
+     * @return Status
+     */
+    virtual Status collExists(int32_t mode, const char* name, bool* flag) const {
+        (void)mode;
+        (void)name;
+        (void)flag;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the last id in the collection (i.e. the id that the next document
+     * stored will have).
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param id Last id
+     *
+     * @return Status
+     */
+    virtual Status collLastID(int32_t mode, const char* name, yk_id_t* id) const {
+        (void)mode;
+        (void)name;
+        (void)id;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the collection size (may be different from LastID if some
+     * documents have been erased).
+     *
+     * @param mode Mode
+     * @param name Collection name
+     * @param size Size
+     *
+     * @return Status
+     */
+    virtual Status collSize(int32_t mode, const char* name, size_t* size) const {
+        (void)mode;
+        (void)name;
+        (void)size;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Get the size of document associated with ids.
+     *
+     * @param collection Name of the collection.
+     * @param mode Mode.
+     * @param ids Buffer storing ids of the documents.
+     * @param sizes Buffer in which to put sizes of the documents.
+     *
+     * @return Status.
+     */
+    virtual Status docSize(const char* collection,
+                           int32_t mode,
+                           const BasicUserMem<yk_id_t>& ids,
+                           BasicUserMem<size_t>& sizes) const {
+        (void)collection;
+        (void)mode;
+        (void)ids;
+        (void)sizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Store multiple documents into the database.
+     *
+     * @param [in] collection Name of the collection.
+     * @param [in] mode Mode.
+     * @param [in] documents Buffer containing documents to put.
+     * @param [in] size Buffer containing the sizes of documents.
+     * @param [in] ids Buffer to store resulting document ids.
+     *
+     * @return Status.
+     */
+    virtual Status docStore(const char* collection,
+                            int32_t mode,
+                            const UserMem& documents,
+                            const BasicUserMem<size_t>& sizes,
+                            BasicUserMem<yk_id_t>& ids) {
+        (void)collection;
+        (void)mode;
+        (void)documents;
+        (void)sizes;
+        (void)ids;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Update multiple documents in the database.
+     *
+     * @param [in] collection Name of the collection.
+     * @param [in] mode Mode.
+     * @param [in] ids Buffer containing document ids.
+     * @param [in] documents Buffer containing documents to put.
+     * @param [in] size Buffer containing the sizes of documents.
+     *
+     * @return Status.
+     */
+    virtual Status docUpdate(const char* collection,
+                             int32_t mode,
+                             const BasicUserMem<yk_id_t>& ids,
+                             const UserMem& documents,
+                             const BasicUserMem<size_t>& sizes) {
+        (void)collection;
+        (void)mode;
+        (void)documents;
+        (void)sizes;
+        (void)ids;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Load documents associated of ids.
+     * sizes is used both as input (to know where to place data in documents
+     * and how much is available to each document) and as output (to store
+     * the actual size of each value).
+     *
+     * @param collection Name of the collection.
+     * @param mode Mode.
+     * @param packed whether data is packed.
+     * @param ids Buffer containing document ids.
+     * @param documents Documents to get.
+     * @param sizes Size of the documents.
+     *
+     * @return Status.
+     */
+    virtual Status docLoad(const char* collection,
+                           int32_t mode, bool packed,
+                           const BasicUserMem<yk_id_t>& ids,
+                           UserMem& documents,
+                           BasicUserMem<size_t>& sizes) {
+        (void)collection;
+        (void)mode;
+        (void)packed;
+        (void)ids;
+        (void)documents;
+        (void)sizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Erase a set of documents.
+     *
+     * @param [in] mode Mode.
+     * @param [in] ids Ids of the documents to erase.
+     *
+     * @return Status.
+     */
+    virtual Status docErase(const char* collection,
+                            int32_t mode, const BasicUserMem<yk_id_t>& ids) {
+        (void)mode;
+        (void)ids;
+        (void)collection;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief List documents from the collection.
+     *
+     * @param[in] collection Collection
+     * @param[in] mode Mode
+     * @param[in] packed Whether data is packed in the document buffer
+     * @param[in] from_id Starting document id
+     * @param[in] filter Filter
+     * @param[out] ids Resulting ids
+     * @param[out] documents Resulting documents
+     * @param[inout] doc_sizes Buffer sizes / Resulting document sizes
+     *
+     * @return Status.
+     */
+    virtual Status docList(const char* collection,
+                           int32_t mode, bool packed,
+                           yk_id_t from_id,
+                           const std::shared_ptr<DocFilter>& filter,
+                           BasicUserMem<yk_id_t>& ids,
+                           UserMem& documents,
+                           BasicUserMem<size_t>& doc_sizes) const {
+        (void)collection;
+        (void)mode;
+        (void)filter;
+        (void)from_id;
+        (void)packed;
+        (void)ids;
+        (void)documents;
+        (void)doc_sizes;
+        return Status::NotSupported;
+    }
+
 };
 
 /**
- * @brief The KeyValueStoreFactory is used by the provider to build
+ * @brief The DatabaseFactory is used by the provider to build
  * key/value store instances of various types.
  */
-class KeyValueStoreFactory {
+class DatabaseFactory {
 
     template <typename T> friend class ::__YOKANBackendRegistration;
 
     public:
 
-    KeyValueStoreFactory() = delete;
+    DatabaseFactory() = delete;
 
     /**
-     * @brief Create a KeyValueStoreInterface object of a specified
+     * @brief Create a DatabaseInterface object of a specified
      * type and return a pointer to it. It is the respondibility of
      * the user to call delete on this pointer.
      *
@@ -374,14 +579,14 @@ class KeyValueStoreFactory {
      *
      * @param backendType Name of the backend.
      * @param jsonConfig Json-formatted configuration string.
-     * @param kvs Created KeyValueStoreInterface pointer.
+     * @param kvs Created DatabaseInterface pointer.
      *
      * @return Status.
      */
-    static Status makeKeyValueStore(
+    static Status makeDatabase(
             const std::string& backendType,
             const std::string& jsonConfig,
-            KeyValueStoreInterface** kvs) {
+            DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
         return make_fn[backendType](jsonConfig, kvs);
     }
@@ -401,7 +606,7 @@ class KeyValueStoreFactory {
 
     static std::unordered_map<
                 std::string,
-                std::function<Status(const std::string&,KeyValueStoreInterface**)>>
+                std::function<Status(const std::string&,DatabaseInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
 };
 
@@ -419,14 +624,14 @@ template <typename T> class __YOKANBackendRegistration {
     public:
 
     __YOKANBackendRegistration(const std::string &backend_name) {
-        ::yokan::KeyValueStoreFactory::make_fn[backend_name] =
-            [](const std::string &config, ::yokan::KeyValueStoreInterface** kvs) {
+        ::yokan::DatabaseFactory::make_fn[backend_name] =
+            [](const std::string &config, ::yokan::DatabaseInterface** kvs) {
                 return T::create(config, kvs);
             };
     }
 };
 
-using yk_database = ::yokan::KeyValueStoreInterface;
-using yk_database_t = ::yokan::KeyValueStoreInterface*;
+using yk_database = ::yokan::DatabaseInterface;
+using yk_database_t = ::yokan::DatabaseInterface*;
 
 #endif

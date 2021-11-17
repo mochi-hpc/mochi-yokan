@@ -5,10 +5,11 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <set>
@@ -21,7 +22,7 @@ namespace yokan {
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct SetKeyValueStoreCompare {
+struct SetDatabaseCompare {
 
     // LCOV_EXCL_START
     static bool DefaultMemCmp(const void* lhs, size_t lhsize,
@@ -39,9 +40,9 @@ struct SetKeyValueStoreCompare {
 
     cmp_type cmp = &DefaultMemCmp;
 
-    SetKeyValueStoreCompare() = default;
+    SetDatabaseCompare() = default;
 
-    SetKeyValueStoreCompare(cmp_type comparator)
+    SetDatabaseCompare(cmp_type comparator)
     : cmp(comparator) {}
 
     bool operator()(const KeyType& lhs, const KeyType& rhs) const {
@@ -63,11 +64,11 @@ struct SetKeyValueStoreCompare {
     using is_transparent = int;
 };
 
-class SetKeyValueStore : public KeyValueStoreInterface {
+class SetDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
         yk_allocator_init_fn key_alloc_init, node_alloc_init;
@@ -126,7 +127,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new SetKeyValueStore(cfg, cmp, node_alloc, key_alloc);
+        *kvs = new SetDatabase(cfg, cmp, node_alloc, key_alloc);
         return Status::OK;
     }
 
@@ -162,6 +163,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -347,8 +351,9 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+    virtual Status listKeys(int32_t mode, bool packed,
+                            const UserMem& fromKey,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
@@ -368,11 +373,10 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         size_t i = 0;
         size_t offset = 0;
         bool buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size()))
+            if(!filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto umem = static_cast<char*>(keys.data) + offset;
 
@@ -386,9 +390,8 @@ class SetKeyValueStore : public KeyValueStoreInterface {
             if(!packed) {
 
                 size_t usize = keySizes[i];
-                keySizes[i] = keyCopy(mode, umem, usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
+                keySizes[i] = keyCopy(mode, is_last, filter, umem, usize,
+                                      key.data(), key.size());
                 offset += usize;
 
             } else { // if packed
@@ -396,9 +399,8 @@ class SetKeyValueStore : public KeyValueStoreInterface {
                 if(buf_too_small)
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
                 else {
-                    keySizes[i] = keyCopy(mode, umem, keys.size - offset,
-                                          key.data(), key.size(), filter.size,
-                                          is_last);
+                    keySizes[i] = keyCopy(mode, is_last, filter, umem, keys.size - offset,
+                                          key.data(), key.size());
                     if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
                         buf_too_small = true;
                     else
@@ -420,7 +422,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -440,14 +442,16 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
+        size_t val_offset = 0;
         bool key_buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
+        bool val_buf_too_small = false;
 
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = *it;
-            if(!key_filter.check(key.data(), key.size()))
+            if(!filter->check(key.data(), key.size(), nullptr, 0))
                 continue;
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
+            auto val_umem = static_cast<char*>(vals.data) + val_offset;
 
             bool is_last = false;
             if(mode & YOKAN_MODE_KEEP_LAST) {
@@ -459,27 +463,38 @@ class SetKeyValueStore : public KeyValueStoreInterface {
             if(!packed) {
 
                 size_t key_usize = keySizes[i];
-                keySizes[i] = keyCopy(mode, key_umem, key_usize,
-                                      key.data(), key.size(),
-                                      filter.size, is_last);
+                size_t val_usize = valSizes[i];
+                keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                      key.data(), key.size());
+                valSizes[i] = filter->valCopy(val_umem, val_usize, "", 0);
                 key_offset += key_usize;
+                val_offset += val_usize;
 
             } else { // not packed
 
-                if(key_buf_too_small)
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                else {
-                    keySizes[i] = keyCopy(mode, key_umem, keys.size - key_offset,
-                                          key.data(), key.size(),
-                                          filter.size, is_last);
-                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL)
-                        key_buf_too_small = true;
-                    else
-                        key_offset += key.size();
-                }
+                size_t key_usize = keys.size - key_offset;
+                size_t val_usize = vals.size - val_offset;
 
+                if(key_buf_too_small) {
+                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                } else {
+                    keySizes[i] = keyCopy(mode, is_last, filter, key_umem, key_usize,
+                                          key.data(), key.size());
+                    if(keySizes[i] != YOKAN_SIZE_TOO_SMALL)
+                        key_offset += keySizes[i];
+                    else
+                        key_buf_too_small = true;
+                }
+                if(val_buf_too_small) {
+                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                } else {
+                    valSizes[i] = filter->valCopy(val_umem, val_usize, "", 0);
+                    if(valSizes[i] != YOKAN_SIZE_TOO_SMALL)
+                        val_offset += valSizes[i];
+                    else
+                        val_buf_too_small = true;
+                }
             }
-            valSizes[i] = 0;
             i += 1;
         }
         keys.size = key_offset;
@@ -492,7 +507,7 @@ class SetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~SetKeyValueStore() {
+    ~SetDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -504,12 +519,12 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
     using key_type = std::basic_string<char, std::char_traits<char>,
                                        Allocator<char>>;
-    using comparator = SetKeyValueStoreCompare<key_type>;
+    using comparator = SetDatabaseCompare<key_type>;
     using cmp_type = comparator::cmp_type;
     using allocator = Allocator<key_type>;
     using set_type = std::set<key_type, comparator, allocator>;
 
-    SetKeyValueStore(json cfg,
+    SetDatabase(json cfg,
                      cmp_type cmp_fun,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator)
@@ -532,4 +547,4 @@ class SetKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(set, yokan::SetKeyValueStore);
+YOKAN_REGISTER_BACKEND(set, yokan::SetDatabase);

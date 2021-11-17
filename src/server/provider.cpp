@@ -180,6 +180,72 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keyvals_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_create",
+            coll_create_in_t, coll_create_out_t,
+            yk_coll_create_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_create_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_drop",
+            coll_drop_in_t, coll_drop_out_t,
+            yk_coll_drop_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_drop_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_exists",
+            coll_exists_in_t, coll_exists_out_t,
+            yk_coll_exists_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_exists_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_last_id",
+            coll_last_id_in_t, coll_last_id_out_t,
+            yk_coll_last_id_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_last_id_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_size",
+            coll_size_in_t, coll_size_out_t,
+            yk_coll_size_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->coll_size_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_erase",
+            doc_erase_in_t, doc_erase_out_t,
+            yk_doc_erase_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_erase_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_load",
+            doc_load_in_t, doc_load_out_t,
+            yk_doc_load_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_load_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_store",
+            doc_store_in_t, doc_store_out_t,
+            yk_doc_store_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_store_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_update",
+            doc_update_in_t, doc_update_out_t,
+            yk_doc_update_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_update_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_length",
+            doc_length_in_t, doc_length_out_t,
+            yk_doc_length_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_length_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_list",
+            doc_list_in_t, doc_list_out_t,
+            yk_doc_list_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_list_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
     if(provider)
@@ -209,6 +275,16 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->erase_id);
     margo_deregister(mid, provider->list_keys_id);
     margo_deregister(mid, provider->list_keyvals_id);
+    margo_deregister(mid, provider->coll_create_id);
+    margo_deregister(mid, provider->coll_drop_id);
+    margo_deregister(mid, provider->coll_exists_id);
+    margo_deregister(mid, provider->coll_last_id_id);
+    margo_deregister(mid, provider->coll_size_id);
+    margo_deregister(mid, provider->doc_erase_id);
+    margo_deregister(mid, provider->doc_store_id);
+    margo_deregister(mid, provider->doc_load_id);
+    margo_deregister(mid, provider->doc_update_id);
+    margo_deregister(mid, provider->doc_length_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
     YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");
@@ -262,7 +338,7 @@ void yk_open_database_ult(hg_handle_t h)
         return;;
     }
 
-    has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(in.type);
+    has_backend_type = yokan::DatabaseFactory::hasBackendType(in.type);
 
     if(!has_backend_type) {
         YOKAN_LOG_ERROR(mid, "could not find backend of type \"%s\"", in.type);
@@ -272,7 +348,7 @@ void yk_open_database_ult(hg_handle_t h)
 
     uuid_generate(id.uuid);
 
-    auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(in.type, in.config, &database);
+    auto status = yokan::DatabaseFactory::makeDatabase(in.type, in.config, &database);
     if(status != yokan::Status::OK) {
         YOKAN_LOG_ERROR(mid, "failed to open database of type %s", in.type);
         out.ret = static_cast<yk_return_t>(status);
@@ -452,7 +528,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
                 type = full_type.substr(p+1);
             }
         }
-        bool has_backend_type = yokan::KeyValueStoreFactory::hasBackendType(type);
+        bool has_backend_type = yokan::DatabaseFactory::hasBackendType(type);
         if(!has_backend_type) {
             YOKAN_LOG_ERROR(provider->mid,
                 "could not find backend of type \"%s\"", type.c_str());
@@ -475,7 +551,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         auto type = db["type"].get<std::string>();
         auto& initial_db_config =  db["config"];
         auto config = initial_db_config.dump();
-        auto status = yokan::KeyValueStoreFactory::makeKeyValueStore(type, config, &database);
+        auto status = yokan::DatabaseFactory::makeDatabase(type, config, &database);
         if(status != yokan::Status::OK) {
             YOKAN_LOG_ERROR(provider->mid,
                 "failed to open database of type %s", type.c_str());

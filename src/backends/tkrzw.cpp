@@ -4,9 +4,11 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <tkrzw_dbm_tree.h>
 #include <tkrzw_dbm_hash.h>
 #include <tkrzw_dbm_skip.h>
@@ -55,11 +57,11 @@ static Status convertStatus(const tkrzw::Status& status) {
     return Status::OK;
 }
 
-class TkrzwKeyValueStore : public KeyValueStoreInterface {
+class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_COMPLETE(__cfg__, __field__, __type__, __default__, __required__) \
@@ -262,7 +264,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
             delete db;
             return convertStatus(status);
         }
-        *kvs = new TkrzwKeyValueStore(std::move(cfg), db);
+        *kvs = new TkrzwDatabase(std::move(cfg), db);
         return Status::OK;
     }
 
@@ -288,13 +290,16 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         //            |YOKAN_MODE_NOTIFY
                     |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -515,59 +520,59 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     struct ListKeys : public tkrzw::DBM::RecordProcessor {
 
+        int32_t               m_mode;
         ssize_t&              m_index;
+        size_t                m_max;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
         bool                  m_packed;
         bool                  m_key_buf_too_small = false;
         size_t                m_key_offset = 0;
-        Filter         m_filter_checker;
+        std::shared_ptr<KeyValueFilter> m_filter;
 
-        ListKeys(ssize_t& i,
-                 int32_t mode,
-                 const UserMem& filter,
+        ListKeys(int32_t mode,
+                 ssize_t& i,
+                 size_t max,
+                 const std::shared_ptr<KeyValueFilter>& filter,
                  BasicUserMem<size_t>& ksizes,
                  UserMem& keys,
                  bool packed)
-        : m_index(i)
+        : m_mode(mode)
+        , m_index(i)
+        , m_max(max)
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_packed(packed)
-        , m_filter_checker(mode, filter.data, filter.size) {}
+        , m_filter(filter) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view value) override {
             (void)value;
 
-            if(!m_filter_checker.check(key.data(), key.size())) {
+            if(!m_filter->check(key.data(), key.size(), value.data(), value.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
 
             if(m_packed) {
-
-                if(m_key_buf_too_small) {
-                    m_ksizes[m_index] = BufTooSmall;
-                } else if(m_keys.size - m_key_offset < key.size()) {
-                    m_ksizes[m_index] = BufTooSmall;
-                    m_key_buf_too_small = true;
+                m_ksizes[m_index] = keyCopy(m_mode, (size_t)m_index == m_max-1, m_filter,
+                                            m_keys.data + m_key_offset,
+                                            m_keys.size - m_key_offset,
+                                            key.data(), key.size());
+                if(m_ksizes[m_index] == BufTooSmall) {
+                    while(m_index < (ssize_t)m_max) {
+                        m_ksizes[m_index] = BufTooSmall;
+                        m_index += 1;
+                    }
                 } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_ksizes[m_index] = key.size();
-                    m_key_offset += key.size();
+                    m_key_offset += m_ksizes[m_index];
                 }
-
             } else {
-
-                if(m_ksizes[m_index] < key.size()) {
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = BufTooSmall;
-                } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = key.size();
-                }
-
+                auto available_ksize = m_ksizes[m_index];
+                m_ksizes[m_index] = keyCopy(m_mode, (size_t)m_index == m_max-1, m_filter,
+                                            m_keys.data + m_key_offset, available_ksize,
+                                            key.data(), key.size());
+                m_key_offset += available_ksize;
             }
             return tkrzw::DBM::RecordProcessor::NOOP;
         }
@@ -579,7 +584,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     };
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         if(!m_db->IsOrdered())
             return Status::NotSupported;
@@ -601,7 +606,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keys = ListKeys{i, mode, filter, keySizes, keys, packed};
+        auto list_keys = ListKeys{mode, i, max, filter, keySizes, keys, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keys, false);
@@ -623,7 +628,9 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
     struct ListKeyVals : public tkrzw::DBM::RecordProcessor {
 
+        int32_t               m_mode;
         ssize_t&              m_index;
+        size_t                m_max;
         BasicUserMem<size_t>& m_ksizes;
         UserMem&              m_keys;
         BasicUserMem<size_t>& m_vsizes;
@@ -633,75 +640,76 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         bool                  m_val_buf_too_small = false;
         size_t                m_key_offset = 0;
         size_t                m_val_offset = 0;
-        Filter         m_filter_checker;
+        std::shared_ptr<KeyValueFilter> m_filter;
 
-        ListKeyVals(ssize_t& i,
-                    int32_t mode,
-                    const UserMem& filter,
+        ListKeyVals(int32_t mode,
+                    ssize_t& i,
+                    size_t max,
+                    const std::shared_ptr<KeyValueFilter>& filter,
                     BasicUserMem<size_t>& ksizes,
                     UserMem& keys,
                     BasicUserMem<size_t>& vsizes,
                     UserMem& vals,
                     bool packed)
-        : m_index(i)
+        : m_mode(mode)
+        , m_index(i)
+        , m_max(max)
         , m_ksizes(ksizes)
         , m_keys(keys)
         , m_vsizes(vsizes)
         , m_vals(vals)
         , m_packed(packed)
-        , m_filter_checker(mode, filter.data, filter.size) {}
+        , m_filter(filter) {}
 
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
-            if(!m_filter_checker.check(key.data(), key.size())) {
+            if(!m_filter->check(key.data(), key.size(), val.data(), val.size())) {
                 m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
 
             if(m_packed) {
-
                 if(m_key_buf_too_small) {
                     m_ksizes[m_index] = BufTooSmall;
-                } else if(m_keys.size - m_key_offset < key.size()) {
-                    m_ksizes[m_index] = BufTooSmall;
-                    m_key_buf_too_small = true;
                 } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_ksizes[m_index] = key.size();
-                    m_key_offset += key.size();
+                    m_ksizes[m_index] = keyCopy(m_mode,
+                        (size_t)m_index == m_max-1, m_filter,
+                        m_keys.data + m_key_offset,
+                        m_keys.size - m_key_offset,
+                        key.data(), key.size());
+                    if(m_ksizes[m_index] == BufTooSmall) {
+                        m_ksizes[m_index] = BufTooSmall;
+                        m_key_buf_too_small = true;
+                    } else {
+                        m_key_offset += m_ksizes[m_index];
+                    }
                 }
-
                 if(m_val_buf_too_small) {
                     m_vsizes[m_index] = BufTooSmall;
-                } else if(m_vals.size - m_val_offset < val.size()) {
-                    m_vsizes[m_index] = BufTooSmall;
-                    m_val_buf_too_small = true;
                 } else {
-                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
-                    m_vsizes[m_index] = val.size();
-                    m_val_offset += val.size();
+                    m_vsizes[m_index] = m_filter->valCopy(
+                        m_vals.data + m_val_offset,
+                        m_vals.size - m_val_offset,
+                        val.data(), val.size());
+                    if(m_vsizes[m_index] == BufTooSmall) {
+                        m_vsizes[m_index] = BufTooSmall;
+                        m_val_buf_too_small = true;
+                    } else {
+                        m_val_offset += m_vsizes[m_index];
+                    }
                 }
-
             } else {
-
-                if(m_ksizes[m_index] < key.size()) {
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = BufTooSmall;
-                } else {
-                    std::memcpy(m_keys.data + m_key_offset, key.data(), key.size());
-                    m_key_offset += m_ksizes[m_index];
-                    m_ksizes[m_index] = key.size();
-                }
-
-                if(m_vsizes[m_index] < val.size()) {
-                    m_val_offset += m_vsizes[m_index];
-                    m_vsizes[m_index] = BufTooSmall;
-                } else {
-                    std::memcpy(m_vals.data + m_val_offset, val.data(), val.size());
-                    m_val_offset += m_vsizes[m_index];
-                    m_vsizes[m_index] = val.size();
-                }
-
+                auto available_ksize = m_ksizes[m_index];
+                auto available_vsize = m_vsizes[m_index];
+                m_ksizes[m_index] = keyCopy(m_mode,
+                        (size_t)m_index == m_max-1, m_filter,
+                        m_keys.data + m_key_offset, available_ksize,
+                        key.data(), key.size());
+                m_vsizes[m_index] = m_filter->valCopy(
+                    m_vals.data + m_val_offset, available_vsize,
+                     val.data(), val.size());
+                m_key_offset += available_ksize;
+                m_val_offset += available_vsize;
             }
             return tkrzw::DBM::RecordProcessor::NOOP;
         }
@@ -715,7 +723,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -740,7 +748,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         const auto max = keySizes.size;
         ssize_t i = 0;
 
-        auto list_keyvals = ListKeyVals{i, mode, filter, keySizes, keys, valSizes, vals, packed};
+        auto list_keyvals = ListKeyVals{mode, i, max, filter, keySizes, keys, valSizes, vals, packed};
 
         for(; (i < (ssize_t)max); i++) {
             status = iterator->Process(&list_keyvals, false);
@@ -762,7 +770,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~TkrzwKeyValueStore() {
+    ~TkrzwDatabase() {
         if(m_db) {
             m_db->Close();
             delete m_db;
@@ -774,7 +782,7 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
     json        m_config;
     tkrzw::DBM* m_db = nullptr;
 
-    TkrzwKeyValueStore(json config, tkrzw::DBM* db)
+    TkrzwDatabase(json config, tkrzw::DBM* db)
     : m_config(std::move(config))
     , m_db(db)
     {}
@@ -782,4 +790,4 @@ class TkrzwKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(tkrzw, yokan::TkrzwKeyValueStore);
+YOKAN_REGISTER_BACKEND(tkrzw, yokan::TkrzwDatabase);

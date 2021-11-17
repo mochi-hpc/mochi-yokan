@@ -15,7 +15,7 @@ foreach (test-source ${test-sources})
         yokan-admin
         yokan-client
         nlohmann_json)
-    add_test (NAME ${test-target} COMMAND timeout 200 ./${test-target})
+    add_test (NAME ${test-target} COMMAND timeout 200 ${CMAKE_CURRENT_SOURCE_DIR}/run-test.sh ./${test-target})
 endforeach ()
 
 if (ENABLE_PYTHON)
@@ -26,3 +26,7 @@ if (ENABLE_PYTHON)
         add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE} ${test-python-source})
     endforeach ()
 endif ()
+
+add_library (custom-filters SHARED
+             ${CMAKE_CURRENT_SOURCE_DIR}/extra/custom-filters.cpp)
+target_link_libraries (custom-filters yokan-server)

@@ -4,9 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
-#include "../common/locks.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <unordered_set>
@@ -24,7 +24,7 @@ namespace yokan {
 using json = nlohmann::json;
 
 template<typename KeyType>
-struct UnorderedSetKeyValueStoreHash {
+struct UnorderedSetDatabaseHash {
 
 #if __cplusplus >= 201703L
     using sv = std::string_view;
@@ -38,11 +38,11 @@ struct UnorderedSetKeyValueStoreHash {
     }
 };
 
-class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
+class UnorderedSetDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, node_alloc;
@@ -104,7 +104,7 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedSetKeyValueStore(std::move(cfg), node_alloc, key_alloc);
+        *kvs = new UnorderedSetDatabase(std::move(cfg), node_alloc, key_alloc);
         return Status::OK;
     }
 
@@ -143,6 +143,9 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -272,7 +275,7 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~UnorderedSetKeyValueStore() {
+    ~UnorderedSetDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         delete m_db;
@@ -286,10 +289,10 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
                                        Allocator<char>>;
     using equal_type = std::equal_to<key_type>;
     using allocator = Allocator<key_type>;
-    using hash_type = UnorderedSetKeyValueStoreHash<key_type>;
+    using hash_type = UnorderedSetDatabaseHash<key_type>;
     using unordered_set_type = std::unordered_set<key_type, hash_type, equal_type, allocator>;
 
-    UnorderedSetKeyValueStore(json cfg,
+    UnorderedSetDatabase(json cfg,
                      const yk_allocator_t& node_allocator,
                      const yk_allocator_t& key_allocator)
     : m_config(std::move(cfg))
@@ -314,4 +317,4 @@ class UnorderedSetKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(unordered_set, yokan::UnorderedSetKeyValueStore);
+YOKAN_REGISTER_BACKEND(unordered_set, yokan::UnorderedSetDatabase);

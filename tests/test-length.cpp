@@ -10,8 +10,8 @@
 
 static void* test_length_context_setup(const MunitParameter params[], void* user_data)
 {
-    auto context = static_cast<test_context*>(
-        test_common_context_setup(params, user_data));
+    auto context = static_cast<kv_test_context*>(
+        kv_test_common_context_setup(params, user_data));
 
     auto count = context->reference.size();
     std::vector<const void*> kptrs;
@@ -48,7 +48,7 @@ static MunitResult test_length(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -73,7 +73,7 @@ static MunitResult test_length_key_not_found(const MunitParameter params[], void
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -96,7 +96,7 @@ static MunitResult test_length_empty_keys(const MunitParameter params[], void* d
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -121,7 +121,7 @@ static MunitResult test_length_multi(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -174,7 +174,7 @@ static MunitResult test_length_multi_empty_key(const MunitParameter params[], vo
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -229,7 +229,7 @@ static MunitResult test_length_multi_key_not_found(const MunitParameter params[]
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -287,7 +287,7 @@ static MunitResult test_length_packed(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -333,7 +333,7 @@ static MunitResult test_length_packed_empty_key(const MunitParameter params[], v
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -396,7 +396,7 @@ static MunitResult test_length_packed_key_not_found(const MunitParameter params[
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
@@ -447,7 +447,7 @@ static MunitResult test_length_bulk(const MunitParameter params[], void* data)
 {
     (void)params;
     (void)data;
-    struct test_context* context = (struct test_context*)data;
+    struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
     hg_return_t hret;
@@ -544,31 +544,31 @@ static MunitParameterEnum test_params[] = {
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
-  { (char*)"num-keyvals", NULL },
+  { (char*)"num-items", NULL },
   { NULL, NULL }
 };
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/length", test_length,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length/empty-keys", test_length_empty_keys,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length/key-not-found", test_length_key_not_found,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_multi", test_length_multi,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_multi/empty-key", test_length_multi_empty_key,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_multi/key-not-found", test_length_multi_key_not_found,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_packed", test_length_packed,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_packed/empty-key", test_length_packed_empty_key,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_packed/key-not-found", test_length_packed_key_not_found,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/length_bulk", test_length_bulk,
-        test_length_context_setup, test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_length_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

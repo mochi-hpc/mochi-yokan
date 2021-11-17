@@ -4,8 +4,10 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
-#include "../common/locks.hpp"
+#include "yokan/doc-mixin.hpp"
+#include "yokan/util/locks.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <unqlite.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
@@ -18,7 +20,7 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-class UnQLiteKeyValueStore : public KeyValueStoreInterface {
+class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     static Status convertStatus(int ret) {
         switch(ret) {
@@ -51,7 +53,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     public:
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_AND_ADD_MISSING(__json__, __field__, __type__, __default__, __required__) \
@@ -121,7 +123,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             if(ret != UNQLITE_OK) return convertStatus(ret);
         }
 
-        *kvs = new UnQLiteKeyValueStore(std::move(cfg), use_lock, db);
+        *kvs = new UnQLiteDatabase(std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
@@ -144,15 +146,19 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
                     |YOKAN_MODE_APPEND
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
+        //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
-        //            |YOKAN_MODE_SUFFIX
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -398,21 +404,22 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
     }
 
     struct check_filter_args {
-        Filter filter_checker;
-        bool          filter_matches = false;
+        std::shared_ptr<KeyValueFilter> filter;
+        bool        filter_matches = false;
+        std::string key = "";
     };
 
-    static int check_filter_callback(const void* key, unsigned int ksize, void* uargs) {
+    static int check_filter_callback(const void* val, unsigned int vsize, void* uargs) {
         auto args = static_cast<check_filter_args*>(uargs);
         args->filter_matches =
-            args->filter_checker.check(key, ksize);
+            args->filter->check(args->key.data(), args->key.size(), val, vsize);
         return UNQLITE_OK;
     }
 
     public:
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         ScopedReadLock lock(m_lock);
@@ -454,7 +461,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             bool                  packed;
             UserMem&              keys;
             BasicUserMem<size_t>& keySizes;
-            const UserMem&        filter;
+            const std::shared_ptr<KeyValueFilter>& filter;
             size_t                key_offset = 0;
             size_t                i = 0;
             bool                  key_buf_too_small = false;
@@ -468,15 +475,15 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->filter.size, ctx->is_last);
+                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                key_umem, key_usize, key, ksize);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->filter.size, ctx->is_last);
+                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                    key_umem, key_usize, key, ksize);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -491,15 +498,18 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         auto max = keySizes.size;
         auto ctx = read_key_args{ mode, packed, keys, keySizes, filter };
 
-        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
+        auto filter_args = check_filter_args{ filter };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
-                if(!filter_args.filter_matches)
-                    continue;
-            }
+            unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                    auto* key = static_cast<std::string*>(args);
+                    key->assign((const char*)k, ksize);
+                    return UNQLITE_OK;
+            }, static_cast<void*>(&filter_args.key));
+            unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(!filter_args.filter_matches)
+                continue;
 
             if(mode & YOKAN_MODE_KEEP_LAST) {
                 if(ctx.i + 1 == max) {
@@ -528,7 +538,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     virtual Status listKeyValues(int32_t mode, bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -571,7 +581,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             BasicUserMem<size_t>& keySizes;
             UserMem&              vals;
             BasicUserMem<size_t>& valSizes;
-            const UserMem&        filter;
+            const std::shared_ptr<KeyValueFilter>& filter;
             size_t                key_offset = 0;
             size_t                val_offset = 0;
             size_t                i = 0;
@@ -587,15 +597,15 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             auto key_umem = ctx->keys.data + ctx->key_offset;
 
             if(!ctx->packed) {
-                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                               ksize, ctx->filter.size, ctx->is_last);
+                ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                key_umem, key_usize, key, ksize);
                 ctx->key_offset += key_usize;
             } else {
                 if(ctx->key_buf_too_small) {
                     ctx->keySizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, key_umem, key_usize, key,
-                                                    ksize, ctx->filter.size, ctx->is_last);
+                    ctx->keySizes[ctx->i] = keyCopy(ctx->mode, ctx->is_last, ctx->filter,
+                                                    key_umem, key_usize, key, ksize);
                     if(ctx->keySizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->key_buf_too_small = true;
                     } else {
@@ -614,13 +624,13 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
             auto val_umem = ctx->vals.data + ctx->val_offset;
 
             if(!ctx->packed) {
-                ctx->valSizes[ctx->i] = valCopy(ctx->mode, val_umem, val_usize, val, vsize);
+                ctx->valSizes[ctx->i] = ctx->filter->valCopy(val_umem, val_usize, val, vsize);
                 ctx->val_offset += val_usize;
             } else {
                 if(ctx->val_buf_too_small) {
                     ctx->valSizes[ctx->i] = YOKAN_SIZE_TOO_SMALL;
                 } else {
-                    ctx->valSizes[ctx->i] = valCopy(ctx->mode, val_umem, val_usize, val, vsize);
+                    ctx->valSizes[ctx->i] = ctx->filter->valCopy(val_umem, val_usize, val, vsize);
                     if(ctx->valSizes[ctx->i] == YOKAN_SIZE_TOO_SMALL) {
                         ctx->val_buf_too_small = true;
                     } else {
@@ -635,15 +645,18 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         auto max = keySizes.size;
         auto ctx = read_keyval_args{ mode, packed, keys, keySizes, vals, valSizes, filter };
 
-        auto filter_args = check_filter_args{ Filter{mode, filter.data, filter.size} };
+        auto filter_args = check_filter_args{ filter };
 
         for(; unqlite_kv_cursor_valid_entry(cursor) && ctx.i < max; unqlite_kv_cursor_next_entry(cursor)) {
 
-            if(filter.size != 0) {
-                unqlite_kv_cursor_key_callback(cursor, check_filter_callback, &filter_args);
-                if(!filter_args.filter_matches)
-                    continue;
-            }
+            unqlite_kv_cursor_key_callback(cursor, [](const void* k, unsigned int ksize, void *args) {
+                    auto* key = static_cast<std::string*>(args);
+                    key->assign((const char*)k, ksize);
+                    return UNQLITE_OK;
+            }, static_cast<void*>(&filter_args.key));
+            unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(!filter_args.filter_matches)
+                continue;
 
             if(mode & YOKAN_MODE_KEEP_LAST) {
                 if(ctx.i + 1 == max) {
@@ -672,7 +685,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~UnQLiteKeyValueStore() {
+    ~UnQLiteDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
         if(m_db)
@@ -681,7 +694,7 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    UnQLiteKeyValueStore(json cfg, bool use_lock, unqlite* db)
+    UnQLiteDatabase(json cfg, bool use_lock, unqlite* db)
     : m_db(db)
     , m_config(std::move(cfg))
     {
@@ -696,4 +709,4 @@ class UnQLiteKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(unqlite, yokan::UnQLiteKeyValueStore);
+YOKAN_REGISTER_BACKEND(unqlite, yokan::UnQLiteDatabase);

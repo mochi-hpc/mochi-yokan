@@ -12,29 +12,30 @@
 #include "available-backends.h"
 #include "munit/munit.h"
 #include <unordered_map>
+#include <vector>
 #include <string>
 
 static size_t g_min_key_size = 8;
 static size_t g_max_key_size = 32;
 static size_t g_min_val_size = 1;
 static size_t g_max_val_size = 1024;
-static size_t g_num_keyvals  = 64;
+static size_t g_num_items  = 64;
 
-struct test_context {
+struct kv_test_context {
     margo_instance_id                           mid;
     hg_addr_t                                   addr;
-    yk_admin_t                                 admin;
-    yk_client_t                                client;
-    yk_provider_t                              provider;
-    yk_database_id_t                           id;
-    yk_database_handle_t                       dbh;
+    yk_admin_t                                  admin;
+    yk_client_t                                 client;
+    yk_provider_t                               provider;
+    yk_database_id_t                            id;
+    yk_database_handle_t                        dbh;
     std::unordered_map<std::string,std::string> reference;
     bool                                        empty_values = false;
 };
 
 static const uint16_t provider_id = 42;
 
-static void* test_common_context_setup(const MunitParameter params[], void* user_data)
+static void* kv_test_common_context_setup(const MunitParameter params[], void* user_data)
 {
     (void) params;
     (void) user_data;
@@ -52,14 +53,14 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     const char* max_key_size = munit_parameters_get(params, "max-key-size");
     const char* min_val_size = munit_parameters_get(params, "min-val-size");
     const char* max_val_size = munit_parameters_get(params, "max-val-size");
-    const char* num_keyvals  = munit_parameters_get(params, "num-keyvals");
+    const char* num_keyvals  = munit_parameters_get(params, "num-items");
     const char* backend_type = munit_parameters_get(params, "backend");
     const char* backend_config = find_backend_config_for(backend_type);
     if(min_key_size) g_min_key_size = std::atol(min_key_size);
     if(max_key_size) g_max_key_size = std::atol(max_key_size);
     if(min_val_size) g_min_val_size = std::atol(min_key_size);
     if(max_val_size) g_max_val_size = std::atol(max_key_size);
-    if(num_keyvals)  g_num_keyvals  = std::atol(num_keyvals);
+    if(num_keyvals)  g_num_items  = std::atol(num_keyvals);
     if(strcmp(backend_type, "set") == 0
     || strcmp(backend_type, "unordered_set") == 0) {
         g_max_val_size = 0;
@@ -99,7 +100,7 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     ret = yk_database_handle_create(client,
             addr, provider_id, id, &dbh);
     // create test context
-    struct test_context* context = new test_context;
+    struct kv_test_context* context = new kv_test_context;
     munit_assert_not_null(context);
     context->mid      = mid;
     context->addr     = addr;
@@ -112,7 +113,7 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
         context->empty_values = true;
     }
     // create random key/value pairs with an empty value every 8 values
-    for(unsigned i = 0; i < g_num_keyvals; i++) {
+    for(unsigned i = 0; i < g_num_items; i++) {
         std::string key;
         std::string val;
         int ksize = munit_rand_int_range(g_min_key_size, g_max_key_size);
@@ -140,10 +141,10 @@ static void* test_common_context_setup(const MunitParameter params[], void* user
     return context;
 }
 
-static void test_common_context_tear_down(void* fixture)
+static void kv_test_common_context_tear_down(void* fixture)
 {
     yk_return_t ret;
-    struct test_context* context = (struct test_context*)fixture;
+    struct kv_test_context* context = (struct kv_test_context*)fixture;
     // destroy the database
     ret = yk_destroy_database(context->admin,
             context->addr, provider_id, NULL, context->id);

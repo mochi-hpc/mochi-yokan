@@ -4,7 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <leveldb/db.h>
@@ -30,7 +32,7 @@ namespace fs = std::experimental::filesystem;
 
 using json = nlohmann::json;
 
-class LevelDBKeyValueStore : public KeyValueStoreInterface {
+class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
@@ -44,7 +46,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -102,7 +104,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBKeyValueStore(db, std::move(cfg));
+        *kvs = new LevelDBDatabase(db, std::move(cfg));
 
         return Status::OK;
     }
@@ -129,13 +131,16 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -320,17 +325,26 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
+        auto max = keySizes.size;
 
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
             iterator->Seek(fromKeySlice);
+            if(!iterator->Valid()) {
+                keys.size = 0;
+                for(unsigned i=0; i < max; i++) {
+                    keySizes[i] = YOKAN_NO_MORE_KEYS;
+                }
+                delete iterator;
+                return Status::OK;
+            }
             if(!inclusive) {
                 if(iterator->key().compare(fromKeySlice) == 0) {
                     iterator->Next();
@@ -338,38 +352,36 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t offset = 0;
-        bool buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key_filter.check(key.data(), key.size())) {
+            auto val = iterator->value();
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
             size_t usize = keySizes[i];
             auto umem = static_cast<char*>(keys.data) + offset;
             if(packed) {
-                if(keys.size - offset < key.size() || buf_too_small) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    buf_too_small = true;
+                auto dst_max_size = keys.size - offset;
+                keySizes[i] = keyCopy(mode, i == max-1, filter, umem,
+                                      dst_max_size, key.data(), key.size());
+                if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += key.size();
+                    offset += keySizes[i];
                 }
             } else {
-                if(usize < key.size()) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    offset += usize;
-                } else {
-                    std::memcpy(umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    offset += usize;
-                }
+                auto dst_max_size = usize;
+                keySizes[i] = keyCopy(mode, i == max-1, filter, umem,
+                                      dst_max_size, key.data(), key.size());
+                offset += usize;
             }
             i += 1;
             iterator->Next();
@@ -385,7 +397,7 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -394,11 +406,23 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
 
+        auto max = keySizes.size;
+
         auto iterator = m_db->NewIterator(m_read_options);
         if(fromKey.size == 0) {
             iterator->SeekToFirst();
         } else {
             iterator->Seek(fromKeySlice);
+            if(!iterator->Valid()) {
+                keys.size = 0;
+                vals.size = 0;
+                for(unsigned i=0; i < max; i++) {
+                    keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    valSizes[i] = YOKAN_NO_MORE_KEYS;
+                }
+                delete iterator;
+                return Status::OK;
+            }
             if(!inclusive) {
                 if(iterator->key().compare(fromKeySlice) == 0) {
                     iterator->Next();
@@ -406,59 +430,63 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(iterator->Valid() && i < max) {
             auto key = iterator->key();
-            if(!key_filter.check(key.data(), key.size())) {
+            auto val = iterator->value();
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
                 iterator->Next();
                 continue;
             }
-            auto val = iterator->value();
             size_t key_usize = keySizes[i];
             size_t val_usize = valSizes[i];
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
-                if(keys.size - key_offset < key.size() || key_buf_too_small) {
+                if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
                 } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key.size();
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, keys.size - key_offset,
+                                          key.data(), key.size());
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        key_buf_too_small = true;
+                    } else {
+                        key_offset += keySizes[i];
+                    }
                 }
-                if(vals.size - val_offset < val.size() || val_buf_too_small) {
+                if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val.size();
+                    valSizes[i] = filter->valCopy(val_umem, vals.size - val_offset,
+                                                  val.data(), val.size());
+                    if(valSizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        val_buf_too_small = true;
+                    } else {
+                        val_offset += valSizes[i];
+                    }
+                }
+                if(val_buf_too_small && key_buf_too_small) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 }
             } else {
-                if(key_usize < key.size()) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.data(), key.size());
-                    keySizes[i] = key.size();
-                    key_offset += key_usize;
-                }
-                if(val_usize < val.size()) {
-                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_offset += val_usize;
-                } else {
-                    std::memcpy(val_umem, val.data(), val.size());
-                    valSizes[i] = val.size();
-                    val_offset += val_usize;
-                }
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize,
+                                      key.data(), key.size());
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.data(), val.size());
+                key_offset += key_usize;
+                val_offset += val_usize;
             }
             i += 1;
             iterator->Next();
@@ -473,13 +501,13 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~LevelDBKeyValueStore() {
+    ~LevelDBDatabase() {
         delete m_db;
     }
 
     private:
 
-    LevelDBKeyValueStore(leveldb::DB* db, json&& cfg)
+    LevelDBDatabase(leveldb::DB* db, json&& cfg)
     : m_db(db)
     , m_config(std::move(cfg)) {
         m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
@@ -497,4 +525,4 @@ class LevelDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(leveldb, yokan::LevelDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(leveldb, yokan::LevelDBDatabase);

@@ -71,14 +71,20 @@ void yk_list_keys_ult(hg_handle_t h)
     }
 
     // build buffer wrappers
-    auto ptr      = buffer->data;
-    auto from_key = yokan::UserMem{ ptr, in.from_ksize };
-    auto filter   = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
-    auto ksizes   = yokan::BasicUserMem<size_t>{
+    auto ptr         = buffer->data;
+    auto from_key    = yokan::UserMem{ ptr, in.from_ksize };
+    auto filter_umem = yokan::UserMem{ ptr + in.from_ksize, in.filter_size };
+    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
+    auto ksizes      = yokan::BasicUserMem<size_t>{
         reinterpret_cast<size_t*>(ptr + ksizes_offset),
         in.count
     };
     auto keys = yokan::UserMem{ ptr + keys_offset, in.keys_buf_size };
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
 
     out.ret = static_cast<yk_return_t>(
             database->listKeys(in.mode, in.packed, from_key, filter, keys, ksizes));

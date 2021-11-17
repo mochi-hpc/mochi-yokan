@@ -4,7 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "yokan/backend.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/modes.hpp"
+#include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <lmdb.h>
@@ -27,7 +29,7 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
-class LMDBKeyValueStore : public KeyValueStoreInterface {
+class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
@@ -65,7 +67,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, KeyValueStoreInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -125,7 +127,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBKeyValueStore(std::move(cfg), env, db);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db);
 
         return Status::OK;
     }
@@ -152,13 +154,16 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         //            |YOKAN_MODE_NOTIFY
         //            |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
-        //            |YOKAN_MODE_NO_PREFIX
-        //            |YOKAN_MODE_IGNORE_KEYS
-        //            |YOKAN_MODE_KEEP_LAST
+                    |YOKAN_MODE_NO_PREFIX
+                    |YOKAN_MODE_IGNORE_KEYS
+                    |YOKAN_MODE_KEEP_LAST
                     |YOKAN_MODE_SUFFIX
 #ifdef YOKAN_HAS_LUA
                     |YOKAN_MODE_LUA_FILTER
 #endif
+                    |YOKAN_MODE_IGNORE_DOCS
+                    |YOKAN_MODE_FILTER_VALUE
+                    |YOKAN_MODE_LIB_FILTER
                     )
             );
     }
@@ -382,7 +387,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     }
 
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
-                            const UserMem& filter,
+                            const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
@@ -397,12 +402,22 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             return convertStatus(ret);
         }
 
+        auto max = keySizes.size;
+
         if(fromKey.size == 0) {
             MDB_val k, v;
             ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
         } else {
             MDB_val k{ fromKey.size, fromKey.data };
@@ -410,7 +425,15 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
             if(!inclusive) {
                 if(k.mv_size == fromKey.size
@@ -424,25 +447,22 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
-        bool key_buf_too_small = false;
-
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(i < max) {
             MDB_val key, val;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
-            if(ret == MDB_NOTFOUND)
+            if(ret == MDB_NOTFOUND) {
                 break;
+            }
             if(ret != MDB_SUCCESS) {
                 mdb_cursor_close(cursor);
                 mdb_txn_abort(txn);
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size)) {
+            if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -457,23 +477,22 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             size_t key_usize = keySizes[i];
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             if(packed) {
-                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
+                auto dst_max_size = keys.size - key_offset;
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                    key_umem, dst_max_size, key.mv_data, key.mv_size);
+                if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key.mv_size;
+                    key_offset += keySizes[i];
                 }
             } else {
-                if(key_usize < key.mv_size) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key_usize;
-                }
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize, key.mv_data, key.mv_size);
+                key_offset += key_usize;
             }
             i += 1;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
@@ -499,7 +518,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
     virtual Status listKeyValues(int32_t mode,
                                  bool packed,
                                  const UserMem& fromKey,
-                                 const UserMem& filter,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
                                  UserMem& keys,
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
@@ -516,13 +535,24 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             mdb_txn_abort(txn);
             return convertStatus(ret);
         }
+        auto max = keySizes.size;
 
         if(fromKey.size == 0) {
             MDB_val k, v;
             ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    vals.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                        valSizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
         } else {
             MDB_val k{ fromKey.size, fromKey.data };
@@ -530,7 +560,17 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
             if(ret != MDB_SUCCESS) {
                 mdb_txn_abort(txn);
-                return convertStatus(ret);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    keys.size = 0;
+                    vals.size = 0;
+                    for(unsigned i=0; i < max; i++) {
+                        keySizes[i] = YOKAN_NO_MORE_KEYS;
+                        valSizes[i] = YOKAN_NO_MORE_KEYS;
+                    }
+                    return Status::OK;
+                }
+                return status;
             }
             if(!inclusive) {
                 if(k.mv_size == fromKey.size
@@ -544,14 +584,11 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             }
         }
 
-        auto max = keySizes.size;
         size_t i = 0;
         size_t key_offset = 0;
         size_t val_offset = 0;
         bool key_buf_too_small = false;
         bool val_buf_too_small = false;
-
-        auto key_filter = Filter{ mode, filter.data, filter.size };
 
         while(i < max) {
             MDB_val key, val;
@@ -564,7 +601,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
                 return convertStatus(ret);
             }
 
-            if(!key_filter.check(key.mv_data, key.mv_size)) {
+            if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -581,39 +618,45 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;
             if(packed) {
-                if(keys.size - key_offset < key.mv_size || key_buf_too_small) {
+                if(key_buf_too_small) {
                     keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_buf_too_small = true;
                 } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key.mv_size;
+                    keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                          key_umem, keys.size - key_offset,
+                                          key.mv_data, key.mv_size);
+                    if(keySizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        key_buf_too_small = true;
+                    } else {
+                        key_offset += keySizes[i];
+                    }
                 }
-                if(vals.size - val_offset < val.mv_size || val_buf_too_small) {
+                if(val_buf_too_small) {
                     valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_buf_too_small = true;
                 } else {
-                    std::memcpy(val_umem, val.mv_data, val.mv_size);
-                    valSizes[i] = val.mv_size;
-                    val_offset += val.mv_size;
+                    valSizes[i] = filter->valCopy(val_umem, vals.size - val_offset,
+                                                  val.mv_data, val.mv_size);
+                    if(valSizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        val_buf_too_small = true;
+                    } else {
+                        val_offset += valSizes[i];
+                    }
+                }
+                if(val_buf_too_small && key_buf_too_small) {
+                    while(i < max) {
+                        keySizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        valSizes[i] = YOKAN_SIZE_TOO_SMALL;
+                        i += 1;
+                    }
+                    break;
                 }
             } else {
-                if(key_usize < key.mv_size) {
-                    keySizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    key_offset += key_usize;
-                } else {
-                    std::memcpy(key_umem, key.mv_data, key.mv_size);
-                    keySizes[i] = key.mv_size;
-                    key_offset += key_usize;
-                }
-                if(val_usize < val.mv_size) {
-                    valSizes[i] = YOKAN_SIZE_TOO_SMALL;
-                    val_offset += val_usize;
-                } else {
-                    std::memcpy(val_umem, val.mv_data, val.mv_size);
-                    valSizes[i] = val.mv_size;
-                    val_offset += val_usize;
-                }
+                keySizes[i] = keyCopy(mode, i == max-1, filter,
+                                      key_umem, key_usize,
+                                      key.mv_data, key.mv_size);
+                valSizes[i] = filter->valCopy(val_umem, val_usize,
+                                              val.mv_data, val.mv_size);
+                key_offset += key_usize;
+                val_offset += val_usize;
             }
             i += 1;
             ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
@@ -638,7 +681,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
         return Status::OK;
     }
 
-    ~LMDBKeyValueStore() {
+    ~LMDBDatabase() {
         if(m_env) {
             mdb_dbi_close(m_env, m_db);
             mdb_env_close(m_env);
@@ -648,7 +691,7 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
     private:
 
-    LMDBKeyValueStore(json&& cfg, MDB_env* env, MDB_dbi db)
+    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
     : m_config(std::move(cfg))
     , m_env(env)
     , m_db(db) {}
@@ -660,4 +703,4 @@ class LMDBKeyValueStore : public KeyValueStoreInterface {
 
 }
 
-YOKAN_REGISTER_BACKEND(lmdb, yokan::LMDBKeyValueStore);
+YOKAN_REGISTER_BACKEND(lmdb, yokan::LMDBDatabase);
