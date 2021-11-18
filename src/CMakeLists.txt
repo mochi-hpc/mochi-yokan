@@ -235,8 +235,7 @@ install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-config.cmake"
                "${CMAKE_CURRENT_BINARY_DIR}/yokan-config-version.cmake"
          DESTINATION ${yokan-pkg} )
 install (DIRECTORY ../include/yokan
-         DESTINATION include
-         FILES_MATCHING PATTERN "*.h")
+         DESTINATION include)
 install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-server.pc"
                "${CMAKE_CURRENT_BINARY_DIR}/yokan-client.pc"
                "${CMAKE_CURRENT_BINARY_DIR}/yokan-admin.pc"
