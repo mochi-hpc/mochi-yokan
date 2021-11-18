@@ -11,6 +11,7 @@
 #include "../../common/linker.hpp"
 #include "../../common/logging.h"
 #include "config.h"
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #ifdef YOKAN_HAS_LUA
