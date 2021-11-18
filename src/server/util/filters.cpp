@@ -269,7 +269,7 @@ std::shared_ptr<DocFilter> FilterFactory::makeDocFilter(
         return std::make_shared<LuaDocFilter>(mode, filter_data);
 #else
         YOKAN_LOG_ERROR(mid, "Yokan wasn't compiled with Lua support!");
-        return std::make_shared<FalseDocFilter>();
+        return nullptr;
 #endif
     } else if(mode & YOKAN_MODE_LIB_FILTER) {
         const char* c1 = std::find(filter_data.data, filter_data.data + filter_data.size, ':');
