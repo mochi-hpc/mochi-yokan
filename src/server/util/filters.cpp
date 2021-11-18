@@ -12,6 +12,7 @@
 #include "../../common/logging.h"
 #include "config.h"
 #include <algorithm>
+#include <memory>
 #include <cstring>
 #include <iostream>
 #ifdef YOKAN_HAS_LUA
