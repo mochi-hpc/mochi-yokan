@@ -6,6 +6,7 @@
 #include "yokan/backend.hpp"
 #include "yokan/watcher.hpp"
 #include "yokan/util/locks.hpp"
+#include "yokan/doc-mixin.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
@@ -20,7 +21,7 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-class NullDatabase : public DatabaseInterface {
+class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
