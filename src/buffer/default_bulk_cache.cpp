@@ -57,7 +57,8 @@ yk_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     if(hret != HG_SUCCESS) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
-            "margo_bulk_create failed with error code %d", hret);
+            "margo_bulk_create failed with error code %d when creating bulk handle for %lu bytes", hret, size);
+        delete buffer->data;
         delete buffer;
         return nullptr;
         // LCOV_EXCL_STOP
@@ -69,6 +70,7 @@ void default_bulk_cache_release(void* c, yk_buffer_t buffer) {
     auto cache = static_cast<default_bulk_cache*>(c);
     margo_bulk_free(buffer->bulk);
     delete[] buffer->data;
+    delete buffer;
     cache->num_allocated -= 1;
 }
 
