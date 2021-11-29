@@ -12,6 +12,60 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+extern "C" yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
+                                           const char* collection,
+                                           int32_t mode,
+                                           size_t count,
+                                           const void* records,
+                                           const size_t* rsizes,
+                                           yk_id_t* ids) {
+
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    else if(rsizes == nullptr)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    doc_store_direct_in_t in;
+    doc_store_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id       = dbh->database_id;
+    in.mode        = mode;
+    in.coll_name   = (char*)collection;
+    in.sizes.count = count;
+    in.sizes.sizes = (uint64_t*)rsizes;
+    in.docs.size   = std::accumulate(rsizes, rsizes+count, 0);
+    in.docs.data   = (char*)records;
+
+    if(records == NULL && in.docs.size != 0)
+        return YOKAN_ERR_INVALID_ARGS;
+
+
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_store_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    ret = static_cast<yk_return_t>(out.ret);
+    if(ret == YOKAN_SUCCESS && ids) {
+        for(size_t i=0; i < count; i++) {
+            ids[i] = out.ids.ids[i];
+        }
+    }
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
+
 extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
                                          const char* name,
                                          int32_t mode,
@@ -147,5 +201,5 @@ extern "C" yk_return_t yk_doc_store(yk_database_handle_t dbh,
                                     const void* record,
                                     size_t size,
                                     yk_id_t* id) {
-    return yk_doc_store_packed(dbh, collection, mode, 1, record, &size, id);
+    return yk_doc_store_direct(dbh, collection, mode, 1, record, &size, id);
 }

@@ -17,17 +17,34 @@
 
 // id_list is used for both arrays of ids and
 // arrays of sizes (ids are uint64_t anyway).
-typedef struct id_list {
+typedef struct uint64_list {
     size_t count;
     union {
-        yk_id_t* ids;
+        yk_id_t*  ids;
         uint64_t* sizes;
     };
-} id_list;
+} uint64_list;
+
+// The raw_data structure is used to send and receive raw data.
+// When de-serializing into a raw_data structure, hg_proc_raw_data
+// will look whether the data pointer is NULL. If it is, it will
+// allocate the memory to store the raw data. If it is not, it will
+// try to copy the data into the existing memory, returning HG_NOMEM
+// if the size is too small.
+//
+// When freeing the structure with margo_free_input or margo_free_output,
+// free will be called on the data pointer. It is therefore important
+// to set it to NULL if the buffer was provided by the caller and should
+// not be freed.
+typedef struct raw_data {
+    size_t size;
+    char*  data;
+} raw_data;
 
 static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
 static inline hg_return_t hg_proc_yk_id_t(hg_proc_t proc, yk_id_t *id);
-static inline hg_return_t hg_proc_id_list(hg_proc_t proc, id_list* list);
+static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* list);
+static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* raw);
 
 /* Admin RPC types */
 
@@ -242,7 +259,7 @@ MERCURY_GEN_PROC(doc_erase_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
-        ((id_list)(ids)))
+        ((uint64_list)(ids)))
 MERCURY_GEN_PROC(doc_erase_out_t,
         ((int32_t)(ret)))
 
@@ -258,14 +275,25 @@ MERCURY_GEN_PROC(doc_store_in_t,
         ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(doc_store_out_t,
         ((int32_t)(ret))\
-        ((id_list)(ids)))
+        ((uint64_list)(ids)))
+
+/* doc_store (direct) */
+MERCURY_GEN_PROC(doc_store_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((uint64_list)(sizes))\
+        ((raw_data)(docs)))
+MERCURY_GEN_PROC(doc_store_direct_out_t,
+        ((int32_t)(ret))\
+        ((uint64_list)(ids)))
 
 /* doc_update */
 MERCURY_GEN_PROC(doc_update_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
-        ((id_list)(ids))\
+        ((uint64_list)(ids))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
@@ -278,7 +306,7 @@ MERCURY_GEN_PROC(doc_load_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
-        ((id_list)(ids))\
+        ((uint64_list)(ids))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
@@ -292,9 +320,9 @@ MERCURY_GEN_PROC(doc_length_in_t,
         ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
-        ((id_list)(ids)))
+        ((uint64_list)(ids)))
 MERCURY_GEN_PROC(doc_length_out_t,
-        ((id_list)(sizes))\
+        ((uint64_list)(sizes))\
         ((int32_t)(ret)))
 
 /* doc_list */
@@ -328,7 +356,7 @@ static inline hg_return_t hg_proc_yk_database_id_t(
     return hg_proc_memcpy(proc, id, sizeof(*id));
 }
 
-static inline hg_return_t hg_proc_id_list(hg_proc_t proc, id_list* in)
+static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)
 {
     hg_return_t ret;
     ret = hg_proc_hg_size_t(proc, &in->count);
@@ -350,6 +378,40 @@ static inline hg_return_t hg_proc_id_list(hg_proc_t proc, id_list* in)
         default:
             break;
         }
+    }
+    return HG_SUCCESS;
+}
+
+static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* in)
+{
+    hg_return_t ret;
+    hg_size_t size;
+    switch(hg_proc_get_op(proc)) {
+    case HG_ENCODE:
+        ret = hg_proc_hg_size_t(proc, &in->size);
+        if(ret != HG_SUCCESS) return ret;
+        ret = hg_proc_raw(proc, in->data, in->size);
+        if(ret != HG_SUCCESS) return ret;
+        break;
+    case HG_DECODE:
+        ret = hg_proc_hg_size_t(proc, &size);
+        if(ret != HG_SUCCESS) return ret;
+        if(in->data == NULL) {
+            in->data = (char*)malloc(size);
+            in->size = size;
+        }
+        if(in->size >= size) {
+            ret = hg_proc_raw(proc, in->data, size);
+            if(ret != HG_SUCCESS) return ret;
+        } else {
+            return HG_NOMEM;
+        }
+        break;
+    case HG_FREE:
+        free(in->data);
+        break;
+    default:
+        break;
     }
     return HG_SUCCESS;
 }

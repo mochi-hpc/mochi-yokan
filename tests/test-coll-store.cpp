@@ -175,6 +175,63 @@ static MunitResult test_coll_store_packed(const MunitParameter params[], void* d
     return MUNIT_OK;
 }
 
+static MunitResult test_coll_store_direct(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct doc_test_context* context = (struct doc_test_context*)data;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
+
+    auto count = context->reference.size();
+
+    std::string packed;
+    std::vector<size_t> sizes;
+    packed.reserve(g_num_items*g_max_val_size);
+    sizes.reserve(g_num_items);
+    for(auto& s : context->reference) {
+        packed += s;
+        sizes.push_back(s.size());
+    }
+    std::vector<yk_id_t> ids(count);
+
+    ret = yk_doc_store_direct(dbh, "abcd", 0, g_num_items, packed.data(), sizes.data(), ids.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    for(unsigned i=0; i < g_num_items; i++) {
+        munit_assert_long(i, ==, ids[i]);
+    }
+
+    for(unsigned i=0; i < count; i++) {
+        yk_id_t id = (yk_id_t)i;
+        auto& ref = context->reference[i];
+        std::vector<char> buffer(g_max_val_size);
+        size_t bufsize = g_max_val_size;
+        ret = yk_doc_load(dbh, "abcd", 0, id, buffer.data(), &bufsize);
+        SKIP_IF_NOT_IMPLEMENTED(ret);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        munit_assert_long(bufsize, ==, ref.size());
+        munit_assert_memory_equal(ref.size(), buffer.data(), ref.data());
+    }
+
+    /* erroneous cases */
+
+    /* tries to store nullptr with a non-zero size */
+    ret = yk_doc_store_direct(dbh, "abcd", 0, g_num_items,
+            nullptr, sizes.data(), ids.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
+
+    /* tries to store in a collection that does not exist */
+    ret = yk_doc_store_direct(dbh, "efgh", 0, g_num_items,
+            packed.data(), sizes.data(), ids.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
+
+    return MUNIT_OK;
+}
+
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
   { (char*)"min-val-size", NULL },
@@ -190,6 +247,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/coll/store_multi", test_coll_store_multi,
         test_coll_store_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/coll/store_packed", test_coll_store_packed,
+        test_coll_store_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/coll/store_direct", test_coll_store_direct,
         test_coll_store_context_setup, doc_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
