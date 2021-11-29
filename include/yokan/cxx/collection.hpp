@@ -68,6 +68,15 @@ class Collection {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
+    void storeDirect(size_t count, const void* documents,
+                     const size_t* docsizes, yk_id_t* ids,
+                     int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_store_direct(m_db.handle(), m_name.c_str(),
+                                       mode, count, documents,
+                                       docsizes, ids);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
     void storeBulk(size_t count, hg_bulk_t data,
                    size_t offset, size_t size,
                    yk_id_t* ids,
