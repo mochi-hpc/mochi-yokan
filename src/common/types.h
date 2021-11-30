@@ -154,6 +154,16 @@ MERCURY_GEN_PROC(length_in_t,
 MERCURY_GEN_PROC(length_out_t,
         ((int32_t)(ret)))
 
+/* length (direct) */
+MERCURY_GEN_PROC(length_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((raw_data)(keys))\
+        ((uint64_list)(sizes)))
+MERCURY_GEN_PROC(length_direct_out_t,
+        ((uint64_list)(sizes))\
+        ((int32_t)(ret)))
+
 /* put */
 MERCURY_GEN_PROC(put_in_t,
         ((yk_database_id_t)(db_id))\

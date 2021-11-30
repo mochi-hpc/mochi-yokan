@@ -6,11 +6,64 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <cstring>
 #include "client.h"
 #include "../common/defer.hpp"
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+
+static yk_return_t yk_length_direct(yk_database_handle_t dbh,
+                                    int32_t mode,
+                                    size_t count,
+                                    const void* keys,
+                                    const size_t* ksizes,
+                                    size_t* vsizes)
+{
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    else if(!keys || !ksizes || !vsizes)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    CHECK_MODE_VALID(mode);
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    length_direct_in_t in;
+    length_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id       = dbh->database_id;
+    in.mode        = mode;
+    in.keys.data   = (char*)keys;
+    in.keys.size   = std::accumulate(ksizes, ksizes+count, 0);
+    in.sizes.sizes = (size_t*)ksizes;
+    in.sizes.count = count;
+
+    out.sizes.sizes = vsizes;
+    out.sizes.count = count;
+
+    hret = margo_create(mid, dbh->addr, dbh->client->length_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
+
+    ret = static_cast<yk_return_t>(out.ret);
+
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
 
 /**
  * The length operations use a single bulk handle exposing data as follows:
@@ -94,6 +147,20 @@ extern "C" yk_return_t yk_length_multi(yk_database_handle_t dbh,
     else if(!keys || !ksizes || !vsizes)
         return YOKAN_ERR_INVALID_ARGS;
 
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        if(count == 1) {
+            return yk_length_direct(dbh, mode, count, keys[0], ksizes, vsizes);
+        }
+        auto total_ksizes = std::accumulate(ksizes, ksizes+count, 0);
+        std::vector<char> packed_keys(total_ksizes);
+        size_t offset = 0;
+        for(size_t i=0; i < count; i++) {
+            std::memcpy(packed_keys.data()+offset, keys[i], ksizes[i]);
+            offset += ksizes[i];
+        }
+        return yk_length_direct(dbh, mode, count, packed_keys.data(), ksizes, vsizes);
+    }
+
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
     std::vector<void*> ptrs = {
@@ -132,6 +199,9 @@ extern "C" yk_return_t yk_length_packed(yk_database_handle_t dbh,
                                           const size_t* ksizes,
                                           size_t* vsizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return yk_length_direct(dbh, mode, count, keys, ksizes, vsizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !vsizes)

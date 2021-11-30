@@ -116,3 +116,67 @@ void yk_length_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_length_ult)
+
+void yk_length_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    length_direct_in_t in;
+    length_direct_out_t out;
+
+    std::vector<size_t> vsizes_vec;
+
+    in.keys.data = nullptr;
+    in.keys.size = 0;
+    in.sizes.sizes = nullptr;
+    in.sizes.count = 0;
+
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
+    out.ret = YOKAN_SUCCESS;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    auto count = in.sizes.count;
+    vsizes_vec.resize(count);
+    out.sizes.sizes = vsizes_vec.data();
+    out.sizes.count = vsizes_vec.size();
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    auto ksizes = yokan::BasicUserMem<size_t>{ in.sizes.sizes, count };
+
+    // check that there is no key of size 0
+    auto min_key_size = std::accumulate(ksizes.data, ksizes.data + count,
+                                        std::numeric_limits<size_t>::max(),
+                                        [](const size_t& lhs, const size_t& rhs) {
+                                            return std::min(lhs, rhs);
+                                        });
+    if(min_key_size == 0) {
+        out.ret = YOKAN_ERR_INVALID_ARGS;
+        return;
+    }
+
+    // create memory wrapper for keys
+    auto keys = yokan::UserMem{ in.keys.data, in.keys.size };
+
+    // create memory wrapper for value sizes
+    auto vsizes = yokan::BasicUserMem<size_t>{ vsizes_vec };
+
+    out.ret = static_cast<yk_return_t>(
+            database->length(in.mode, keys, ksizes, vsizes));
+}
+DEFINE_MARGO_RPC_HANDLER(yk_length_direct_ult)

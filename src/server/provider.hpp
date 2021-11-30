@@ -60,6 +60,7 @@ typedef struct yk_provider {
     hg_id_t exists_id;
     hg_id_t exists_direct_id;
     hg_id_t length_id;
+    hg_id_t length_direct_id;
     hg_id_t put_id;
     hg_id_t get_id;
     hg_id_t erase_id;
@@ -102,6 +103,8 @@ DECLARE_MARGO_RPC_HANDLER(yk_get_ult)
 void yk_get_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_length_ult)
 void yk_length_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_length_direct_ult)
+void yk_length_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_exists_ult)
 void yk_exists_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_exists_direct_ult)
