@@ -15,6 +15,16 @@
 #include <vector>
 #include <string>
 
+inline bool to_bool(const char* v) {
+    if(v == nullptr)
+        return false;
+    if(strcmp(v, "true") == 0)
+        return true;
+    if(strcmp(v, "false") == 0)
+        return false;
+    return false;
+}
+
 static size_t g_min_key_size = 8;
 static size_t g_max_key_size = 32;
 static size_t g_min_val_size = 1;
@@ -31,6 +41,7 @@ struct kv_test_context {
     yk_database_handle_t                        dbh;
     std::unordered_map<std::string,std::string> reference;
     bool                                        empty_values = false;
+    int32_t                                     mode;
 };
 
 static const uint16_t provider_id = 42;
@@ -55,6 +66,7 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     const char* max_val_size = munit_parameters_get(params, "max-val-size");
     const char* num_keyvals  = munit_parameters_get(params, "num-items");
     const char* backend_type = munit_parameters_get(params, "backend");
+    const char* no_rdma      = munit_parameters_get(params, "no-rdma");
     const char* backend_config = find_backend_config_for(backend_type);
     if(min_key_size) g_min_key_size = std::atol(min_key_size);
     if(max_key_size) g_max_key_size = std::atol(max_key_size);
@@ -109,6 +121,9 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     context->provider = provider;
     context->id       = id;
     context->dbh      = dbh;
+    context->mode     = 0;
+    if(no_rdma && to_bool(no_rdma))
+        context->mode |= YOKAN_MODE_NO_RDMA;
     if(g_max_val_size == 0 && g_min_val_size == 0) {
         context->empty_values = true;
     }

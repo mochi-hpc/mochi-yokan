@@ -10,16 +10,6 @@
 #include <iostream>
 #include <map>
 
-inline bool to_bool(const char* v) {
-    if(v == nullptr)
-        return false;
-    if(strcmp(v, "true") == 0)
-        return true;
-    if(strcmp(v, "false") == 0)
-        return false;
-    return false;
-}
-
 inline bool starts_with(const std::string& s, const std::string& prefix) {
     if(s.size() < prefix.size()) return false;
     if(prefix.size() == 0) return true;
@@ -28,10 +18,9 @@ inline bool starts_with(const std::string& s, const std::string& prefix) {
 }
 
 struct list_keyvals_context {
-    kv_test_context*                     base;
+    kv_test_context*                  base;
     std::map<std::string,std::string> ordered_ref;
     std::string                       prefix;
-    int32_t                           mode;
     size_t                            keys_per_op; // max keys per operation
 };
 
@@ -45,7 +34,7 @@ static void* test_list_keyvals_context_setup(const MunitParameter params[], void
 
     context->prefix = munit_parameters_get(params, "prefix");
     g_max_key_size += context->prefix.size(); // important!
-    context->mode = atoi(munit_parameters_get(params, "mode"));
+    context->base->mode |= to_bool(munit_parameters_get(params, "inclusive")) ? YOKAN_MODE_INCLUSIVE : 0;
     const char* keys_per_op_str = munit_parameters_get(params, "keys-per-op");
     context->keys_per_op = keys_per_op_str ? atol(keys_per_op_str) : 6;
 
@@ -136,7 +125,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         // failing cases
         if(from_key.size() > 0) {
             ret = yk_list_keyvals(dbh,
-                context->mode,
+                context->base->mode,
                 nullptr,
                 from_key.size(),
                 prefix.data(),
@@ -151,7 +140,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         }
         if(prefix.size() > 0) {
             ret = yk_list_keyvals(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -166,7 +155,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         }
         // with a count of 0 (correct but won't return anything)
         ret = yk_list_keyvals(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -180,7 +169,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         // correct case
         ret = yk_list_keyvals(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -209,7 +198,7 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         ksizes.clear();
@@ -269,7 +258,7 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
     std::string prefix = context->prefix;
 
     ret = yk_list_keyvals(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -344,7 +333,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         // invalid cases
         if(from_key.size() > 0) {
             ret = yk_list_keyvals_packed(dbh,
-                context->mode,
+                context->base->mode,
                 nullptr,
                 from_key.size(),
                 prefix.data(),
@@ -361,7 +350,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         }
         if(prefix.size() > 0) {
             ret = yk_list_keyvals_packed(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -378,7 +367,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         }
         // case with count = 0
         ret = yk_list_keyvals_packed(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -394,7 +383,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         // correct case
         ret = yk_list_keyvals_packed(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 prefix.data(),
@@ -431,7 +420,7 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -484,7 +473,7 @@ static MunitResult test_list_keyvals_packed_key_too_small(const MunitParameter p
     std::string prefix = context->prefix;
 
     ret = yk_list_keyvals_packed(dbh,
-            context->mode,
+            context->base->mode,
             from_key.data(),
             from_key.size(),
             prefix.data(),
@@ -568,7 +557,7 @@ static MunitResult test_list_keyvals_packed_val_too_small(const MunitParameter p
     std::string prefix = context->prefix;
 
     ret = yk_list_keyvals_packed(dbh,
-            context->mode,
+            context->base->mode,
             from_key.data(),
             from_key.size(),
             prefix.data(),
@@ -686,7 +675,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
         }
         // count = 0
         ret = yk_list_keyvals_bulk(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.size(),
                 prefix.size(),
                 addr_str, data,
@@ -698,7 +687,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         // correct count
         ret = yk_list_keyvals_bulk(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.size(),
                 prefix.size(),
                 addr_str, data,
@@ -735,7 +724,7 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -783,7 +772,7 @@ static MunitResult test_custom_filter(const MunitParameter params[], void* data)
     std::string filter = "libcustom-filters.so:custom_kv:I am groot";
 
     ret = yk_list_keyvals(dbh,
-                context->mode|YOKAN_MODE_LIB_FILTER,
+                context->base->mode|YOKAN_MODE_LIB_FILTER,
                 nullptr,
                 0,
                 filter.data(),
@@ -816,8 +805,8 @@ static MunitResult test_custom_filter(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
-static char* mode_params[] = {
-    (char*)"0", (char*)"1", NULL
+static char* inclusive_params[] = {
+    (char*)"true", (char*)"false", NULL
 };
 
 static char* prefix_params[] = {
@@ -826,7 +815,7 @@ static char* prefix_params[] = {
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
-  { (char*)"mode", mode_params },
+  { (char*)"inclusive", inclusive_params },
   { (char*)"prefix", prefix_params },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },

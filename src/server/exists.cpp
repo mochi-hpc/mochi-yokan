@@ -120,3 +120,69 @@ void yk_exists_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_exists_ult)
+
+void yk_exists_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    exists_direct_in_t in;
+    exists_direct_out_t out;
+
+    std::vector<char> flags_data;
+
+    in.keys.data = nullptr;
+    in.keys.size = 0;
+    in.sizes.sizes = nullptr;
+    in.sizes.count = 0;
+
+    out.ret = YOKAN_SUCCESS;
+    out.flags.data = nullptr;
+    out.flags.size = 0;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    auto count = in.sizes.count;
+    auto ksizes = yokan::BasicUserMem<size_t>{ in.sizes.sizes, count };
+
+    // check that there is no key of size 0
+    auto min_key_size = std::accumulate(ksizes.data, ksizes.data + count,
+                                        std::numeric_limits<size_t>::max(),
+                                        [](const size_t& lhs, const size_t& rhs) {
+                                            return std::min(lhs, rhs);
+                                        });
+    if(min_key_size == 0) {
+        out.ret = YOKAN_ERR_INVALID_ARGS;
+        return;
+    }
+
+    // create memory wrapper for flags
+    size_t flags_size = std::ceil(((double)count)/8.0);
+    flags_data.resize(flags_size);
+    auto flags = yokan::BitField{ (uint8_t*)flags_data.data(), count };
+    std::memset(flags.data, 0, flags_data.size());
+
+    out.flags.data = flags_data.data();
+    out.flags.size = flags_data.size();
+
+    // create memory wrapper for keys
+    auto keys = yokan::UserMem{ in.keys.data, in.keys.size };
+
+    out.ret = static_cast<yk_return_t>(
+            database->exists(in.mode, keys, ksizes, flags));
+}
+DEFINE_MARGO_RPC_HANDLER(yk_exists_direct_ult)

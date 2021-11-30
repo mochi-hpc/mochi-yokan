@@ -168,6 +168,12 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->exists_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_exists_direct",
+            exists_direct_in_t, exists_direct_out_t,
+            yk_exists_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->exists_direct_id = id;
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_list_keys",
             list_keys_in_t, list_keys_out_t,
             yk_list_keys_ult, provider_id, p->pool);
@@ -275,6 +281,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
     margo_deregister(mid, provider->exists_id);
+    margo_deregister(mid, provider->exists_direct_id);
     margo_deregister(mid, provider->length_id);
     margo_deregister(mid, provider->put_id);
     margo_deregister(mid, provider->get_id);

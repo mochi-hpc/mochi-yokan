@@ -26,6 +26,7 @@ PYBIND11_MODULE(pyyokan_common, m) {
     m.attr("YOKAN_MODE_IGNORE_DOCS")  = YOKAN_MODE_IGNORE_DOCS;
     m.attr("YOKAN_MODE_FILTER_VALUE") = YOKAN_MODE_FILTER_VALUE;
     m.attr("YOKAN_MODE_LIB_FILTER")   = YOKAN_MODE_LIB_FILTER;
+    m.attr("YOKAN_MODE_NO_RDMA")      = YOKAN_MODE_NO_RDMA;
 
     py::class_<yk_database_id_t>(m, "DatabaseID")
         .def(py::init<>())

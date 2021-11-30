@@ -23,6 +23,7 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
 
         margo_registered_name(mid, "yk_count",        &c->count_id,        &flag);
         margo_registered_name(mid, "yk_exists",       &c->exists_id,       &flag);
+        margo_registered_name(mid, "yk_exists_direct",&c->exists_direct_id,&flag);
         margo_registered_name(mid, "yk_length",       &c->length_id,       &flag);
         margo_registered_name(mid, "yk_put",          &c->put_id,          &flag);
         margo_registered_name(mid, "yk_get",          &c->get_id,          &flag);
@@ -51,6 +52,9 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->exists_id =
             MARGO_REGISTER(mid, "yk_exists",
                            exists_in_t, exists_out_t, NULL);
+        c->exists_direct_id =
+            MARGO_REGISTER(mid, "yk_exists_direct",
+                           exists_direct_in_t, exists_direct_out_t, NULL);
         c->length_id =
             MARGO_REGISTER(mid, "yk_length",
                            length_in_t, length_out_t, NULL);

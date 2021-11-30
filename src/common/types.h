@@ -132,6 +132,16 @@ MERCURY_GEN_PROC(exists_in_t,
 MERCURY_GEN_PROC(exists_out_t,
         ((int32_t)(ret)))
 
+/* exists (direct) */
+MERCURY_GEN_PROC(exists_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((raw_data)(keys))\
+        ((uint64_list)(sizes)))
+MERCURY_GEN_PROC(exists_direct_out_t,
+        ((raw_data)(flags))\
+        ((int32_t)(ret)))
+
 /* length */
 MERCURY_GEN_PROC(length_in_t,
         ((yk_database_id_t)(db_id))\

@@ -10,16 +10,6 @@
 #include <iostream>
 #include <map>
 
-inline bool to_bool(const char* v) {
-    if(v == nullptr)
-        return false;
-    if(strcmp(v, "true") == 0)
-        return true;
-    if(strcmp(v, "false") == 0)
-        return false;
-    return false;
-}
-
 inline bool check_filter(int32_t mode, const std::string& s, const std::string& filter) {
     if(s.size() < filter.size()) return false;
     if(filter.size() == 0) return true;
@@ -35,7 +25,6 @@ struct list_keys_context {
     kv_test_context*                  base;
     std::map<std::string,std::string> ordered_ref;
     std::string                       filter;
-    int32_t                           mode;
     size_t                            keys_per_op; // max keys per operation
 };
 
@@ -47,13 +36,13 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     auto context = new list_keys_context;
     context->base = base_context;
 
-    context->mode = to_bool(munit_parameters_get(params, "inclusive")) ? YOKAN_MODE_INCLUSIVE : 0;
+    context->base->mode |= to_bool(munit_parameters_get(params, "inclusive")) ? YOKAN_MODE_INCLUSIVE : 0;
     context->filter = munit_parameters_get(params, "filter");
     if(context->filter.find("prefix:") == 0) {
         context->filter = context->filter.substr(7);
     } else if(context->filter.find("suffix:") == 0) {
         context->filter = context->filter.substr(7);
-        context->mode |= YOKAN_MODE_SUFFIX;
+        context->base->mode |= YOKAN_MODE_SUFFIX;
     }
     g_max_key_size += context->filter.size(); // important!
     const char* keys_per_op_str = munit_parameters_get(params, "keys-per-op");
@@ -63,7 +52,7 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
     unsigned i = 0;
     for(auto& p : base_context->reference) {
         if(i % 2 == 0) {
-            if(context->mode & YOKAN_MODE_SUFFIX) {
+            if(context->base->mode & YOKAN_MODE_SUFFIX) {
                 context->ordered_ref[p.first + context->filter] = p.second;
             } else {
                 context->ordered_ref[context->filter + p.first] = p.second;
@@ -129,7 +118,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
-        if(check_filter(context->mode, key, context->filter)) {
+        if(check_filter(context->base->mode, key, context->filter)) {
             expected_keys.push_back(key);
         }
     }
@@ -144,7 +133,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
         // failing calls
         if(from_key.size() > 0) {
             ret = yk_list_keys(dbh,
-                context->mode,
+                context->base->mode,
                 nullptr,
                 from_key.size(),
                 filter.data(),
@@ -157,7 +146,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
         }
         if(filter.size() > 0) {
             ret = yk_list_keys(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -171,7 +160,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
 
         // successful call
         ret = yk_list_keys(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 filter.data(),
@@ -194,7 +183,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         ksizes.clear();
@@ -202,7 +191,7 @@ static MunitResult test_list_keys(const MunitParameter params[], void* data)
     }
 
     ret = yk_list_keys(dbh,
-            context->mode,
+            context->base->mode,
             from_key.data(),
             from_key.size(),
             filter.data(),
@@ -235,7 +224,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
-        if(check_filter(context->mode, key, context->filter)) {
+        if(check_filter(context->base->mode, key, context->filter)) {
             expected_keys.push_back(key);
         }
     }
@@ -253,7 +242,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
     std::string filter = context->filter;
 
     ret = yk_list_keys(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 filter.data(),
@@ -281,7 +270,7 @@ static MunitResult test_list_keys_too_small(const MunitParameter params[], void*
     // test with a ksize set to 0
     ksizes[ksizes.size()/2] = 0;
     ret = yk_list_keys(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 filter.data(),
@@ -310,7 +299,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
-        if(check_filter(context->mode, key, context->filter)) {
+        if(check_filter(context->base->mode, key, context->filter)) {
             expected_keys.push_back(key);
         }
     }
@@ -325,7 +314,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
         // failing calls
         if(from_key.size() > 0) {
             ret = yk_list_keys_packed(dbh,
-                context->mode,
+                context->base->mode,
                 nullptr,
                 from_key.size(),
                 filter.data(),
@@ -339,7 +328,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
         }
         if(filter.size() > 0) {
             ret = yk_list_keys_packed(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 nullptr,
@@ -354,7 +343,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
 
         // successful call
         ret = yk_list_keys_packed(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.data(),
                 from_key.size(),
                 filter.data(),
@@ -381,7 +370,7 @@ static MunitResult test_list_keys_packed(const MunitParameter params[], void* da
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -408,7 +397,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     unsigned i = 0;
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
-        if(check_filter(context->mode, key, context->filter)) {
+        if(check_filter(context->base->mode, key, context->filter)) {
             expected_keys.push_back(key);
             if(i < count)
                 size_needed += key.size();
@@ -424,7 +413,7 @@ static MunitResult test_list_keys_packed_too_small(const MunitParameter params[]
     std::string filter = context->filter;
 
     ret = yk_list_keys_packed(dbh,
-            context->mode,
+            context->base->mode,
             from_key.data(),
             from_key.size(),
             filter.data(),
@@ -474,7 +463,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
 
     for(auto& p : context->ordered_ref) {
         auto& key = p.first;
-        if(check_filter(context->mode, key, context->filter)) {
+        if(check_filter(context->base->mode, key, context->filter)) {
             expected_keys.push_back(key);
         }
     }
@@ -524,7 +513,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
 
         // test with count = 0
         ret = yk_list_keys_bulk(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.size(),
                 filter.size(),
                 addr_str, data,
@@ -536,7 +525,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
 
         // test with actual count
         ret = yk_list_keys_bulk(dbh,
-                context->mode,
+                context->base->mode,
                 from_key.size(),
                 filter.size(),
                 addr_str, data,
@@ -564,7 +553,7 @@ static MunitResult test_list_keys_bulk(const MunitParameter params[], void* data
             }
         }
         i += count;
-        if(context->mode & YOKAN_MODE_INCLUSIVE)
+        if(context->base->mode & YOKAN_MODE_INCLUSIVE)
             i -= 1;
 
         packed_ksizes.clear();
@@ -603,7 +592,7 @@ static MunitResult test_custom_filter(const MunitParameter params[], void* data)
     std::string filter = "libcustom-filters.so:custom_kv:I am groot";
 
     ret = yk_list_keys(dbh,
-                context->mode|YOKAN_MODE_LIB_FILTER,
+                context->base->mode|YOKAN_MODE_LIB_FILTER,
                 nullptr,
                 0,
                 filter.data(),
@@ -628,7 +617,7 @@ static MunitResult test_custom_filter(const MunitParameter params[], void* data)
 }
 
 
-static char* mode_params[] = {
+static char* inclusive_params[] = {
     (char*)"true", (char*)"false", NULL
 };
 
@@ -638,7 +627,7 @@ static char* filter_params[] = {
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
-  { (char*)"inclusive", mode_params },
+  { (char*)"inclusive", inclusive_params },
   { (char*)"filter", filter_params },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },

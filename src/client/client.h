@@ -15,6 +15,7 @@ typedef struct yk_client {
 
     hg_id_t           count_id;
     hg_id_t           exists_id;
+    hg_id_t           exists_direct_id;
     hg_id_t           length_id;
     hg_id_t           put_id;
     hg_id_t           get_id;

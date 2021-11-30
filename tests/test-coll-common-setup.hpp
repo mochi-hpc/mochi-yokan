@@ -114,7 +114,9 @@ static void* doc_test_common_context_setup(const MunitParameter params[], void* 
     context->provider = provider;
     context->id       = id;
     context->dbh      = dbh;
-    context->mode     = no_rdma ? to_bool(no_rdma) : 0;
+    context->mode     = 0;
+    if(no_rdma && to_bool(no_rdma))
+        context->mode |= YOKAN_MODE_NO_RDMA;
     // create random docs with empty data every 8 values
     for(unsigned i = 0; i < g_num_items; i++) {
         std::string doc;
