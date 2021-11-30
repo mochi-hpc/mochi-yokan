@@ -153,18 +153,6 @@ yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
                                 yk_id_t* ids);
 
 /**
- * @brief Same as yk_doc_store_packed but will internally pass data
- * via RPC arguments instead of RDMA.
- */
-yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
-                                const char* collection,
-                                int32_t mode,
-                                size_t count,
-                                const void* documents,
-                                const size_t* rsizes,
-                                yk_id_t* ids);
-
-/**
  * @brief Store a document using the low-level bulk handle.
  * The payload is considered from offset to offset+size in
  * the bulk handle. See src/client/doc_store.cpp for

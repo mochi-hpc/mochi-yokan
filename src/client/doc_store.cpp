@@ -5,6 +5,7 @@
  */
 #include <vector>
 #include <array>
+#include <cstring>
 #include <numeric>
 #include "client.h"
 #include "../common/defer.hpp"
@@ -12,13 +13,13 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-extern "C" yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
-                                           const char* collection,
-                                           int32_t mode,
-                                           size_t count,
-                                           const void* records,
-                                           const size_t* rsizes,
-                                           yk_id_t* ids) {
+static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
+                                       const char* collection,
+                                       int32_t mode,
+                                       size_t count,
+                                       const void* records,
+                                       const size_t* rsizes,
+                                       yk_id_t* ids) {
 
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -76,6 +77,8 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
                                          size_t size,
                                          yk_id_t* ids) {
     CHECK_MODE_VALID(mode);
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return YOKAN_ERR_INVALID_ARGS;
 
     margo_instance_id mid = dbh->client->mid;
     yk_return_t ret = YOKAN_SUCCESS;
@@ -122,6 +125,10 @@ extern "C" yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
                                            const void* records,
                                            const size_t* rsizes,
                                            yk_id_t* ids) {
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        return yk_doc_store_direct(dbh, collection, mode,
+                                   count, records, rsizes, ids);
+    }
 
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -166,6 +173,18 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
     else if(!records || !rsizes)
         return YOKAN_ERR_INVALID_ARGS;
 
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        size_t total_size = std::accumulate(rsizes, rsizes+count, 0);
+        std::vector<char> packed_records(total_size);
+        size_t offset = 0;
+        for(size_t i=0; i < count; i++) {
+            std::memcpy(packed_records.data()+offset, records[i], rsizes[i]);
+            offset += rsizes[i];
+        }
+        return yk_doc_store_direct(dbh, collection, mode, count,
+                                   packed_records.data(), rsizes, ids);
+    }
+
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
     std::vector<void*> ptrs = {
@@ -201,5 +220,5 @@ extern "C" yk_return_t yk_doc_store(yk_database_handle_t dbh,
                                     const void* record,
                                     size_t size,
                                     yk_id_t* id) {
-    return yk_doc_store_direct(dbh, collection, mode, 1, record, &size, id);
+    return yk_doc_store_packed(dbh, collection, mode, 1, record, &size, id);
 }

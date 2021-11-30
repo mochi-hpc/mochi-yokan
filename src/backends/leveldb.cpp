@@ -141,6 +141,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_IGNORE_DOCS
                     |YOKAN_MODE_FILTER_VALUE
                     |YOKAN_MODE_LIB_FILTER
+                    |YOKAN_MODE_NO_RDMA
                     )
             );
     }

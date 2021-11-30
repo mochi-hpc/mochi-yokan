@@ -15,21 +15,19 @@
 #include <vector>
 #include <string>
 
+inline bool to_bool(const char* v) {
+    if(v == nullptr)
+        return false;
+    if(strcmp(v, "true") == 0)
+        return true;
+    if(strcmp(v, "false") == 0)
+        return false;
+    return false;
+}
+
 static size_t g_min_val_size = 1;
 static size_t g_max_val_size = 1024;
 static size_t g_num_items  = 64;
-
-struct kv_test_context {
-    margo_instance_id                           mid;
-    hg_addr_t                                   addr;
-    yk_admin_t                                  admin;
-    yk_client_t                                 client;
-    yk_provider_t                               provider;
-    yk_database_id_t                            id;
-    yk_database_handle_t                        dbh;
-    std::unordered_map<std::string,std::string> reference;
-    bool                                        empty_values = false;
-};
 
 struct doc_test_context {
     margo_instance_id        mid;
@@ -39,6 +37,7 @@ struct doc_test_context {
     yk_provider_t            provider;
     yk_database_id_t         id;
     yk_database_handle_t     dbh;
+    int32_t                  mode;
     std::vector<std::string> reference;
 };
 
@@ -60,9 +59,10 @@ static void* doc_test_common_context_setup(const MunitParameter params[], void* 
     // read parameters
     const char* min_val_size = munit_parameters_get(params, "min-val-size");
     const char* max_val_size = munit_parameters_get(params, "max-val-size");
-    const char* num_items  = munit_parameters_get(params, "num-itemss");
+    const char* num_items  = munit_parameters_get(params, "num-items");
     const char* backend_type = munit_parameters_get(params, "backend");
     const char* backend_config = find_backend_config_for(backend_type);
+    const char* no_rdma = munit_parameters_get(params, "no-rdma");
     if(min_val_size) g_min_val_size = std::atol(min_val_size);
     if(max_val_size) g_max_val_size = std::atol(max_val_size);
     if(num_items)  g_num_items  = std::atol(num_items);
@@ -114,6 +114,7 @@ static void* doc_test_common_context_setup(const MunitParameter params[], void* 
     context->provider = provider;
     context->id       = id;
     context->dbh      = dbh;
+    context->mode     = no_rdma ? to_bool(no_rdma) : 0;
     // create random docs with empty data every 8 values
     for(unsigned i = 0; i < g_num_items; i++) {
         std::string doc;
