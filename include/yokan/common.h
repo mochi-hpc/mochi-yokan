@@ -100,8 +100,8 @@ typedef enum yk_return_t {
  * - YOKAN_MODE_FILTER_VALUE: filter requires value to be provided.
  * - YOKAN_MODE_LIB_FILTER: filter is the name of a library and a function,
  *   separated by a column character.
- * - YOKAN_MODE_NO_RDMA: use a version of the RPC that doesn't rely on
- *   RDMA transfers.
+ * - YOKAN_MODE_NO_RDMA: use a version of the RPC that does not use RDMA for data
+ *   transfers, when multiple underlying implementations of the RPC exists.
  *
  * Important: not all backends support all modes.
  */

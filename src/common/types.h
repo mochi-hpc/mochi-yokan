@@ -15,16 +15,6 @@
 
 // LCOV_EXCL_START
 
-// id_list is used for both arrays of ids and
-// arrays of sizes (ids are uint64_t anyway).
-typedef struct uint64_list {
-    size_t count;
-    union {
-        yk_id_t*  ids;
-        uint64_t* sizes;
-    };
-} uint64_list;
-
 // The raw_data structure is used to send and receive raw data.
 // When de-serializing into a raw_data structure, hg_proc_raw_data
 // will look whether the data pointer is NULL. If it is, it will
@@ -40,6 +30,19 @@ typedef struct raw_data {
     size_t size;
     char*  data;
 } raw_data;
+
+// id_list is used for both arrays of ids and  arrays of sizes
+// (ids are uint64_t anyway).
+// This structure's serialization functions work in the same way
+// as the ones for raw_data, so precautions must be taken to
+// correctly set the fields before deserializing into such a structure.
+typedef struct uint64_list {
+    size_t count;
+    union {
+        yk_id_t*  ids;
+        uint64_t* sizes;
+    };
+} uint64_list;
 
 static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
 static inline hg_return_t hg_proc_yk_id_t(hg_proc_t proc, yk_id_t *id);
@@ -359,17 +362,27 @@ static inline hg_return_t hg_proc_yk_database_id_t(
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)
 {
     hg_return_t ret;
-    ret = hg_proc_hg_size_t(proc, &in->count);
-    if(ret != HG_SUCCESS) return ret;
-    if(in->count) {
-        switch(hg_proc_get_op(proc)) {
+    hg_size_t count;
+    switch(hg_proc_get_op(proc)) {
         case HG_ENCODE:
+            ret = hg_proc_hg_size_t(proc, &in->count);
+            if(ret != HG_SUCCESS) return ret;
             ret = hg_proc_raw(proc, in->ids, in->count*sizeof(*(in->ids)));
             if (ret != HG_SUCCESS) return ret;
             break;
         case HG_DECODE:
-            in->ids  = (yk_id_t*)malloc(in->count*sizeof(*(in->ids)));
-            ret      = hg_proc_raw(proc, in->ids, in->count*sizeof(*(in->ids)));
+            ret = hg_proc_hg_size_t(proc, &count);
+            if(ret != HG_SUCCESS) return ret;
+            if(!in->ids) {
+                in->ids  = (yk_id_t*)malloc(count*sizeof(*(in->ids)));
+                in->count = count;
+            }
+            if(in->count >= count) {
+                in->count = count;
+                ret       = hg_proc_raw(proc, in->ids, in->count*sizeof(*(in->ids)));
+            } else {
+                ret = HG_NOMEM;
+            }
             if(ret != HG_SUCCESS) return ret;
             break;
         case HG_FREE:
@@ -377,7 +390,6 @@ static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)
             break;
         default:
             break;
-        }
     }
     return HG_SUCCESS;
 }

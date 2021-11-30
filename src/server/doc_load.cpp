@@ -18,6 +18,9 @@ void yk_doc_load_ult(hg_handle_t h)
     doc_load_out_t out;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 
+    in.ids.ids = nullptr;
+    in.ids.count = 0;
+
     out.ret = YOKAN_SUCCESS;
 
     DEFER(margo_destroy(h));

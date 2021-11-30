@@ -17,6 +17,9 @@ void yk_doc_erase_ult(hg_handle_t h)
     doc_erase_in_t in;
     doc_erase_out_t out;
 
+    in.ids.ids = nullptr;
+    in.ids.count = 0;
+
     out.ret = YOKAN_SUCCESS;
 
     DEFER(margo_destroy(h));

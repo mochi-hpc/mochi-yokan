@@ -33,6 +33,9 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
     doc_store_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
+    out.ids.ids   = ids;
+    out.ids.count = count;
+
     in.db_id       = dbh->database_id;
     in.mode        = mode;
     in.coll_name   = (char*)collection;
@@ -56,11 +59,10 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_get_output);
 
     ret = static_cast<yk_return_t>(out.ret);
-    if(ret == YOKAN_SUCCESS && ids) {
-        for(size_t i=0; i < count; i++) {
-            ids[i] = out.ids.ids[i];
-        }
-    }
+
+    out.ids.ids = NULL;
+    out.ids.count = 0;
+
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
@@ -87,6 +89,9 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
     doc_store_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
+    out.ids.ids   = ids;
+    out.ids.count = count;
+
     in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)name;
@@ -107,11 +112,10 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_get_output);
 
     ret = static_cast<yk_return_t>(out.ret);
-    if(ret == YOKAN_SUCCESS && ids) {
-        for(size_t i=0; i < count; i++) {
-            ids[i] = out.ids.ids[i];
-        }
-    }
+
+    out.ids.ids = NULL;
+    out.ids.count = 0;
+
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);
 
@@ -174,15 +178,21 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
         return YOKAN_ERR_INVALID_ARGS;
 
     if(mode & YOKAN_MODE_NO_RDMA) {
-        size_t total_size = std::accumulate(rsizes, rsizes+count, 0);
-        std::vector<char> packed_records(total_size);
-        size_t offset = 0;
-        for(size_t i=0; i < count; i++) {
-            std::memcpy(packed_records.data()+offset, records[i], rsizes[i]);
-            offset += rsizes[i];
-        }
-        return yk_doc_store_direct(dbh, collection, mode, count,
+        std::vector<char> packed_records;
+        if(count > 1) {
+            size_t total_size = std::accumulate(rsizes, rsizes+count, 0);
+            packed_records.resize(total_size);
+            size_t offset = 0;
+            for(size_t i=0; i < count; i++) {
+                std::memcpy(packed_records.data()+offset, records[i], rsizes[i]);
+                offset += rsizes[i];
+            }
+            return yk_doc_store_direct(dbh, collection, mode, count,
                                    packed_records.data(), rsizes, ids);
+        } else {
+            return yk_doc_store_direct(dbh, collection, mode, count,
+                                   records[0], rsizes, ids);
+        }
     }
 
     hg_bulk_t bulk   = HG_BULK_NULL;

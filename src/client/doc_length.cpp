@@ -32,6 +32,9 @@ extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
     doc_length_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
+    out.sizes.sizes = rsizes;
+    out.sizes.count = count;
+
     in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)collection;
@@ -50,11 +53,8 @@ extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
 
     ret = static_cast<yk_return_t>(out.ret);
 
-    if(ret == YOKAN_SUCCESS) {
-        for(size_t i = 0; i < count; i++) {
-            rsizes[i] = out.sizes.sizes[i];
-        }
-    }
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
 
     hret = margo_free_output(handle, &out);
     CHECK_HRET(hret, margo_free_output);

@@ -18,6 +18,9 @@ void yk_doc_length_ult(hg_handle_t h)
     doc_length_in_t in;
     doc_length_out_t out;
 
+    in.ids.ids = nullptr;
+    in.ids.count = 0;
+
     out.ret = YOKAN_SUCCESS;
     out.sizes.sizes = NULL;
     out.sizes.count = 0;
