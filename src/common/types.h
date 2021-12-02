@@ -212,6 +212,15 @@ MERCURY_GEN_PROC(erase_in_t,
 MERCURY_GEN_PROC(erase_out_t,
         ((int32_t)(ret)))
 
+/* erase (direct) */
+MERCURY_GEN_PROC(erase_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint64_list)(ksizes))\
+        ((raw_data)(keys)))
+MERCURY_GEN_PROC(erase_direct_out_t,
+        ((int32_t)(ret)))
+
 /* list_keys */
 MERCURY_GEN_PROC(list_keys_in_t,
         ((yk_database_id_t)(db_id))\

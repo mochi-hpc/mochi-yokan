@@ -65,6 +65,7 @@ typedef struct yk_provider {
     hg_id_t put_direct_id;
     hg_id_t get_id;
     hg_id_t erase_id;
+    hg_id_t erase_direct_id;
     hg_id_t list_keys_id;
     hg_id_t list_keyvals_id;
     hg_id_t coll_create_id;
@@ -102,6 +103,8 @@ DECLARE_MARGO_RPC_HANDLER(yk_put_direct_ult)
 void yk_put_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_erase_ult)
 void yk_erase_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_erase_direct_ult)
+void yk_erase_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_get_ult)
 void yk_get_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_length_ult)
