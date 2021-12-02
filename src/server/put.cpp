@@ -96,3 +96,63 @@ void yk_put_ult(hg_handle_t h)
             database->put(in.mode, keys, ksizes, vals, vsizes));
 }
 DEFINE_MARGO_RPC_HANDLER(yk_put_ult)
+
+void yk_put_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    put_direct_in_t in;
+    put_direct_out_t out;
+
+    in.ksizes.count = 0;
+    in.ksizes.sizes = nullptr;
+    in.vsizes.count = 0;
+    in.vsizes.sizes = nullptr;
+    in.keys.data = nullptr;
+    in.keys.size = 0;
+    in.vals.data = nullptr;
+    in.vals.size = 0;
+    out.ret = YOKAN_SUCCESS;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    auto ksizes = yokan::BasicUserMem<size_t>{
+        in.ksizes.sizes, in.ksizes.count
+    };
+
+    auto vsizes = yokan::BasicUserMem<size_t>{
+        in.vsizes.sizes, in.vsizes.count
+    };
+
+    auto min_key_size = std::accumulate(in.ksizes.sizes, in.ksizes.sizes + in.ksizes.count,
+                                        std::numeric_limits<size_t>::max(),
+                                        [](const size_t& lhs, const size_t& rhs) {
+                                            return std::min(lhs, rhs);
+                                        });
+    if(min_key_size == 0) {
+        out.ret = YOKAN_ERR_INVALID_ARGS;
+        return;
+    }
+
+    auto keys = yokan::UserMem{ in.keys.data, in.keys.size };
+    auto vals = yokan::UserMem{ in.vals.data, in.vals.size };
+
+    out.ret = static_cast<yk_return_t>(
+            database->put(in.mode, keys, ksizes, vals, vsizes));
+}
+DEFINE_MARGO_RPC_HANDLER(yk_put_direct_ult)

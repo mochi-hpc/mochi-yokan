@@ -173,8 +173,18 @@ MERCURY_GEN_PROC(put_in_t,
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk)))
-
 MERCURY_GEN_PROC(put_out_t,
+        ((int32_t)(ret)))
+
+/* put (direct) */
+MERCURY_GEN_PROC(put_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint64_list)(ksizes))\
+        ((uint64_list)(vsizes))\
+        ((raw_data)(keys))\
+        ((raw_data)(vals)))
+MERCURY_GEN_PROC(put_direct_out_t,
         ((int32_t)(ret)))
 
 /* get */

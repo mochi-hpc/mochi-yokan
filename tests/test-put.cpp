@@ -26,7 +26,7 @@ static MunitResult test_put(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         auto val   = p.second.data();
         auto vsize = p.second.size();
-        ret = yk_put(dbh, 0,key, ksize, val, vsize);
+        ret = yk_put(dbh, context->mode, key, ksize, val, vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
     }
@@ -38,7 +38,7 @@ static MunitResult test_put(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
-        ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+        ret = yk_get(dbh, context->mode, key, ksize, val.data(), &vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(vsize, ==, p.second.size());
@@ -59,15 +59,15 @@ static MunitResult test_put_empty_keys(const MunitParameter params[], void* data
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
-    ret = yk_put(dbh, 0,"abc", 0, "def", 3);
+    ret = yk_put(dbh, context->mode, "abc", 0, "def", 3);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
-    ret = yk_put(dbh, 0,nullptr, 0, "def", 3);
+    ret = yk_put(dbh, context->mode, nullptr, 0, "def", 3);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
-    ret = yk_put(dbh, 0,nullptr, 0, nullptr, 0);
+    ret = yk_put(dbh, context->mode, nullptr, 0, nullptr, 0);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -109,8 +109,9 @@ static MunitResult test_put_multi(const MunitParameter params[], void* data)
         vsizes.push_back(vsize);
     }
 
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), ksizes.data(),
-                                    vptrs.data(), vsizes.data());
+    ret = yk_put_multi(dbh, context->mode,
+                       count, kptrs.data(), ksizes.data(),
+                       vptrs.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -121,7 +122,8 @@ static MunitResult test_put_multi(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
-        ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+        ret = yk_get(dbh, context->mode,
+                     key, ksize, val.data(), &vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(vsize, ==, p.second.size());
@@ -129,26 +131,31 @@ static MunitResult test_put_multi(const MunitParameter params[], void* data)
     }
 
     // check with some nullptr
-    ret = yk_put_multi(dbh, 0,count, nullptr, ksizes.data(),
-                                    vptrs.data(), vsizes.data());
+    ret = yk_put_multi(dbh, context->mode,
+                       count, nullptr, ksizes.data(),
+                       vptrs.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), nullptr,
-                                    vptrs.data(), vsizes.data());
+    ret = yk_put_multi(dbh, context->mode,
+                       count, kptrs.data(), nullptr,
+                       vptrs.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), ksizes.data(),
-                                    nullptr, vsizes.data());
+    ret = yk_put_multi(dbh, context->mode,
+                       count, kptrs.data(), ksizes.data(),
+                       nullptr, vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), ksizes.data(),
-                                    vptrs.data(), nullptr);
+    ret = yk_put_multi(dbh, context->mode,
+                       count, kptrs.data(), ksizes.data(),
+                       vptrs.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     // check with all NULL
 
-    ret = yk_put_multi(dbh, 0,0, NULL, NULL, NULL, NULL);
+    ret = yk_put_multi(dbh, context->mode,
+                       0, NULL, NULL, NULL, NULL);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -188,8 +195,9 @@ static MunitResult test_put_multi_all_empty_values(const MunitParameter params[]
         vsizes.push_back(vsize);
     }
 
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), ksizes.data(),
-                                    vptrs.data(), vsizes.data());
+    ret = yk_put_multi(dbh, context->mode,
+                       count, kptrs.data(), ksizes.data(),
+                       vptrs.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -200,7 +208,7 @@ static MunitResult test_put_multi_all_empty_values(const MunitParameter params[]
         auto ksize = p.first.size();
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
-        ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+        ret = yk_get(dbh, context->mode, key, ksize, val.data(), &vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(vsize, ==, 0);
@@ -245,8 +253,9 @@ static MunitResult test_put_multi_empty_key(const MunitParameter params[], void*
 
     ksizes[count/2] = 0;
 
-    ret = yk_put_multi(dbh, 0,count, kptrs.data(), ksizes.data(),
-                                    vptrs.data(), vsizes.data());
+    ret = yk_put_multi(dbh, context->mode, count,
+                       kptrs.data(), ksizes.data(),
+                       vptrs.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -286,8 +295,9 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
         vsizes.push_back(vsize);
     }
 
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode,
+                        count, pkeys.data(), ksizes.data(),
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -298,7 +308,7 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
         auto ksize = p.first.size();
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
-        ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+        ret = yk_get(dbh, context->mode, key, ksize, val.data(), &vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(vsize, ==, p.second.size());
@@ -307,41 +317,44 @@ static MunitResult test_put_packed(const MunitParameter params[], void* data)
 
     // check with 0 keys
 
-    ret = yk_put_packed(dbh, 0,0, pkeys.data(), ksizes.data(),
-                                 pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode, 0, pkeys.data(), ksizes.data(),
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
     // check with some nullptrs
-    ret = yk_put_packed(dbh, 0,count, nullptr, ksizes.data(),
+    ret = yk_put_packed(dbh, context->mode, count, nullptr, ksizes.data(),
                                      pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), nullptr,
-                                     pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode, count, pkeys.data(), nullptr,
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
+
     if(!context->empty_values) {
+        ret = yk_put_packed(dbh, context->mode, count,
+                            pkeys.data(), ksizes.data(),
+                            nullptr, vsizes.data());
+        SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-        ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                         nullptr, vsizes.data());
     }
-    SKIP_IF_NOT_IMPLEMENTED(ret);
-    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), nullptr);
+    ret = yk_put_packed(dbh, context->mode, count,
+                        pkeys.data(), ksizes.data(),
+                        pvals.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     // check with all ksizes[*] = 0
     for(auto& s : ksizes) s = 0;
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode, count,
+                        pkeys.data(), ksizes.data(),
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     // check with all NULL
 
-    ret = yk_put_packed(dbh, 0,0, NULL, NULL, NULL, NULL);
+    ret = yk_put_packed(dbh, context->mode, 0, NULL, NULL, NULL, NULL);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -377,8 +390,9 @@ static MunitResult test_put_packed_all_empty_values(const MunitParameter params[
         vsizes.push_back(0);
     }
 
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode, count,
+                        pkeys.data(), ksizes.data(),
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -389,7 +403,8 @@ static MunitResult test_put_packed_all_empty_values(const MunitParameter params[
         auto ksize = p.first.size();
         std::vector<char> val(g_max_val_size);
         size_t vsize = g_max_val_size;
-        ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+        ret = yk_get(dbh, context->mode, key,
+                     ksize, val.data(), &vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(vsize, ==, 0);
@@ -437,8 +452,9 @@ static MunitResult test_put_packed_empty_key(const MunitParameter params[], void
         i += 1;
     }
 
-    ret = yk_put_packed(dbh, 0,count, pkeys.data(), ksizes.data(),
-                                     pvals.data(), vsizes.data());
+    ret = yk_put_packed(dbh, context->mode, count,
+                        pkeys.data(), ksizes.data(),
+                        pvals.data(), vsizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -516,19 +532,22 @@ static MunitResult test_put_bulk(const MunitParameter params[], void* data)
     hret = margo_addr_to_string(context->mid,
             addr_str, &addr_str_size, context->addr);
 
-    ret = yk_put_bulk(dbh, 0,count, addr_str, bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode,
+                      count, addr_str, bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    ret = yk_put_bulk(dbh, 0,count, nullptr, bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode,
+                      count, nullptr, bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // with useful size = 0
-    ret = yk_put_bulk(dbh, 0,count, addr_str, bulk,
-                       garbage_size, 0);
+    ret = yk_put_bulk(dbh, context->mode, count,
+                      addr_str, bulk,
+                      garbage_size, 0);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -596,25 +615,27 @@ static MunitResult test_put_bulk_all_empty_values(const MunitParameter params[],
     hret = margo_addr_to_string(context->mid,
             addr_str, &addr_str_size, context->addr);
 
-    ret = yk_put_bulk(dbh, 0,count, addr_str, bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode, count,
+                      addr_str, bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    ret = yk_put_bulk(dbh, 0,count, nullptr, bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode, count, nullptr, bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     /* invalid address */
-    ret = yk_put_bulk(dbh, 0,count, "invalid-address", bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode, count,
+                      "invalid-address", bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_FROM_MERCURY);
 
     /* incorrect bulk size */
-    ret = yk_put_bulk(dbh, 0,count, nullptr, bulk,
-                       garbage_size, useful_size/2);
+    ret = yk_put_bulk(dbh, context->mode, count, nullptr, bulk,
+                      garbage_size, useful_size/2);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -703,12 +724,12 @@ static MunitResult test_put_bulk_empty_key(const MunitParameter params[], void* 
     hret = margo_addr_to_string(context->mid,
             addr_str, &addr_str_size, context->addr);
 
-    ret = yk_put_bulk(dbh, 0,count, addr_str, bulk,
-                       garbage_size, useful_size);
+    ret = yk_put_bulk(dbh, context->mode, count, addr_str, bulk,
+                      garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
-    ret = yk_put_bulk(dbh, 0,count, nullptr, bulk,
+    ret = yk_put_bulk(dbh, context->mode, count, nullptr, bulk,
                        garbage_size, useful_size);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
@@ -752,7 +773,7 @@ static MunitResult test_put_append(const MunitParameter params[], void* data)
             auto ksize = p.first.size();
             std::vector<char> val(g_max_val_size);
             size_t vsize = g_max_val_size;
-            ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+            ret = yk_get(dbh, context->mode, key, ksize, val.data(), &vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
             munit_assert_int(vsize, ==, p.second.size());
@@ -772,7 +793,7 @@ static MunitResult test_put_append(const MunitParameter params[], void* data)
         } else {
             auto key   = p.first.data();
             auto ksize = p.first.size();
-            ret = yk_put(dbh, YOKAN_MODE_APPEND, key, ksize, val, vsize);
+            ret = yk_put(dbh, YOKAN_MODE_APPEND|context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
         }
@@ -792,7 +813,7 @@ static MunitResult test_put_append(const MunitParameter params[], void* data)
             auto exp_vsize = p.second.size() + vsize;
             std::vector<char> out_val(g_max_val_size*2);
             size_t out_vsize = 2*g_max_val_size;
-            ret = yk_get(dbh, 0, key, ksize, out_val.data(), &out_vsize);
+            ret = yk_get(dbh, context->mode, key, ksize, out_val.data(), &out_vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
             munit_assert_int(out_vsize, ==, exp_vsize);
@@ -820,7 +841,7 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
             auto ksize = p.first.size();
             auto val   = p.second.data();
             auto vsize = p.second.size();
-            ret = yk_put(dbh, 0, key, ksize, val, vsize);
+            ret = yk_put(dbh, context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
         }
@@ -835,7 +856,7 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
             auto ksize = p.first.size();
             std::vector<char> val(g_max_val_size);
             size_t vsize = g_max_val_size;
-            ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+            ret = yk_get(dbh, context->mode, key, ksize, val.data(), &vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
             munit_assert_int(vsize, ==, p.second.size());
@@ -856,7 +877,8 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
         auto ksize = p.first.size();
         auto val   = p.second.data();
         auto vsize = p.second.size();
-        ret = yk_put(dbh, YOKAN_MODE_EXIST_ONLY, key, ksize, val, vsize);
+        ret = yk_put(dbh, YOKAN_MODE_EXIST_ONLY|context->mode,
+                     key, ksize, val, vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
     }
@@ -870,7 +892,7 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
         auto vsize = p.second.size();
         std::vector<char> out_val(g_max_val_size);
         size_t out_vsize = g_max_val_size;
-        ret = yk_get(dbh, 0, key, ksize, out_val.data(), &out_vsize);
+        ret = yk_get(dbh, context->mode, key, ksize, out_val.data(), &out_vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         if(i % 2 == 0) {
             munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
@@ -901,7 +923,7 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
             auto ksize = p.first.size();
             auto val   = p.second.data();
             auto vsize = p.second.size();
-            ret = yk_put(dbh, 0, key, ksize, val, vsize);
+            ret = yk_put(dbh, context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
         }
@@ -916,7 +938,7 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
             auto ksize = p.first.size();
             std::vector<char> val(g_max_val_size);
             size_t vsize = g_max_val_size;
-            ret = yk_get(dbh, 0,key, ksize, val.data(), &vsize);
+            ret = yk_get(dbh, context->mode,key, ksize, val.data(), &vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
             munit_assert_int(vsize, ==, p.second.size());
@@ -935,7 +957,7 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
             auto ksize = p.first.size();
             auto val   = p.second.data();
             auto vsize = p.second.size();
-            ret = yk_put(dbh, YOKAN_MODE_NEW_ONLY, key, ksize, val, vsize);
+            ret = yk_put(dbh, YOKAN_MODE_NEW_ONLY|context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
         } else {
@@ -945,7 +967,7 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
             auto ksize = p.first.size();
             auto val   = rev_val.data();
             auto vsize = rev_val.size();
-            ret = yk_put(dbh, YOKAN_MODE_NEW_ONLY, key, ksize, val, vsize);
+            ret = yk_put(dbh, YOKAN_MODE_NEW_ONLY|context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
             munit_assert_int(ret, ==, YOKAN_SUCCESS);
         }
@@ -960,7 +982,7 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
         auto vsize = p.second.size();
         std::vector<char> out_val(g_max_val_size);
         size_t out_vsize = g_max_val_size;
-        ret = yk_get(dbh, 0, key, ksize, out_val.data(), &out_vsize);
+        ret = yk_get(dbh, context->mode, key, ksize, out_val.data(), &out_vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_int(out_vsize, ==, vsize);
@@ -970,8 +992,12 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static char* no_rdma_params[] = {
+    (char*)"true", (char*)"false", (char*)NULL };
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"no-rdma", (char**)no_rdma_params },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },

@@ -6,19 +6,73 @@
 #include <vector>
 #include <array>
 #include <numeric>
+#include <cstring>
 #include "client.h"
 #include "../common/defer.hpp"
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+static yk_return_t yk_put_direct(yk_database_handle_t dbh,
+                                 int32_t mode,
+                                 size_t count,
+                                 const void* keys,
+                                 const size_t* ksizes,
+                                 const void* values,
+                                 const size_t* vsizes)
+{
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    else if(!keys || !ksizes || !vsizes)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    CHECK_MODE_VALID(mode);
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    put_direct_in_t in;
+    put_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id  = dbh->database_id;
+    in.mode   = mode;
+    in.ksizes.sizes = (size_t*)ksizes;
+    in.ksizes.count = count;
+    in.vsizes.sizes = (size_t*)vsizes;
+    in.vsizes.count = count;
+    in.keys.data = (char*)keys;
+    in.keys.size = std::accumulate(ksizes, ksizes+count, 0);
+    in.vals.data = (char*)values;
+    in.vals.size = std::accumulate(vsizes, vsizes+count, 0);
+
+    if(in.vals.data == nullptr && in.vals.size != 0)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    hret = margo_create(mid, dbh->addr, dbh->client->put_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    ret = static_cast<yk_return_t>(out.ret);
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
+
 extern "C" yk_return_t yk_put_bulk(yk_database_handle_t dbh,
-                                     int32_t mode,
-                                     size_t count,
-                                     const char* origin,
-                                     hg_bulk_t data,
-                                     size_t offset,
-                                     size_t size)
+                                   int32_t mode,
+                                   size_t count,
+                                   const char* origin,
+                                   hg_bulk_t data,
+                                   size_t offset,
+                                   size_t size)
 {
     if(count != 0 && size == 0)
         return YOKAN_ERR_INVALID_ARGS;
@@ -70,17 +124,34 @@ extern "C" yk_return_t yk_put(yk_database_handle_t dbh,
 }
 
 extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
-                                      int32_t mode,
-                                      size_t count,
-                                      const void* const* keys,
-                                      const size_t* ksizes,
-                                      const void* const* values,
-                                      const size_t* vsizes)
+                                    int32_t mode,
+                                    size_t count,
+                                    const void* const* keys,
+                                    const size_t* ksizes,
+                                    const void* const* values,
+                                    const size_t* vsizes)
 {
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !values || !vsizes)
         return YOKAN_ERR_INVALID_ARGS;
+
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        if(count == 1) {
+            return yk_put_direct(dbh, mode, count, keys[0], ksizes, values[0], vsizes);
+        }
+        std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, 0));
+        std::vector<char> packed_vals(std::accumulate(vsizes, vsizes+count, 0));
+        size_t koffset = 0, voffset = 0;
+        for(size_t i = 0; i < count; i++) {
+            std::memcpy(packed_keys.data()+koffset, keys[i], ksizes[i]);
+            std::memcpy(packed_vals.data()+voffset, values[i], vsizes[i]);
+            koffset += ksizes[i];
+            voffset += vsizes[i];
+        }
+        return yk_put_direct(dbh, mode, count, packed_keys.data(),
+                             ksizes, packed_vals.data(), vsizes);
+    }
 
     hg_bulk_t bulk   = HG_BULK_NULL;
     hg_return_t hret = HG_SUCCESS;
@@ -127,6 +198,10 @@ extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
                                        const void* values,
                                        const size_t* vsizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        return yk_put_direct(dbh, mode, count, keys, ksizes, values, vsizes);
+    }
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !vsizes)
