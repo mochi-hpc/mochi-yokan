@@ -343,6 +343,17 @@ MERCURY_GEN_PROC(doc_update_in_t,
 MERCURY_GEN_PROC(doc_update_out_t,
         ((int32_t)(ret)))
 
+/* doc_update (direct) */
+MERCURY_GEN_PROC(doc_update_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_string_t)(coll_name))\
+        ((uint64_list)(ids))\
+        ((uint64_list)(sizes))\
+        ((raw_data)(docs)))
+MERCURY_GEN_PROC(doc_update_direct_out_t,
+        ((int32_t)(ret)))
+
 /* doc_load */
 MERCURY_GEN_PROC(doc_load_in_t,
         ((yk_database_id_t)(db_id))\

@@ -264,6 +264,12 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_update_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_update_direct",
+            doc_update_direct_in_t, doc_update_direct_out_t,
+            yk_doc_update_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_update_direct_id = id;
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_length",
             doc_length_in_t, doc_length_out_t,
             yk_doc_length_ult, provider_id, p->pool);
@@ -319,6 +325,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_store_direct_id);
     margo_deregister(mid, provider->doc_load_id);
     margo_deregister(mid, provider->doc_update_id);
+    margo_deregister(mid, provider->doc_update_direct_id);
     margo_deregister(mid, provider->doc_length_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;

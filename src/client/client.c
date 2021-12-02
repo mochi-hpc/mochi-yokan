@@ -116,6 +116,9 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_update_id =
             MARGO_REGISTER(mid, "yk_doc_update",
                            doc_update_in_t, doc_update_out_t, NULL);
+        c->doc_update_direct_id =
+            MARGO_REGISTER(mid, "yk_doc_update_direct",
+                           doc_update_direct_in_t, doc_update_direct_out_t, NULL);
         c->doc_length_id =
             MARGO_REGISTER(mid, "yk_doc_length",
                            doc_length_in_t, doc_length_out_t, NULL);

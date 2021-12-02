@@ -31,7 +31,7 @@ static void* test_coll_update_context_setup(const MunitParameter params[], void*
     yk_collection_create(context->dbh, "abcd", 0);
 
     std::vector<yk_id_t> ids(count);
-    yk_doc_store_multi(context->dbh, "abcd", 0, count, ptrs.data(), sizes.data(), ids.data());
+    yk_doc_store_multi(context->dbh, "abcd", context->mode, count, ptrs.data(), sizes.data(), ids.data());
 
     return context;
 }
@@ -58,7 +58,7 @@ static MunitResult test_coll_update(const MunitParameter params[], void* data)
             char c = (char)munit_rand_int_range(33, 126);
             doc[j] = c;
         }
-        ret = yk_doc_update(dbh, "abcd", 0, i, doc.data(), size);
+        ret = yk_doc_update(dbh, "abcd", context->mode, i, doc.data(), size);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         context->reference[i] = std::move(doc);
@@ -69,7 +69,7 @@ static MunitResult test_coll_update(const MunitParameter params[], void* data)
         yk_id_t id = (yk_id_t)i;
         auto& ref = context->reference[i];
         size_t bufsize = g_max_val_size;
-        ret = yk_doc_load(dbh, "abcd", 0, id, buffer.data(), &bufsize);
+        ret = yk_doc_load(dbh, "abcd", context->mode, id, buffer.data(), &bufsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_long(bufsize, ==, ref.size());
@@ -77,17 +77,17 @@ static MunitResult test_coll_update(const MunitParameter params[], void* data)
     }
 
     /* tries to update an id outside of the collection */
-    ret = yk_doc_update(dbh, "abcd", 0, g_num_items+10, "something", 9);
+    ret = yk_doc_update(dbh, "abcd", context->mode, g_num_items+10, "something", 9);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ID);
 
     /* tries to update from an invalid collection */
-    ret = yk_doc_update(dbh, "efgh", 0, 0, "something", 9);
+    ret = yk_doc_update(dbh, "efgh", context->mode, 0, "something", 9);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     /* tries to update using nullptr for the document content */
-    ret = yk_doc_update(dbh, "efgh", 0, 0, nullptr, 9);
+    ret = yk_doc_update(dbh, "efgh", context->mode, 0, nullptr, 9);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -126,7 +126,7 @@ static MunitResult test_coll_update_multi(const MunitParameter params[], void* d
         ids.push_back(i);
     }
 
-    ret = yk_doc_update_multi(dbh, "abcd", 0, ids.size(), ids.data(),
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode, ids.size(), ids.data(),
             ptrs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
@@ -136,7 +136,7 @@ static MunitResult test_coll_update_multi(const MunitParameter params[], void* d
         yk_id_t id = (yk_id_t)i;
         auto& ref = context->reference[i];
         size_t bufsize = g_max_val_size;
-        ret = yk_doc_load(dbh, "abcd", 0, id, buffer.data(), &bufsize);
+        ret = yk_doc_load(dbh, "abcd", context->mode, id, buffer.data(), &bufsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_long(bufsize, ==, ref.size());
@@ -144,29 +144,33 @@ static MunitResult test_coll_update_multi(const MunitParameter params[], void* d
     }
 
     /* tries to update from an invalid collection */
-    ret = yk_doc_update_multi(dbh, "efgh", 0, ids.size(), ids.data(), ptrs.data(), sizes.data());
+    ret = yk_doc_update_multi(dbh, "efgh", context->mode, ids.size(),
+                              ids.data(), ptrs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     /* tries to update using nullptr for the ids */
-    ret = yk_doc_update_multi(dbh, "abcd", 0, ids.size(), nullptr, ptrs.data(), sizes.data());
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode, ids.size(),
+                              nullptr, ptrs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update using nullptr for the documents content */
-    ret = yk_doc_update_multi(dbh, "abcd", 0, ids.size(), ids.data(), nullptr, sizes.data());
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode, ids.size(),
+                              ids.data(), nullptr, sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update using nullptr for the sizes */
-    ret = yk_doc_update_multi(dbh, "abcd", 0, ids.size(), ids.data(), ptrs.data(), nullptr);
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode, ids.size(),
+                              ids.data(), ptrs.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update an id outside of the collection */
     ids[0] = g_num_items+10;
-    ret = yk_doc_update_multi(dbh, "abcd", 0, ids.size(), ids.data(),
-            ptrs.data(), sizes.data());
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode, ids.size(),
+                              ids.data(), ptrs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ID);
 
@@ -205,7 +209,7 @@ static MunitResult test_coll_update_packed(const MunitParameter params[], void* 
         ids.push_back(i);
     }
 
-    ret = yk_doc_update_packed(dbh, "abcd", 0, ids.size(), ids.data(),
+    ret = yk_doc_update_packed(dbh, "abcd", context->mode, ids.size(), ids.data(),
             packed_docs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
@@ -215,7 +219,7 @@ static MunitResult test_coll_update_packed(const MunitParameter params[], void* 
         yk_id_t id = (yk_id_t)i;
         auto& ref = context->reference[i];
         size_t bufsize = g_max_val_size;
-        ret = yk_doc_load(dbh, "abcd", 0, id, buffer.data(), &bufsize);
+        ret = yk_doc_load(dbh, "abcd", context->mode, id, buffer.data(), &bufsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         munit_assert_long(bufsize, ==, ref.size());
@@ -223,37 +227,45 @@ static MunitResult test_coll_update_packed(const MunitParameter params[], void* 
     }
 
     /* tries to update from an invalid collection */
-    ret = yk_doc_update_packed(dbh, "efgh", 0, ids.size(), ids.data(), packed_docs.data(), sizes.data());
+    ret = yk_doc_update_packed(dbh, "efgh", context->mode, ids.size(),
+                               ids.data(), packed_docs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
 
     /* tries to update using nullptr for the ids */
-    ret = yk_doc_update_packed(dbh, "abcd", 0, ids.size(), nullptr, packed_docs.data(), sizes.data());
+    ret = yk_doc_update_packed(dbh, "abcd", context->mode, ids.size(),
+                               nullptr, packed_docs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update using nullptr for the documents content */
-    ret = yk_doc_update_packed(dbh, "abcd", 0, ids.size(), ids.data(), nullptr, sizes.data());
+    ret = yk_doc_update_packed(dbh, "abcd", context->mode, ids.size(),
+                               ids.data(), nullptr, sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update using nullptr for the sizes */
-    ret = yk_doc_update_packed(dbh, "abcd", 0, ids.size(), ids.data(), packed_docs.data(), nullptr);
+    ret = yk_doc_update_packed(dbh, "abcd", context->mode, ids.size(),
+                               ids.data(), packed_docs.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to update an id outside of the collection */
     ids[0] = g_num_items+10;
-    ret = yk_doc_update_packed(dbh, "abcd", 0, ids.size(), ids.data(),
-            packed_docs.data(), sizes.data());
+    ret = yk_doc_update_packed(dbh, "abcd", context->mode, ids.size(),
+                               ids.data(), packed_docs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ID);
 
     return MUNIT_OK;
 }
 
+static char* no_rdma_params[] = {
+    (char*)"true", (char*)"false", (char*)NULL };
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"no-rdma", (char**)no_rdma_params },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
   { (char*)"num-items", NULL },
