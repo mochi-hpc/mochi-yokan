@@ -145,3 +145,73 @@ void yk_get_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_get_ult)
+
+void yk_get_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    get_direct_in_t in;
+    get_direct_out_t out;
+
+    std::memset(&in, 0, sizeof(in));
+    std::memset(&out, 0, sizeof(out));
+
+    std::vector<char> values;
+    std::vector<size_t> vsizes;
+
+    out.ret = YOKAN_SUCCESS;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    auto count = in.ksizes.count;
+    auto ksizes_umem = yokan::BasicUserMem<size_t>{
+        in.ksizes.sizes, count };
+    auto keys_umem = yokan::UserMem{
+        in.keys.data, in.keys.size };
+
+    // check that there is no key of size 0
+    auto min_key_size = std::accumulate(in.ksizes.sizes, in.ksizes.sizes + in.ksizes.count,
+                                        std::numeric_limits<size_t>::max(),
+                                        [](const size_t& lhs, const size_t& rhs) {
+                                            return std::min(lhs, rhs);
+                                        });
+    if(min_key_size == 0) {
+        out.ret = YOKAN_ERR_INVALID_ARGS;
+        return;
+    }
+
+    values.resize(in.vbufsize);
+    vsizes.resize(count, 0);
+
+    auto vsizes_umem = yokan::BasicUserMem<size_t>{
+        vsizes.data(), count };
+    auto values_umem = yokan::UserMem{
+        values.data(), values.size() };
+
+    out.ret = static_cast<yk_return_t>(
+            database->get(in.mode, true, keys_umem,
+                          ksizes_umem, values_umem, vsizes_umem));
+
+    if(out.ret == YOKAN_SUCCESS) {
+        out.vsizes.sizes = vsizes.data();
+        out.vsizes.count = count;
+        out.vals.data = values.data();
+        out.vals.size = values_umem.size;
+    }
+}
+DEFINE_MARGO_RPC_HANDLER(yk_get_direct_ult)

@@ -498,7 +498,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
         }
 
-        vals.size = key_offset;
+        vals.size = get_value.m_offset;
         if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }

@@ -200,6 +200,18 @@ MERCURY_GEN_PROC(get_in_t,
 MERCURY_GEN_PROC(get_out_t,
         ((int32_t)(ret)))
 
+/* get (direct) */
+MERCURY_GEN_PROC(get_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_size_t)(vbufsize))\
+        ((uint64_list)(ksizes))\
+        ((raw_data)(keys)))
+MERCURY_GEN_PROC(get_direct_out_t,
+        ((uint64_list)(vsizes))\
+        ((raw_data)(vals))\
+        ((int32_t)(ret)))
+
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
         ((yk_database_id_t)(db_id))\

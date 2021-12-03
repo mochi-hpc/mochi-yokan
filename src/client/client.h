@@ -21,6 +21,7 @@ typedef struct yk_client {
     hg_id_t           put_id;
     hg_id_t           put_direct_id;
     hg_id_t           get_id;
+    hg_id_t           get_direct_id;
     hg_id_t           erase_id;
     hg_id_t           erase_direct_id;
     hg_id_t           list_keys_id;
