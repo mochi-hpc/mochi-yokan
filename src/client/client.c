@@ -41,6 +41,7 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_coll_last_id",     &c->coll_last_id_id,     &flag);
         margo_registered_name(mid, "yk_coll_size",        &c->coll_size_id,        &flag);
         margo_registered_name(mid, "yk_doc_load",         &c->doc_load_id,         &flag);
+        margo_registered_name(mid, "yk_doc_load_direct",  &c->doc_load_direct_id,  &flag);
         margo_registered_name(mid, "yk_doc_erase",        &c->doc_erase_id,        &flag);
         margo_registered_name(mid, "yk_doc_store",        &c->doc_store_id,        &flag);
         margo_registered_name(mid, "yk_doc_store_direct", &c->doc_store_direct_id, &flag);
@@ -111,6 +112,9 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_load_id =
             MARGO_REGISTER(mid, "yk_doc_load",
                            doc_load_in_t, doc_load_out_t, NULL);
+        c->doc_load_direct_id =
+            MARGO_REGISTER(mid, "yk_doc_load_direct",
+                           doc_load_direct_in_t, doc_load_direct_out_t, NULL);
         c->doc_store_id =
             MARGO_REGISTER(mid, "yk_doc_store",
                            doc_store_in_t, doc_store_out_t, NULL);

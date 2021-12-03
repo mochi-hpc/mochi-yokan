@@ -100,3 +100,62 @@ void yk_doc_load_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_load_ult)
+
+void yk_doc_load_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    doc_load_direct_in_t in;
+    doc_load_direct_out_t out;
+
+    in.ids.ids = nullptr;
+    in.ids.count = 0;
+
+    out.ret = YOKAN_SUCCESS;
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
+    out.docs.data = nullptr;
+    out.docs.size = 0;
+
+    std::vector<size_t> doc_sizes;
+    std::vector<char> doc_data;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    size_t count = in.ids.count;
+    doc_sizes.resize(count);
+    doc_data.resize(in.bufsize);
+
+    yokan::BasicUserMem<yk_id_t> ids{ in.ids.ids, in.ids.count };
+    auto sizes_umem = yokan::BasicUserMem<size_t>{
+        doc_sizes.data(), count };
+    auto docs_umem = yokan::UserMem{
+        doc_data.data(), doc_data.size()
+    };
+
+    out.ret = static_cast<yk_return_t>(
+        database->docLoad(in.coll_name, in.mode, true, ids, docs_umem, sizes_umem));
+
+    if(out.ret == YOKAN_SUCCESS) {
+        out.sizes.sizes = doc_sizes.data();
+        out.sizes.count = count;
+        out.docs.data   = doc_data.data();
+        out.docs.size   = docs_umem.size;
+    }
+}
+DEFINE_MARGO_RPC_HANDLER(yk_doc_load_direct_ult)

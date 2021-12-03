@@ -34,6 +34,7 @@ typedef struct yk_client {
     hg_id_t           coll_size_id;
     hg_id_t           doc_erase_id;
     hg_id_t           doc_load_id;
+    hg_id_t           doc_load_direct_id;
     hg_id_t           doc_store_id;
     hg_id_t           doc_store_direct_id;
     hg_id_t           doc_update_id;

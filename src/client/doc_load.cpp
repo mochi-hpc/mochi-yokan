@@ -13,6 +13,64 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+static yk_return_t yk_doc_load_direct(yk_database_handle_t dbh,
+                                      const char* collection,
+                                      int32_t mode,
+                                      size_t count,
+                                      const yk_id_t* ids,
+                                      size_t rbufsize,
+                                      void* records,
+                                      size_t* rsizes) {
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    else if(!ids || !rsizes || (!records && rbufsize))
+        return YOKAN_ERR_INVALID_ARGS;
+
+    CHECK_MODE_VALID(mode);
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    doc_load_direct_in_t in;
+    doc_load_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id     = dbh->database_id;
+    in.mode      = mode;
+    in.coll_name = (char*)collection;
+    in.ids.count = count;
+    in.ids.ids   = (yk_id_t*)ids;
+    in.bufsize   = rbufsize;
+
+    out.sizes.sizes = rsizes;
+    out.sizes.count = count;
+    out.docs.data   = (char*)records;
+    out.docs.size   = rbufsize;
+
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_load_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    ret = static_cast<yk_return_t>(out.ret);
+
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
+    out.docs.data   = nullptr;
+    out.docs.size   = 0;
+
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
+
+
 extern "C" yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
                                         const char* name,
                                         int32_t mode,
@@ -69,6 +127,11 @@ extern "C" yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
                                           size_t rbufsize,
                                           void* records,
                                           size_t* rsizes) {
+
+    if(mode & YOKAN_MODE_NO_RDMA) {
+        return yk_doc_load_direct(dbh, collection, mode, count, ids,
+                                  rbufsize, records, rsizes);
+    }
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes || (!records && rbufsize))
@@ -101,6 +164,9 @@ extern "C" yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
                                          const yk_id_t* ids,
                                          void* const* records,
                                          size_t* rsizes) {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return YOKAN_ERR_OP_UNSUPPORTED;
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes || !records)
