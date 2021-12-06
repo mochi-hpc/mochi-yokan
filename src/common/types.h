@@ -248,6 +248,19 @@ MERCURY_GEN_PROC(list_keys_in_t,
 MERCURY_GEN_PROC(list_keys_out_t,
         ((int32_t)(ret)))
 
+/* list_keys (direct) */
+MERCURY_GEN_PROC(list_keys_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint64_t)(count))\
+        ((raw_data)(from_key))\
+        ((raw_data)(filter))\
+        ((uint64_t)(keys_buf_size)))
+MERCURY_GEN_PROC(list_keys_direct_out_t,
+        ((int32_t)(ret))\
+        ((uint64_list)(ksizes))\
+        ((raw_data)(keys)))
+
 /* list_keyvals */
 MERCURY_GEN_PROC(list_keyvals_in_t,
         ((yk_database_id_t)(db_id))\
@@ -263,6 +276,22 @@ MERCURY_GEN_PROC(list_keyvals_in_t,
         ((hg_bulk_t)(bulk)))
 MERCURY_GEN_PROC(list_keyvals_out_t,
         ((int32_t)(ret)))
+
+/* list_keyvals (direct) */
+MERCURY_GEN_PROC(list_keyvals_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint64_t)(count))\
+        ((raw_data)(from_key))\
+        ((raw_data)(filter))\
+        ((uint64_t)(keys_buf_size))\
+        ((uint64_t)(vals_buf_size)))
+MERCURY_GEN_PROC(list_keyvals_direct_out_t,
+        ((int32_t)(ret))\
+        ((uint64_list)(ksizes))\
+        ((uint64_list)(vsizes))\
+        ((raw_data)(keys))\
+        ((raw_data)(vals)))
 
 
 /* coll_create */

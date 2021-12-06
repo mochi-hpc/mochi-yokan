@@ -86,9 +86,9 @@ static void* test_list_keys_context_setup(const MunitParameter params[], void* u
         vsizes.push_back(vsize);
     }
 
-    yk_put_multi(base_context->dbh, 0, count,
-                  kptrs.data(), ksizes.data(),
-                  vptrs.data(), vsizes.data());
+    yk_put_multi(base_context->dbh, context->base->mode, count,
+                 kptrs.data(), ksizes.data(),
+                 vptrs.data(), vsizes.data());
 
     return context;
 }
@@ -625,8 +625,12 @@ static char* filter_params[] = {
     (char*)"", (char*)"prefix:matt", (char*)"suffix:matt", NULL
 };
 
+static char* no_rdma_params[] = {
+    (char*)"true", (char*)"false", (char*)NULL };
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"no-rdma", (char**)no_rdma_params },
   { (char*)"inclusive", inclusive_params },
   { (char*)"filter", filter_params },
   { (char*)"min-key-size", NULL },

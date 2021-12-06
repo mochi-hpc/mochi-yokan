@@ -204,11 +204,23 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keys_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_list_keys_direct",
+            list_keys_direct_in_t, list_keys_direct_out_t,
+            yk_list_keys_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->list_keys_direct_id = id;
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_list_keyvals",
             list_keyvals_in_t, list_keyvals_out_t,
             yk_list_keyvals_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keyvals_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_list_keyvals_direct",
+            list_keyvals_direct_in_t, list_keyvals_direct_out_t,
+            yk_list_keyvals_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->list_keyvals_direct_id = id;
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_create",
             coll_create_in_t, coll_create_out_t,
@@ -333,6 +345,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->erase_id);
     margo_deregister(mid, provider->erase_direct_id);
     margo_deregister(mid, provider->list_keys_id);
+    margo_deregister(mid, provider->list_keys_direct_id);
     margo_deregister(mid, provider->list_keyvals_id);
     margo_deregister(mid, provider->coll_create_id);
     margo_deregister(mid, provider->coll_drop_id);

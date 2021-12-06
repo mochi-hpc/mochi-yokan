@@ -110,3 +110,71 @@ void yk_list_keyvals_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)
+
+void yk_list_keyvals_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    list_keyvals_direct_in_t in;
+    list_keyvals_direct_out_t out;
+
+    std::vector<size_t> ksizes;
+    std::vector<char> keys;
+    std::vector<size_t> vsizes;
+    std::vector<char> vals;
+
+    std::memset(&in, 0, sizeof(in));
+    std::memset(&out, 0, sizeof(out));
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    ksizes.resize(in.count);
+    keys.resize(in.keys_buf_size);
+    vsizes.resize(in.count);
+    vals.resize(in.vals_buf_size);
+
+    // build buffer wrappers
+    auto from_key    = yokan::UserMem{ in.from_key.data, in.from_key.size };
+    auto filter_umem = yokan::UserMem{ in.filter.data, in.filter.size };
+    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
+    auto keys_umem   = yokan::UserMem{keys};
+    auto ksizes_umem = yokan::BasicUserMem<size_t>{ksizes};
+    auto vals_umem   = yokan::UserMem{vals};
+    auto vsizes_umem = yokan::BasicUserMem<size_t>{vsizes};
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
+
+    out.ret = static_cast<yk_return_t>(
+            database->listKeyValues(in.mode, true, from_key, filter,
+                keys_umem, ksizes_umem, vals_umem, vsizes_umem));
+
+    if(out.ret == YOKAN_SUCCESS) {
+        out.ksizes.sizes = ksizes.data();
+        out.ksizes.count = in.count;
+        out.keys.data    = keys.data();
+        out.keys.size    = keys_umem.size;
+        out.vsizes.sizes = vsizes.data();
+        out.vsizes.count = in.count;
+        out.vals.data    = vals.data();
+        out.vals.size    = vals_umem.size;
+    }
+}
+DEFINE_MARGO_RPC_HANDLER(yk_list_keyvals_direct_ult)

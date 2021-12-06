@@ -13,6 +13,81 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+static yk_return_t yk_list_keyvals_direct(yk_database_handle_t dbh,
+                                          int32_t mode,
+                                          const void* from_key,
+                                          size_t from_ksize,
+                                          const void* filter,
+                                          size_t filter_size,
+                                          size_t count,
+                                          void* keys,
+                                          size_t keys_buf_size,
+                                          size_t* ksizes,
+                                          void* values,
+                                          size_t vals_buf_size,
+                                          size_t* vsizes)
+{
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    if(from_key == nullptr && from_ksize > 0)
+        return YOKAN_ERR_INVALID_ARGS;
+    if(filter == nullptr && filter_size > 0)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    CHECK_MODE_VALID(mode);
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    list_keyvals_direct_in_t in;
+    list_keyvals_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id         = dbh->database_id;
+    in.mode          = mode;
+    in.count         = count;
+    in.from_key.size = from_ksize;
+    in.from_key.data = (char*)from_key;
+    in.filter.size   = filter_size;
+    in.filter.data   = (char*)filter;
+    in.keys_buf_size = keys_buf_size;
+    in.vals_buf_size = vals_buf_size;
+
+    out.ksizes.sizes = ksizes;
+    out.ksizes.count = count;
+    out.keys.data    = (char*)keys;
+    out.keys.size    = keys_buf_size;
+    out.vsizes.sizes = vsizes;
+    out.vsizes.count = count;
+    out.vals.data    = (char*)values;
+    out.vals.size    = vals_buf_size;
+
+    hret = margo_create(mid, dbh->addr, dbh->client->list_keyvals_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    out.ksizes.sizes = nullptr;
+    out.ksizes.count = 0;
+    out.keys.data    = nullptr;
+    out.keys.size    = 0;
+    out.vsizes.sizes = nullptr;
+    out.vsizes.count = 0;
+    out.vals.data    = nullptr;
+    out.vals.size    = 0;
+
+    ret = static_cast<yk_return_t>(out.ret);
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
+
 /**
  * The list operations use a single bulk handle exposing data as follows:
  * - The first from_ksize bytes represent the start key.
@@ -91,6 +166,9 @@ extern "C" yk_return_t yk_list_keyvals(yk_database_handle_t dbh,
                                          void* const* values,
                                          size_t* vsizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return YOKAN_ERR_OP_UNSUPPORTED;
+
     if(count == 0)
         return YOKAN_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)
@@ -163,6 +241,12 @@ extern "C" yk_return_t yk_list_keyvals_packed(yk_database_handle_t dbh,
                                                 size_t vals_buf_size,
                                                 size_t* vsizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return yk_list_keyvals_direct(dbh, mode, from_key,
+                from_ksize, filter, filter_size, count,
+                keys, keys_buf_size, ksizes,
+                values, vals_buf_size, vsizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)

@@ -21,19 +21,21 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
 
     if(flag == HG_TRUE) {
 
-        margo_registered_name(mid, "yk_count",        &c->count_id,        &flag);
-        margo_registered_name(mid, "yk_exists",       &c->exists_id,       &flag);
-        margo_registered_name(mid, "yk_exists_direct",&c->exists_direct_id,&flag);
-        margo_registered_name(mid, "yk_length",       &c->length_id,       &flag);
-        margo_registered_name(mid, "yk_length_direct",&c->length_direct_id,&flag);
-        margo_registered_name(mid, "yk_put",          &c->put_id,          &flag);
-        margo_registered_name(mid, "yk_put_direct",   &c->put_direct_id,   &flag);
-        margo_registered_name(mid, "yk_get",          &c->get_id,          &flag);
-        margo_registered_name(mid, "yk_get_direct",   &c->get_direct_id,   &flag);
-        margo_registered_name(mid, "yk_erase",        &c->erase_id,        &flag);
-        margo_registered_name(mid, "yk_erase_direct", &c->erase_direct_id, &flag);
-        margo_registered_name(mid, "yk_list_keys",    &c->list_keys_id,    &flag);
-        margo_registered_name(mid, "yk_list_keyvals", &c->list_keyvals_id, &flag);
+        margo_registered_name(mid, "yk_count",               &c->count_id,               &flag);
+        margo_registered_name(mid, "yk_exists",              &c->exists_id,              &flag);
+        margo_registered_name(mid, "yk_exists_direct",       &c->exists_direct_id,       &flag);
+        margo_registered_name(mid, "yk_length",              &c->length_id,              &flag);
+        margo_registered_name(mid, "yk_length_direct",       &c->length_direct_id,       &flag);
+        margo_registered_name(mid, "yk_put",                 &c->put_id,                 &flag);
+        margo_registered_name(mid, "yk_put_direct",          &c->put_direct_id,          &flag);
+        margo_registered_name(mid, "yk_get",                 &c->get_id,                 &flag);
+        margo_registered_name(mid, "yk_get_direct",          &c->get_direct_id,          &flag);
+        margo_registered_name(mid, "yk_erase",               &c->erase_id,               &flag);
+        margo_registered_name(mid, "yk_erase_direct",        &c->erase_direct_id,        &flag);
+        margo_registered_name(mid, "yk_list_keys",           &c->list_keys_id,           &flag);
+        margo_registered_name(mid, "yk_list_keys_direct",    &c->list_keys_direct_id,    &flag);
+        margo_registered_name(mid, "yk_list_keyvals",        &c->list_keyvals_id,        &flag);
+        margo_registered_name(mid, "yk_list_keyvals_direct", &c->list_keyvals_direct_id, &flag);
 
         margo_registered_name(mid, "yk_coll_create",      &c->coll_create_id,      &flag);
         margo_registered_name(mid, "yk_coll_drop",        &c->coll_drop_id,        &flag);
@@ -89,9 +91,15 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->list_keys_id =
             MARGO_REGISTER(mid, "yk_list_keys",
                            list_keys_in_t, list_keys_out_t, NULL);
+        c->list_keys_direct_id =
+            MARGO_REGISTER(mid, "yk_list_keys_direct",
+                           list_keys_direct_in_t, list_keys_direct_out_t, NULL);
         c->list_keyvals_id =
             MARGO_REGISTER(mid, "yk_list_keyvals",
                            list_keyvals_in_t, list_keyvals_out_t, NULL);
+        c->list_keyvals_direct_id =
+            MARGO_REGISTER(mid, "yk_list_keyvals_direct",
+                           list_keyvals_direct_in_t, list_keyvals_direct_out_t, NULL);
 
         c->coll_create_id =
             MARGO_REGISTER(mid, "yk_coll_create",
