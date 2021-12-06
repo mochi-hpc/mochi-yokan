@@ -41,6 +41,7 @@ typedef struct yk_client {
     hg_id_t           doc_update_direct_id;
     hg_id_t           doc_length_id;
     hg_id_t           doc_list_id;
+    hg_id_t           doc_list_direct_id;
 
     uint64_t          num_database_handles;
 } yk_client;

@@ -109,3 +109,67 @@ void yk_doc_list_ult(hg_handle_t h)
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_list_ult)
+
+void yk_doc_list_direct_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    doc_list_direct_in_t in;
+    doc_list_direct_out_t out;
+
+    std::vector<yk_id_t> ids;
+    std::vector<size_t>  doc_sizes;
+    std::vector<char>    docs;
+
+    std::memset(&in, 0, sizeof(in));
+    std::memset(&out, 0, sizeof(out));
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    yk_database* database = find_database(provider, &in.db_id);
+    CHECK_DATABASE(database, in.db_id);
+    CHECK_MODE_SUPPORTED(database, in.mode);
+
+    doc_sizes.resize(in.count);
+    ids.resize(in.count);
+    docs.resize(in.bufsize);
+
+    auto filter_umem = yokan::UserMem{ in.filter.data, in.filter.size };
+    auto filter = yokan::FilterFactory::makeDocFilter(mid, in.mode, filter_umem);
+    auto doc_sizes_umem = yokan::BasicUserMem<size_t>{doc_sizes};
+    auto ids_umem = yokan::BasicUserMem<yk_id_t>{ids};
+    auto docs_umem = yokan::UserMem{docs};
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
+
+    out.ret = static_cast<yk_return_t>(
+            database->docList(
+                in.coll_name,
+                in.mode, true,
+                in.from_id, filter,
+                ids_umem, docs_umem, doc_sizes_umem));
+
+    if(out.ret == YOKAN_SUCCESS) {
+        out.ids.ids = ids.data();
+        out.ids.count = in.count;
+        out.sizes.sizes = doc_sizes.data();
+        out.sizes.count = in.count;
+        out.docs.data = docs.data();
+        out.docs.size = docs_umem.size;
+    }
+}
+DEFINE_MARGO_RPC_HANDLER(yk_doc_list_direct_ult)

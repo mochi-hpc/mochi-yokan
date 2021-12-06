@@ -83,6 +83,7 @@ typedef struct yk_provider {
     hg_id_t doc_update_direct_id;
     hg_id_t doc_length_id;
     hg_id_t doc_list_id;
+    hg_id_t doc_list_direct_id;
 } yk_provider;
 
 /* Admin RPCs */
@@ -153,6 +154,8 @@ DECLARE_MARGO_RPC_HANDLER(yk_doc_length_ult)
 void yk_doc_length_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_list_ult)
 void yk_doc_list_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_list_direct_ult)
+void yk_doc_list_direct_ult(hg_handle_t h);
 
 static inline yk_database_t find_database(yk_provider_t provider,
                                            yk_database_id_t* db_id)

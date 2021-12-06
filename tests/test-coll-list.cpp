@@ -36,7 +36,8 @@ static void* test_coll_list_context_setup(const MunitParameter params[], void* u
     yk_collection_create(context->dbh, "abcd", 0);
 
     std::vector<yk_id_t> ids(count);
-    yk_doc_store_multi(context->dbh, "abcd", 0, count, ptrs.data(), sizes.data(), ids.data());
+    yk_doc_store_multi(context->dbh, "abcd", context->mode,
+                       count, ptrs.data(), sizes.data(), ids.data());
 
     return context;
 }
@@ -74,8 +75,8 @@ static MunitResult test_coll_list(const MunitParameter params[], void* data)
 
     i = 0;
     while(i < g_num_items) {
-        ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE, start_id,
-                          nullptr, 0,
+        ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|context->mode,
+                          start_id, nullptr, 0,
                           g_items_per_op, ids.data()+i,
                           buf_ptrs.data()+i, buf_sizes.data()+i);
         SKIP_IF_NOT_IMPLEMENTED(ret);
@@ -102,25 +103,25 @@ static MunitResult test_coll_list(const MunitParameter params[], void* data)
     /* erroneous cases */
 
     /* tries to load with nullptr as ids */
-    ret = yk_doc_list(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             nullptr, buf_ptrs.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load with nullptr for document */
-    ret = yk_doc_list(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), nullptr, buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load with nullptr as size */
-    ret = yk_doc_list(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), buf_ptrs.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load from a collection that does not exist */
-    ret = yk_doc_list(dbh, "efgh", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list(dbh, "efgh", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), buf_ptrs.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
@@ -148,11 +149,11 @@ static MunitResult test_coll_list_packed(const MunitParameter params[], void* da
     unsigned i = 0;
     size_t doc_offset = 0;
     while(i < g_num_items) {
-        ret = yk_doc_list_packed(dbh, "abcd", YOKAN_MODE_INCLUSIVE, start_id,
-                          nullptr, 0,
-                          g_items_per_op, ids.data()+i,
-                          buffer.size()-doc_offset,
-                          buffer.data()+doc_offset, buf_sizes.data()+i);
+        ret = yk_doc_list_packed(dbh, "abcd", YOKAN_MODE_INCLUSIVE|context->mode,
+                                 start_id, nullptr, 0,
+                                 g_items_per_op, ids.data()+i,
+                                 buffer.size()-doc_offset,
+                                 buffer.data()+doc_offset, buf_sizes.data()+i);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         for(unsigned j = 0; j < g_items_per_op; j++) {
@@ -182,25 +183,25 @@ static MunitResult test_coll_list_packed(const MunitParameter params[], void* da
     /* erroneous cases */
 
     /* tries to load with nullptr as ids */
-    ret = yk_doc_list_packed(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list_packed(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             nullptr, buffer.size(), buffer.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load with nullptr for document */
-    ret = yk_doc_list_packed(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list_packed(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), buffer.size(), nullptr, buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load with nullptr as size */
-    ret = yk_doc_list_packed(dbh, "abcd", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list_packed(dbh, "abcd", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), buffer.size(), buffer.data(), nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     /* tries to load from a collection that does not exist */
-    ret = yk_doc_list_packed(dbh, "efgh", 0, 0, nullptr, 0, g_items_per_op,
+    ret = yk_doc_list_packed(dbh, "efgh", context->mode, 0, nullptr, 0, g_items_per_op,
             ids.data(), buffer.size(), buffer.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
@@ -236,7 +237,7 @@ static MunitResult test_coll_list_lua(const MunitParameter params[], void* data)
         "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
     size_t code_size = strlen(lua_code);
 
-    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER;
+    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER|context->mode;
     while(start_id != YOKAN_NO_MORE_DOCS) {
         ret = yk_doc_list(dbh, "abcd", mode, start_id,
                           lua_code, code_size,
@@ -280,6 +281,7 @@ static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void
     size_t code_size = strlen(lua_code);
 
     int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER|YOKAN_MODE_FILTER_VALUE;
+    mode |= context->mode;
     while(start_id != YOKAN_NO_MORE_DOCS) {
         ret = yk_doc_list_packed(dbh, "abcd", mode, start_id,
                           lua_code, code_size,
@@ -332,7 +334,7 @@ static MunitResult test_coll_list_custom_filter(const MunitParameter params[], v
     yk_id_t start_id = 0;
     std::string filter = "libcustom-filters.so:custom_doc:";
 
-    ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LIB_FILTER, start_id,
+    ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LIB_FILTER|context->mode, start_id,
             filter.data(), filter.size(), count, ids.data(), buf_ptrs.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
@@ -351,9 +353,12 @@ static MunitResult test_coll_list_custom_filter(const MunitParameter params[], v
     return MUNIT_OK;
 }
 
+static char* no_rdma_params[] = {
+    (char*)"true", (char*)"false", (char*)NULL };
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
+  { (char*)"no-rdma", (char**)no_rdma_params },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
   { (char*)"num-items", NULL },

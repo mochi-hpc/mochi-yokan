@@ -46,8 +46,10 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_doc_store",        &c->doc_store_id,        &flag);
         margo_registered_name(mid, "yk_doc_store_direct", &c->doc_store_direct_id, &flag);
         margo_registered_name(mid, "yk_doc_update",       &c->doc_update_id,       &flag);
+        margo_registered_name(mid, "yk_doc_update_direct",&c->doc_update_direct_id,&flag);
         margo_registered_name(mid, "yk_doc_length",       &c->doc_length_id,       &flag);
         margo_registered_name(mid, "yk_doc_list",         &c->doc_list_id,         &flag);
+        margo_registered_name(mid, "yk_doc_list_direct",  &c->doc_list_direct_id,  &flag);
 
     } else {
 
@@ -133,6 +135,9 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_list_id =
             MARGO_REGISTER(mid, "yk_doc_list",
                            doc_list_in_t, doc_list_out_t, NULL);
+        c->doc_list_direct_id =
+            MARGO_REGISTER(mid, "yk_doc_list_direct",
+                           doc_list_direct_in_t, doc_list_direct_out_t, NULL);
     }
 
     *client = c;

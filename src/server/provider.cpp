@@ -294,6 +294,12 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_list_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_list_direct",
+            doc_list_direct_in_t, doc_list_direct_out_t,
+            yk_doc_list_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_list_direct_id = id;
+
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
     if(provider)
@@ -341,6 +347,8 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_update_id);
     margo_deregister(mid, provider->doc_update_direct_id);
     margo_deregister(mid, provider->doc_length_id);
+    margo_deregister(mid, provider->doc_list_id);
+    margo_deregister(mid, provider->doc_list_direct_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
     YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");

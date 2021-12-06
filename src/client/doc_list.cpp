@@ -13,6 +13,75 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
+static yk_return_t yk_doc_list_direct(yk_database_handle_t dbh,
+                                      const char* collection,
+                                      int32_t mode,
+                                      yk_id_t start_id,
+                                      const void* filter,
+                                      size_t filter_size,
+                                      size_t count,
+                                      yk_id_t* ids,
+                                      size_t bufsize,
+                                      void* docs,
+                                      size_t* doc_sizes)
+{
+    if(count == 0)
+        return YOKAN_SUCCESS;
+    if(filter == nullptr && filter_size > 0) {
+        return YOKAN_ERR_INVALID_ARGS;
+    }
+    if(ids == nullptr || (docs == nullptr && bufsize != 0) || doc_sizes == nullptr)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    CHECK_MODE_VALID(mode);
+
+    margo_instance_id mid = dbh->client->mid;
+    yk_return_t ret = YOKAN_SUCCESS;
+    hg_return_t hret = HG_SUCCESS;
+    doc_list_direct_in_t in;
+    doc_list_direct_out_t out;
+    hg_handle_t handle = HG_HANDLE_NULL;
+
+    in.db_id         = dbh->database_id;
+    in.mode          = mode;
+    in.count         = count;
+    in.from_id       = start_id;
+    in.coll_name     = (char*)collection;
+    in.filter.data   = (char*)filter;
+    in.filter.size   = filter_size;
+    in.bufsize       = bufsize;
+
+    out.ids.ids     = ids;
+    out.ids.count   = count;
+    out.sizes.sizes = doc_sizes;
+    out.sizes.count = count;
+    out.docs.data   = (char*)docs;
+    out.docs.size   = bufsize;
+
+    hret = margo_create(mid, dbh->addr, dbh->client->doc_list_direct_id, &handle);
+    CHECK_HRET(hret, margo_create);
+    DEFER(margo_destroy(handle));
+
+    hret = margo_provider_forward(dbh->provider_id, handle, &in);
+    CHECK_HRET(hret, margo_provider_forward);
+
+    hret = margo_get_output(handle, &out);
+    CHECK_HRET(hret, margo_get_output);
+
+    ret = static_cast<yk_return_t>(out.ret);
+    out.ids.ids     = nullptr;
+    out.ids.count   = 0;
+    out.sizes.sizes = nullptr;
+    out.sizes.count = 0;
+    out.docs.data   = nullptr;
+    out.docs.size   = 0;
+
+    hret = margo_free_output(handle, &out);
+    CHECK_HRET(hret, margo_free_output);
+
+    return ret;
+}
+
 /**
  * The list operations use a single bulk handle exposing data as follows:
  * - The first filter_size bytes represent the filter.
@@ -88,6 +157,9 @@ extern "C" yk_return_t yk_doc_list(yk_database_handle_t dbh,
                                    void* const* docs,
                                    size_t* doc_sizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return YOKAN_ERR_OP_UNSUPPORTED;
+
     if(count == 0)
         return YOKAN_SUCCESS;
     if(filter == nullptr && filter_size > 0)
@@ -146,6 +218,11 @@ extern "C" yk_return_t yk_doc_list_packed(yk_database_handle_t dbh,
                                           void* docs,
                                           size_t* doc_sizes)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return yk_doc_list_direct(dbh, collection, mode,
+                start_id, filter, filter_size, count, ids,
+                bufsize, docs, doc_sizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     if(filter == nullptr && filter_size > 0) {
