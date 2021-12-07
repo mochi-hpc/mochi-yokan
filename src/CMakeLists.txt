@@ -21,6 +21,9 @@ set (server-src-files
      server/doc_length.cpp
      server/doc_list.cpp
      server/util/filters.cpp
+     server/util/lua-cjson/fpconv.c
+     server/util/lua-cjson/lua_cjson.c
+     server/util/lua-cjson/strbuf.c
      buffer/default_bulk_cache.cpp)
 
 set (backend-src-files

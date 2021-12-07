@@ -17,6 +17,7 @@
 #include <iostream>
 #ifdef YOKAN_HAS_LUA
 #include <sol/sol.hpp>
+#include "lua-cjson/lua_cjson.h"
 #endif
 
 namespace yokan {
@@ -162,6 +163,7 @@ struct LuaDocFilter : public DocFilter {
         m_lua.open_libraries(sol::lib::base);
         m_lua.open_libraries(sol::lib::string);
         m_lua.open_libraries(sol::lib::math);
+        m_lua.require("cjson", luaopen_cjson);
     }
 
     bool check(yk_id_t id, const void* val, size_t vsize) const override {
