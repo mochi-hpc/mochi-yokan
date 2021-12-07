@@ -21,10 +21,14 @@ set (server-src-files
      server/doc_length.cpp
      server/doc_list.cpp
      server/util/filters.cpp
-     server/util/lua-cjson/fpconv.c
-     server/util/lua-cjson/lua_cjson.c
-     server/util/lua-cjson/strbuf.c
      buffer/default_bulk_cache.cpp)
+
+if (ENABLE_LUA)
+     list(APPEND server-src-files
+          server/util/lua-cjson/fpconv.c
+          server/util/lua-cjson/lua_cjson.c
+          server/util/lua-cjson/strbuf.c)
+endif (ENABLE_LUA)
 
 set (backend-src-files
      backends/backends.cpp
