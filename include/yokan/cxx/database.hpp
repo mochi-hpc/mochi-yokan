@@ -23,6 +23,8 @@ class Database {
 
     public:
 
+    Database() = default;
+
     Database(yk_database_handle_t db, bool copy=true)
     : m_db(db) {
         if(copy && (m_db != YOKAN_DATABASE_HANDLE_NULL)) {

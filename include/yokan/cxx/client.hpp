@@ -16,6 +16,8 @@ class Client {
 
     public:
 
+    Client() = default;
+
     Client(margo_instance_id mid) {
         auto err = yk_client_init(mid, &m_client);
         YOKAN_CONVERT_AND_THROW(err);
