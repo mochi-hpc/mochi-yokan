@@ -75,6 +75,9 @@
 static constexpr int32_t incompatible_modes[][2] = {
     { YOKAN_MODE_APPEND, YOKAN_MODE_NEW_ONLY },
     { YOKAN_MODE_NEW_ONLY, YOKAN_MODE_EXIST_ONLY },
+    { YOKAN_MODE_SUFFIX, YOKAN_MODE_LUA_FILTER },
+    { YOKAN_MODE_LIB_FILTER, YOKAN_MODE_SUFFIX },
+    { YOKAN_MODE_LUA_FILTER, YOKAN_MODE_LIB_FILTER },
     { 0, 0 }};
 
 #define CHECK_MODE_VALID(__mode__) \
