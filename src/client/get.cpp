@@ -156,8 +156,6 @@ extern "C" yk_return_t yk_get_multi(yk_database_handle_t dbh,
                                     void* const* values,
                                     size_t* vsizes)
 {
-    if(mode & YOKAN_MODE_NO_RDMA)
-        return YOKAN_ERR_OP_UNSUPPORTED;
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !values || !vsizes)

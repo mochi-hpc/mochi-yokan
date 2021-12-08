@@ -79,8 +79,6 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
                                          size_t size,
                                          yk_id_t* ids) {
     CHECK_MODE_VALID(mode);
-    if(mode & YOKAN_MODE_NO_RDMA)
-        return YOKAN_ERR_INVALID_ARGS;
 
     margo_instance_id mid = dbh->client->mid;
     yk_return_t ret = YOKAN_SUCCESS;

@@ -148,9 +148,6 @@ extern "C" yk_return_t yk_list_keys(yk_database_handle_t dbh,
                                       void* const* keys,
                                       size_t* ksizes)
 {
-    if(mode & YOKAN_MODE_NO_RDMA)
-        return YOKAN_ERR_OP_UNSUPPORTED;
-
     if(count == 0)
         return YOKAN_SUCCESS;
     if(from_key == nullptr && from_ksize > 0)

@@ -157,9 +157,6 @@ extern "C" yk_return_t yk_doc_list(yk_database_handle_t dbh,
                                    void* const* docs,
                                    size_t* doc_sizes)
 {
-    if(mode & YOKAN_MODE_NO_RDMA)
-        return YOKAN_ERR_OP_UNSUPPORTED;
-
     if(count == 0)
         return YOKAN_SUCCESS;
     if(filter == nullptr && filter_size > 0)

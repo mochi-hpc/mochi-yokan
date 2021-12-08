@@ -164,9 +164,6 @@ extern "C" yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
                                          const yk_id_t* ids,
                                          void* const* records,
                                          size_t* rsizes) {
-    if(mode & YOKAN_MODE_NO_RDMA)
-        return YOKAN_ERR_OP_UNSUPPORTED;
-
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes || !records)
