@@ -38,7 +38,15 @@ class Client {
 
     Client& operator=(const Client&) = delete;
 
-    Client& operator=(Client&&) = delete;
+    Client& operator=(Client&& other) {
+        if(this == &other) return *this;
+        if(m_client != YOKAN_CLIENT_NULL) {
+            yk_client_finalize(m_client);
+        }
+        m_client = other.m_client;
+        other.m_client = YOKAN_CLIENT_NULL;
+        return *this;
+    }
 
     Database makeDatabaseHandle(
         hg_addr_t addr,
