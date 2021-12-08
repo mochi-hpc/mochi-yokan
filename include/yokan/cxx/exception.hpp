@@ -27,6 +27,10 @@ class Exception : public std::exception {
         return "";
     }
 
+    auto code() const {
+        return m_code;
+    }
+
     private:
 
     yk_return_t m_code;
