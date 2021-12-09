@@ -274,6 +274,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             int status = m_db->put(nullptr, &key, &val, flag);
             if(status != 0 && status != DB_KEYEXIST)
                 return convertStatus(status);
+            if(status == DB_KEYEXIST && (mode & YOKAN_MODE_NEW_ONLY) && ksizes.size == 1)
+                return Status::KeyExists;
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }

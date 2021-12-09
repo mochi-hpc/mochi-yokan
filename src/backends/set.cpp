@@ -257,6 +257,7 @@ class SetDatabase : public DatabaseInterface {
 
         const auto mode_notify     = mode & YOKAN_MODE_NOTIFY;
         const auto mode_exist_only = mode & YOKAN_MODE_EXIST_ONLY;
+        const auto mode_new_only   = mode & YOKAN_MODE_NEW_ONLY;
 
         size_t key_offset = 0;
 
@@ -270,8 +271,20 @@ class SetDatabase : public DatabaseInterface {
                                               0);
         if(total_vsizes != 0) return Status::InvalidArg;
 
-        if(mode_exist_only)
+        if(mode_exist_only) {
+            if(ksizes.size == 1) {
+                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) == m_db->end())
+                    return Status::NotFound;
+            }
             return Status::OK;
+        }
+
+        if(mode_new_only) {
+            if(ksizes.size == 1) {
+                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) != m_db->end())
+                    return Status::KeyExists;
+            }
+        }
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {

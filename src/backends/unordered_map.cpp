@@ -296,6 +296,9 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                 vsizes[i], m_val_allocator));
                     if(mode_notify)
                         m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
+                } else {
+                    if(ksizes.size == 1)
+                        return Status::KeyExists;
                 }
 
             } else if(mode_exist_only) { // may of may not have mode_append
@@ -311,6 +314,9 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     }
                     if(mode_notify)
                         m_watcher.notifyKey({keys.data + key_offset, ksizes[i]});
+                } else {
+                    if(ksizes.size == 1)
+                        return Status::NotFound;
                 }
 
             } else if(mode_append) { // but not mode_exist_only

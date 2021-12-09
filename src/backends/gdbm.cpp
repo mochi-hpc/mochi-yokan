@@ -177,9 +177,14 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             if(mode_exist_only) {
                 if(gdbm_exists(m_db, key))
                     ret = gdbm_store(m_db, key, val, GDBM_REPLACE);
+                else if(ksizes.size == 1) {
+                    return Status::NotFound;
+                }
             } else {
                 auto flag = mode_new_only ? GDBM_INSERT : GDBM_REPLACE;
                 ret = gdbm_store(m_db, key, val, flag);
+                if(ret == 1 && mode_new_only && ksizes.size == 1)
+                    return Status::KeyExists;
             }
             if(ret != 0 && gdbm_errno != GDBM_CANNOT_REPLACE) { // TODO convert status ?
                 return Status::Other;

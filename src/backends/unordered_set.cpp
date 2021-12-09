@@ -217,8 +217,20 @@ class UnorderedSetDatabase : public DatabaseInterface {
                                               0);
         if(total_vsizes > 0) return Status::InvalidArg;
 
-        if(mode & YOKAN_MODE_EXIST_ONLY)
+        if(mode & YOKAN_MODE_EXIST_ONLY) {
+            if(ksizes.size == 1) {
+                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) == m_db->end())
+                    return Status::NotFound;
+            }
             return Status::OK;
+        }
+
+        if(mode & YOKAN_MODE_NEW_ONLY) {
+            if(ksizes.size == 1) {
+                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) != m_db->end())
+                    return Status::KeyExists;
+            }
+        }
 
         ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {

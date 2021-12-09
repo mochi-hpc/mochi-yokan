@@ -419,6 +419,9 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             if(!status.IsOK() && (status != tkrzw::Status::DUPLICATION_ERROR)) {
                 return convertStatus(status);
             }
+            if(status == tkrzw::Status::DUPLICATION_ERROR
+            && mode_new_only && ksizes.size == 1)
+                return Status::KeyExists;
             key_offset += ksizes[i];
             val_offset += vsizes[i];
         }

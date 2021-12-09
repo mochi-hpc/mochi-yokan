@@ -871,6 +871,7 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
     }
 
     // put all the value this time, with YOKAN_MODE_EXIST_ONLY
+    i = 0;
     for(auto& p : context->reference)
     {
         auto key   = p.first.data();
@@ -880,7 +881,11 @@ static MunitResult test_put_exist_only(const MunitParameter params[], void* data
         ret = yk_put(dbh, YOKAN_MODE_EXIST_ONLY|context->mode,
                      key, ksize, val, vsize);
         SKIP_IF_NOT_IMPLEMENTED(ret);
-        munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        if(i % 2 == 0)
+            munit_assert_int(ret, ==, YOKAN_ERR_KEY_NOT_FOUND);
+        else
+            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        i += 1;
     }
 
     // check that only the keys that previously existed were modified
@@ -969,8 +974,9 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
             auto vsize = rev_val.size();
             ret = yk_put(dbh, YOKAN_MODE_NEW_ONLY|context->mode, key, ksize, val, vsize);
             SKIP_IF_NOT_IMPLEMENTED(ret);
-            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+            munit_assert_int(ret, ==, YOKAN_ERR_KEY_EXISTS);
         }
+        i += 1;
     }
 
     // check that only the keys that previously did not exist were added
