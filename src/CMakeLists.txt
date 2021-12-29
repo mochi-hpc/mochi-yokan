@@ -141,6 +141,7 @@ target_link_libraries (yokan-server
     PRIVATE nlohmann_json
     PRIVATE ${DB_DEPENDENCIES}
     PRIVATE coverage_config)
+target_compile_definitions (yokan-server PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-server BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -156,6 +157,7 @@ target_link_libraries (yokan-client
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE coverage_config)
+target_compile_definitions (yokan-client PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-client PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-client BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -171,6 +173,7 @@ target_link_libraries (yokan-admin
     PUBLIC PkgConfig::margo
     PUBLIC PkgConfig::uuid
     PRIVATE coverage_config)
+target_compile_definitions (yokan-admin PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-admin PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-admin BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
@@ -189,6 +192,7 @@ target_link_libraries (yokan-bedrock-module
     PUBLIC yokan-client
     PUBLIC bedrock-server
     PRIVATE coverage_config)
+target_compile_definitions (yokan-bedrock-module PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-bedrock-module BEFORE PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
