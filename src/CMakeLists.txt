@@ -92,6 +92,7 @@ endif ()
 
 set (client-src-files
      client/client.c
+     client/find_by_name.cpp
      client/count.cpp
      client/put.cpp
      client/erase.cpp

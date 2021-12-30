@@ -19,6 +19,29 @@ typedef struct yk_database_handle *yk_database_handle_t;
 #define YOKAN_DATABASE_HANDLE_NULL ((yk_database_handle_t)NULL)
 
 /**
+ * @brief If a database has a "name":"something" entry in its
+ * configuration, this function will find the corresponding
+ * database id.
+ *
+ * Note that if multiple databases have the same name, this
+ * function will return the first one.
+ *
+ * @param[in] client Client
+ * @param[in] addr Server address
+ * @param[in] provider_id Provider id
+ * @param[in] db_name Database name
+ * @param[out] database_id Database id
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_database_find_by_name(
+        yk_client_t client,
+        hg_addr_t addr,
+        uint16_t provider_id,
+        const char* db_name,
+        yk_database_id_t* database_id);
+
+/**
  * @brief Creates a YOKAN database handle.
  *
  * @param[in] client YOKAN client responsible for the database handle

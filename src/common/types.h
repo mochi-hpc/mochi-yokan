@@ -112,6 +112,13 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
 
 /* Client RPC types */
 
+/* find_by_name */
+MERCURY_GEN_PROC(find_by_name_in_t,
+        ((hg_string_t)(db_name)))
+MERCURY_GEN_PROC(find_by_name_out_t,
+        ((int32_t)(ret))\
+        ((yk_database_id_t)(db_id)))
+
 /* count */
 MERCURY_GEN_PROC(count_in_t,
         ((yk_database_id_t)(db_id))\

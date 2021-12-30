@@ -167,6 +167,36 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+static MunitResult test_database_find_by_name(const MunitParameter params[], void* data)
+{
+    (void)params;
+    (void)data;
+    struct test_context* context = (struct test_context*)data;
+    yk_client_t client;
+    yk_return_t ret;
+    // test that we can create a client object
+    ret = yk_client_init(context->mid, &client);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    // test that we can find the database by its name "mydb"
+    yk_database_id_t id;
+    ret = yk_database_find_by_name(client, context->addr,
+            provider_id, "mydb", &id);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_memory_equal(sizeof(id), &id, &(context->id));
+
+    // test with a wrong name
+    ret = yk_database_find_by_name(client, context->addr,
+            provider_id, "invalid", &id);
+    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_DATABASE);
+
+    // test that we can free the client object
+    ret = yk_client_finalize(client);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    return MUNIT_OK;
+}
+
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
   { NULL, NULL }
@@ -178,6 +208,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/client/two", test_two_clients,
         test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/database", test_database,
+        test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/database/find_by_name", test_database_find_by_name,
         test_context_setup, test_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

@@ -21,6 +21,7 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
 
     if(flag == HG_TRUE) {
 
+        margo_registered_name(mid, "yk_find_by_name",        &c->find_by_name_id,        &flag);
         margo_registered_name(mid, "yk_count",               &c->count_id,               &flag);
         margo_registered_name(mid, "yk_exists",              &c->exists_id,              &flag);
         margo_registered_name(mid, "yk_exists_direct",       &c->exists_direct_id,       &flag);
@@ -55,6 +56,9 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
 
     } else {
 
+        c->find_by_name_id =
+            MARGO_REGISTER(mid, "yk_find_by_name",
+                           find_by_name_in_t, find_by_name_out_t, NULL);
         c->count_id =
             MARGO_REGISTER(mid, "yk_count",
                            count_in_t, count_out_t, NULL);

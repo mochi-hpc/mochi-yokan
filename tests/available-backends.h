@@ -33,41 +33,46 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
-    "{}",
-    "{}",
-    "{}",
-    "{}",
+    "{\"name\":\"mydb\"}",
+    "{\"name\":\"mydb\"}",
+    "{\"name\":\"mydb\"}",
+    "{\"name\":\"mydb\"}",
 #ifdef YOKAN_HAS_LEVELDB
-    "{\"path\":\"/tmp/leveldb-test\","
-    " \"create_if_missing\":true}",
+    "{\"path\":\"/tmp/leveldb-test\",\"name\":\"mydb\","
+    " \"create_if_missing\":true,\"name\":\"mydb\"}",
 #endif
 #ifdef YOKAN_HAS_LMDB
-    "{\"path\":\"/tmp/lmdb-test\","
+    "{\"path\":\"/tmp/lmdb-test\",\"name\":\"mydb\","
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_BERKELEYDB
     "{\"home\":\"/tmp/berkeleydb-test\","
     " \"file\":\"my-bdb\","
     " \"create_if_missing\":true,"
+    " \"name\":\"mydb\","
     " \"type\":\"btree\"}",
 #endif
 #ifdef YOKAN_HAS_ROCKSDB
     "{\"path\":\"/tmp/rocksdb-test\","
+    " \"name\":\"mydb\","
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_GDBM
     "{\"path\":\"/tmp/gdbm-test\","
+    " \"name\":\"mydb\","
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_PMEMKV
-    "{}",
+    "{\"name\":\"mydb\"}",
 #endif
 #ifdef YOKAN_HAS_TKRZW
     "{\"path\":\"/tmp/trkzw-test\","
+    " \"name\":\"mydb\","
     " \"type\":\"tree\"}",
 #endif
 #ifdef YOKAN_HAS_UNQLITE
     "{\"path\":\":mem:\","
+    "\"name\":\"mydb\","
     "\"mode\":\"memory\"}",
 #endif
     NULL

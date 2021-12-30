@@ -13,6 +13,7 @@
 typedef struct yk_client {
     margo_instance_id mid;
 
+    hg_id_t           find_by_name_id;
     hg_id_t           count_id;
     hg_id_t           exists_id;
     hg_id_t           exists_direct_id;

@@ -11,6 +11,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include "../buffer/default_bulk_cache.hpp"
+#include <string>
 
 static void yk_finalize_provider(void* p);
 
@@ -131,6 +132,12 @@ yk_return_t yk_provider_register(
     p->list_databases_id = id;
 
     /* Client RPCs */
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_find_by_name",
+            find_by_name_in_t, find_by_name_out_t,
+            yk_find_by_name_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->find_by_name_id = id;
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_count",
             count_in_t, count_out_t,
@@ -334,6 +341,8 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->close_database_id);
     margo_deregister(mid, provider->destroy_database_id);
     margo_deregister(mid, provider->list_databases_id);
+    margo_deregister(mid, provider->find_by_name_id);
+    margo_deregister(mid, provider->count_id);
     margo_deregister(mid, provider->exists_id);
     margo_deregister(mid, provider->exists_direct_id);
     margo_deregister(mid, provider->length_id);
@@ -569,6 +578,44 @@ void yk_list_databases_ult(hg_handle_t h)
     out.count = i;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_list_databases_ult)
+
+void yk_find_by_name_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    find_by_name_in_t  in;
+    find_by_name_out_t out;
+    out.ret = YOKAN_SUCCESS;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    const auto name = std::string(in.db_name);
+    auto it = std::find_if(provider->dbs.begin(), provider->dbs.end(),
+    [&name](const auto& pair){
+        auto db = pair.second;
+        auto config = json::parse(db->config());
+        if(!config.contains("name")) return false;
+        if(!config["name"].is_string()) return false;
+        return config["name"] == name;
+    });
+    if(it == provider->dbs.end()) {
+        out.ret = YOKAN_ERR_INVALID_DATABASE;
+    } else {
+        out.db_id = it->first;
+    }
+}
+DEFINE_MARGO_RPC_HANDLER(yk_find_by_name_ult)
 
 static inline bool check_token(
         yk_provider_t provider,
