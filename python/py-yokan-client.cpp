@@ -581,7 +581,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_database_id_t database_id) {
                 return client.makeDatabaseHandle(addr, provider_id, database_id);
              },
-             "address"_a, "provider_id"_a, "database_id"_a);
+             "address"_a, "provider_id"_a, "database_id"_a)
+
+        .def("find_database_by_name",
+             [](const yokan::Client& client,
+                py_hg_addr_t addr,
+                uint16_t provider_id,
+                const std::string& name) {
+                return client.findDatabaseByName(addr, provider_id, name.c_str());
+             },
+             "address"_a, "provider_id"_a, "name"_a);
 
     py::class_<yokan::Database>(m, "Database")
         // --------------------------------------------------------------

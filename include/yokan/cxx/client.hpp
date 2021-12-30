@@ -7,6 +7,7 @@
 #define __YOKAN_CLIENT_HPP
 
 #include <yokan/client.h>
+#include <yokan/database.h>
 #include <yokan/cxx/exception.hpp>
 #include <yokan/cxx/database.hpp>
 
@@ -57,6 +58,17 @@ class Client {
             m_client, addr, provider_id, database_id, &db);
         YOKAN_CONVERT_AND_THROW(err);
         return Database(db, false);
+    }
+
+    Database findDatabaseByName(
+        hg_addr_t addr,
+        uint16_t provider_id,
+        const char* name) const {
+        yk_database_id_t id;
+        auto err = yk_database_find_by_name(
+            m_client, addr, provider_id, name, &id);
+        YOKAN_CONVERT_AND_THROW(err);
+        return makeDatabaseHandle(addr, provider_id, id);
     }
 
     auto handle() const {
