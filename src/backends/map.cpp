@@ -502,8 +502,11 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         for(auto it = fromKeyIt; it != end && i < max; ++it) {
             auto& key = it->first;
             auto& val = it->second;
-            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
                 continue;
+            }
 
             size_t usize = packed ? (keys.size - offset) : keySizes[i];
             auto umem = static_cast<char*>(keys.data) + offset;
@@ -571,8 +574,11 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         for(auto it = fromKeyIt; it != end && i < max; it++) {
             auto& key = it->first;
             auto& val = it->second;
-            if(!filter->check(key.data(), key.size(), val.data(), val.size()))
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
                 continue;
+            }
 
             auto key_umem = static_cast<char*>(keys.data) + key_offset;
             auto val_umem = static_cast<char*>(vals.data) + val_offset;

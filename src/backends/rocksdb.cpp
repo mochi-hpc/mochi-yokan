@@ -454,6 +454,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key = iterator->key();
             auto val = iterator->value();
             if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
                 iterator->Next();
                 continue;
             }
@@ -536,6 +538,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key = iterator->key();
             auto val = iterator->value();
             if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
                 iterator->Next();
                 continue;
             }

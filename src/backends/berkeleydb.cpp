@@ -464,6 +464,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 if(filter->check(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
                     break;
+                else if(filter->shouldStop(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
+                    goto complete;
             }
 
             if(packed && key_buf_too_small) {
@@ -593,6 +595,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 }
                 if(filter->check(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
                     break;
+                else if(filter->shouldStop(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
+                    goto complete;
             }
 
             // compute available size in current key buffer

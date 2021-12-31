@@ -63,6 +63,15 @@ struct KeyPrefixFilter : public KeyValueFilter {
         std::memcpy(dst, val, vsize);
         return vsize;
     }
+
+    bool shouldStop(
+        const void* key, size_t ksize,
+        const void* val, size_t vsize) const override {
+        (void)val;
+        (void)vsize;
+        auto x = std::memcmp(key, m_prefix.data, std::min<size_t>(ksize, m_prefix.size));
+        return x > 0;
+    }
 };
 
 struct KeySuffixFilter : public KeyValueFilter {

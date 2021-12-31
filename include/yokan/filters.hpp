@@ -63,6 +63,30 @@ class KeyValueFilter {
     virtual size_t valCopy(
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
+
+    /**
+     * @brief Some filters may be able to tell Yokan that no more
+     * keys will be accepted after a certain key (e.g. the prefix
+     * filter). In such a case, the filter can implement the
+     * shouldStop function to optimize iterations. Note that this
+     * function will be called only if check returns false.
+     *
+     * @param key Key
+     * @param ksize Key size
+     * @param val Value
+     * @param vsize Value size
+     *
+     * @return whether iteration can stop after this key.
+     */
+    virtual bool shouldStop(
+        const void* key, size_t ksize,
+        const void* val, size_t vsize) const {
+        (void)key;
+        (void)ksize;
+        (void)val;
+        (void)vsize;
+        return false;
+    }
 };
 
 /**

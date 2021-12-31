@@ -464,6 +464,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
 
             if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+                if(filter->shouldStop(key.mv_data, key.mv_size, val.mv_data, val.mv_size))
+                    break;
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;
@@ -603,6 +605,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
 
             if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+                if(filter->shouldStop(key.mv_data, key.mv_size, val.mv_data, val.mv_size))
+                    break;
                 ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
                 if(ret == MDB_NOTFOUND)
                     break;

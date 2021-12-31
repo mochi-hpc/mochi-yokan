@@ -531,6 +531,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         UserMem&              m_keys;
         bool                  m_packed;
         bool                  m_key_buf_too_small = false;
+        bool                  m_should_stop = false;
         size_t                m_key_offset = 0;
         std::shared_ptr<KeyValueFilter> m_filter;
 
@@ -554,7 +555,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             (void)value;
 
             if(!m_filter->check(key.data(), key.size(), value.data(), value.size())) {
-                m_index -= 1;
+                m_should_stop = m_filter->shouldStop(key.data(), key.size(), value.data(), value.size());
+                if(!m_should_stop) m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
 
@@ -619,6 +621,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     break;
                 else return convertStatus(status);
             }
+            if(list_keys.m_should_stop)
+                break;
             status = iterator->Next();
             if(!status.IsOK()) return convertStatus(status);
         }
@@ -642,6 +646,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         bool                  m_packed;
         bool                  m_key_buf_too_small = false;
         bool                  m_val_buf_too_small = false;
+        bool                  m_should_stop = false;
         size_t                m_key_offset = 0;
         size_t                m_val_offset = 0;
         std::shared_ptr<KeyValueFilter> m_filter;
@@ -668,7 +673,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::string_view ProcessFull(std::string_view key,
                                      std::string_view val) override {
             if(!m_filter->check(key.data(), key.size(), val.data(), val.size())) {
-                m_index -= 1;
+                m_should_stop = m_filter->shouldStop(key.data(), key.size(), val.data(), val.size());
+                if(!m_should_stop) m_index -= 1;
                 return tkrzw::DBM::RecordProcessor::NOOP;
             }
 
@@ -761,6 +767,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     break;
                 else return convertStatus(status);
             }
+            if(list_keyvals.m_should_stop)
+                break;
             status = iterator->Next();
             if(!status.IsOK()) return convertStatus(status);
         }

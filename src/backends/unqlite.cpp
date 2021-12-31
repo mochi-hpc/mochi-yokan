@@ -407,6 +407,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     struct check_filter_args {
         std::shared_ptr<KeyValueFilter> filter;
         bool        filter_matches = false;
+        bool        should_stop = false;
         std::string key = "";
     };
 
@@ -414,6 +415,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto args = static_cast<check_filter_args*>(uargs);
         args->filter_matches =
             args->filter->check(args->key.data(), args->key.size(), val, vsize);
+        if(!args->filter_matches)
+            args->should_stop = args->filter->shouldStop(args->key.data(), args->key.size(), val, vsize);
         return UNQLITE_OK;
     }
 
@@ -509,6 +512,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     return UNQLITE_OK;
             }, static_cast<void*>(&filter_args.key));
             unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(filter_args.should_stop)
+                break;
             if(!filter_args.filter_matches)
                 continue;
 
@@ -656,6 +661,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     return UNQLITE_OK;
             }, static_cast<void*>(&filter_args.key));
             unqlite_kv_cursor_data_callback(cursor, check_filter_callback, &filter_args);
+            if(filter_args.should_stop)
+                break;
             if(!filter_args.filter_matches)
                 continue;
 
