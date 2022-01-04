@@ -138,6 +138,12 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
+include(CheckIncludeFileCXX)
+check_include_file_cxx (filesystem HAS_FILESYSTEM)
+if (${HAS_FILESYSTEM})
+    add_definitions (-DYOKAN_USE_FILESYSTEM_HEADER)
+endif ()
+
 add_subdirectory (bin)
 add_subdirectory (benchmark)
 

@@ -16,7 +16,7 @@
 #include <string>
 #include <cstring>
 #include <iostream>
-#if __cplusplus >= 201703L
+#ifdef YOKAN_USE_FILESYSTEM_HEADER
 #include <filesystem>
 #else
 #include <experimental/filesystem>
@@ -24,7 +24,7 @@
 
 namespace yokan {
 
-#if __cplusplus >= 201703L
+#ifdef YOKAN_USE_FILESYSTEM_HEADER
 namespace fs = std::filesystem;
 #else
 namespace fs = std::experimental::filesystem;
