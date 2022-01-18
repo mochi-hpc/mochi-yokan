@@ -9,7 +9,7 @@
 #include <map>
 #include <yokan/backend.hpp>
 #include <abt.h>
-#if __cplusplus >= 201703L
+#ifdef YOKAN_USE_STD_STRING_VIEW
 #include <string_view>
 #else
 #include <experimental/string_view>
@@ -44,7 +44,7 @@ class KeyWatcher {
 
     private:
 
-#if __cplusplus >= 201703L
+#ifdef YOKAN_USE_STD_STRING_VIEW
     using string_view = std::string_view;
 #else
     using string_view = std::experimental::string_view;

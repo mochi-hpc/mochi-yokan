@@ -16,7 +16,7 @@
 #include <string>
 #include <cstring>
 #include <iostream>
-#if __cplusplus >= 201703L
+#ifdef YOKAN_USE_STD_STRING_VIEW
 #include <string_view>
 #else
 #include <experimental/string_view>
@@ -30,7 +30,7 @@ using json = nlohmann::json;
 template<typename KeyType>
 struct UnorderedMapDatabaseHash {
 
-#if __cplusplus >= 201703L
+#if YOKAN_USE_STD_STRING_VIEW
     using sv = std::string_view;
 #else
     using sv = std::experimental::string_view;

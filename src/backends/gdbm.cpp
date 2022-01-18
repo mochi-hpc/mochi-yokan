@@ -12,7 +12,7 @@
 #include <cstring>
 #include <iostream>
 #include <gdbm.h>
-#ifdef YOKAN_USE_FILESYSTEM_HEADER
+#ifdef YOKAN_USE_STD_FILESYSTEM
 #include <filesystem>
 #else
 #include <experimental/filesystem>
@@ -22,7 +22,7 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-#ifdef YOKAN_USE_FILESYSTEM_HEADER
+#ifdef YOKAN_USE_STD_FILESYSTEM
 namespace fs = std::filesystem;
 #else
 namespace fs = std::experimental::filesystem;

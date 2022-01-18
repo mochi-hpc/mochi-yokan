@@ -16,7 +16,7 @@
 #include <string>
 #include <cstring>
 #include <iostream>
-#ifdef YOKAN_USE_FILESYSTEM_HEADER
+#ifdef YOKAN_USE_STD_FILESYSTEM
 #include <filesystem>
 #else
 #include <experimental/filesystem>
@@ -24,7 +24,7 @@
 
 namespace yokan {
 
-#ifdef YOKAN_USE_FILESYSTEM_HEADER
+#ifdef YOKAN_USE_STD_FILESYSTEM
 namespace fs = std::filesystem;
 #else
 namespace fs = std::experimental::filesystem;

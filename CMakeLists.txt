@@ -138,11 +138,46 @@ if (ENABLE_PYTHON)
     add_subdirectory (python)
 endif ()
 
-include(CheckIncludeFileCXX)
-check_include_file_cxx (filesystem HAS_FILESYSTEM)
-if (${HAS_FILESYSTEM})
-    add_definitions (-DYOKAN_USE_FILESYSTEM_HEADER)
-endif ()
+# Detect std::string_view or std::experimental::string_view
+try_compile (HAS_STRING_VIEW ${CMAKE_CURRENT_BINARY_DIR}
+             ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake-tests/has_string_view.cpp)
+if (${HAS_STRING_VIEW})
+    message (STATUS "Found std::string_view to be available")
+    add_definitions (-DYOKAN_USE_STD_STRING_VIEW)
+else ()
+    try_compile (HAS_EXP_STRING_VIEW ${CMAKE_CURRENT_BINARY_DIR}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake-tests/has_experimental_string_view.cpp)
+    if (${HAS_EXP_STRING_VIEW})
+        message (STATUS "Found std::experimental::string_view to be available")
+    else ()
+        message (FATAL_ERROR "Yokan needs either std::string_view or std::experimental::string_view")
+    endif()
+endif()
+
+# Detect std::string_view or std::experimental::string_view
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
+        set (FS_LIB c++fs)
+    endif()
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set (FS_LIB stdc++fs)
+endif()
+try_compile (HAS_FILESYSTEM ${CMAKE_CURRENT_BINARY_DIR}
+             ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake-tests/has_filesystem.cpp
+             LINK_LIBRARIES ${FS_LIB})
+     if (${HAS_FILESYSTEM})
+    message (STATUS "Found std::filesystem to be available")
+    add_definitions (-DYOKAN_USE_STD_FILESYSTEM)
+else ()
+    try_compile (HAS_EXP_FILESYSTEM ${CMAKE_CURRENT_BINARY_DIR}
+                 ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake-tests/has_experimental_filesystem.cpp
+                 LINK_LIBRARIES ${FS_LIB})
+    if (${HAS_EXP_FILESYSTEM})
+        message (STATUS "Found std::experimental::filesystem to be available")
+    else ()
+        message (FATAL_ERROR "Yokan needs either std::filesystem or std::experimental::filesystem")
+    endif()
+endif()
 
 add_subdirectory (bin)
 add_subdirectory (benchmark)
