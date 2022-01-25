@@ -7,6 +7,6 @@ Name: yokan-admin
 Description: <insert description here>
 Version: @YOKAN_VERSION@
 
-Requires: margo
+Requires: margo uuid
 Libs: -L${libdir} @ADMIN_PRIVATE_LIBS@
 Cflags: -I${includedir}

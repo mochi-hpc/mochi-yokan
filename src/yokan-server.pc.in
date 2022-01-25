@@ -7,6 +7,6 @@ Name: yokan-server
 Description: <insert description here>
 Version: @YOKAN_VERSION@
 
-Requires: margo
+Requires: margo uuid
 Libs: -L${libdir} @SERVER_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}
