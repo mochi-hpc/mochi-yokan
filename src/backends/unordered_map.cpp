@@ -519,6 +519,8 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 hash_type(),
                 equal_type(),
                 allocator(m_node_allocator));
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
     unordered_map_type* m_db;

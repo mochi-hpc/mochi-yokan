@@ -138,7 +138,10 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     NullDatabase(json cfg)
     : m_config(std::move(cfg))
-    {}
+    {
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
+    }
 
     json m_config;
 };

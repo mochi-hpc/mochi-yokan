@@ -636,6 +636,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         GET_OPTION(m_write_options, m_config["write_options"], memtable_insert_hint_per_batch);
 
         m_use_write_batch = m_config["write_options"]["use_write_batch"].get<bool>();
+
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
     rocksdb::DB*          m_db;

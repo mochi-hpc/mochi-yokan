@@ -699,7 +699,10 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
     : m_config(std::move(cfg))
     , m_env(env)
-    , m_db(db) {}
+    , m_db(db) {
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
+    }
 
     json     m_config;
     MDB_env* m_env = nullptr;

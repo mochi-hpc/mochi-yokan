@@ -9,6 +9,7 @@
 #include <iostream>
 #include <yokan/backend.hpp>
 #include <yokan/util/locks.hpp>
+#include <memory>
 #include <cstring>
 
 namespace yokan {
@@ -28,6 +29,7 @@ class DocumentStoreMixin : public DB {
     };
 
     ABT_rwlock m_lock = ABT_RWLOCK_NULL;
+    mutable std::unordered_map<std::string, CollectionMetadata> m_cached_metadata;
 
     public:
 
@@ -54,6 +56,11 @@ class DocumentStoreMixin : public DB {
     using DB::erase;
     using DB::listKeys;
     using DB::listKeyValues;
+
+    void disableDocMixinLock() {
+        ABT_rwlock_free(&m_lock);
+        m_lock = ABT_RWLOCK_NULL;
+    }
 
     Status collCreate(int32_t mode, const char* name) override {
         (void)mode;
@@ -86,6 +93,7 @@ class DocumentStoreMixin : public DB {
         keys.resize(keys.size() + name_len);
         std::memcpy(keys.data() + keys.size() - name_len, collection, name_len);
         ksizes[ksizes.size()-1] = name_len;
+        m_cached_metadata.erase(std::string(collection, name_len));
         return erase(mode, keys, ksizes);
     }
 
@@ -143,7 +151,7 @@ class DocumentStoreMixin : public DB {
                 ids[i] = metadata.last_id + i;
             }
             metadata.last_id += count;
-            status = _collPutMetadata(collection, name_len, &metadata);
+            status = _collPutMetadata(collection, name_len, &metadata, false);
             if(status != Status::OK) return status;
         }
         auto keys = _keysFromIds(collection, name_len, ids);
@@ -275,9 +283,16 @@ class DocumentStoreMixin : public DB {
         return stt;
     }
 
-    Status _collGetMetadata(const char* name, size_t name_size, CollectionMetadata* metadata) const {
+    Status _collGetMetadata(const char* name, size_t name_size, CollectionMetadata* metadata,
+                            bool from_disk=false) const {
         if(name == nullptr || name[0] == '\0')
             return Status::InvalidArg;
+        auto coll_name = std::string(name, name_size);
+        auto it = m_cached_metadata.find(coll_name);
+        if(it != m_cached_metadata.end() && !from_disk) {
+            *metadata = it->second;
+            return Status::OK;
+        }
         size_t klen = name_size;
         size_t vlen = sizeof(*metadata);
         UserMem key_umem{const_cast<char*>(name), klen};
@@ -288,19 +303,30 @@ class DocumentStoreMixin : public DB {
         if(status != Status::OK) return status;
         if(vlen == YOKAN_KEY_NOT_FOUND) return Status::NotFound;
         if(vlen != sizeof(*metadata)) return Status::Corruption;
+        if(it != m_cached_metadata.end())
+            it->second = *metadata;
+        else
+            m_cached_metadata[coll_name] = *metadata;
         return Status::OK;
     }
 
-    Status _collPutMetadata(const char* name, size_t name_size, CollectionMetadata* metadata) {
+    Status _collPutMetadata(const char* name, size_t name_size, CollectionMetadata* metadata, bool flush_to_disk=true) {
         if(name == nullptr || name[0] == '\0')
             return Status::InvalidArg;
-        size_t klen = name_size;
-        size_t vlen = sizeof(*metadata);
-        UserMem key_umem{const_cast<char*>(name), klen};
-        BasicUserMem<size_t> ksize_umem{&klen, 1};
-        UserMem val_umem{reinterpret_cast<char*>(metadata), vlen};
-        BasicUserMem<size_t> vsize_umem{&vlen, 1};
-        return put(0, key_umem, ksize_umem, val_umem, vsize_umem);
+        if(flush_to_disk) {
+            size_t klen = name_size;
+            size_t vlen = sizeof(*metadata);
+            UserMem key_umem{const_cast<char*>(name), klen};
+            BasicUserMem<size_t> ksize_umem{&klen, 1};
+            UserMem val_umem{reinterpret_cast<char*>(metadata), vlen};
+            BasicUserMem<size_t> vsize_umem{&vlen, 1};
+            auto ret = put(0, key_umem, ksize_umem, val_umem, vsize_umem);
+            if(ret != Status::OK)
+                return ret;
+        }
+        auto coll_name = std::string(name, name_size);
+        m_cached_metadata[coll_name] = *metadata;
+        return Status::OK;
     }
 
     static std::vector<char> _keysFromIds(const char* name, size_t name_size, const BasicUserMem<yk_id_t>& ids) {

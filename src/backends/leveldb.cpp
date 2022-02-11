@@ -87,6 +87,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(...) {
             return Status::InvalidConf;
         }
+        CHECK_AND_ADD_MISSING(cfg, "disable_doc_mutex", boolean, false);
         CHECK_AND_ADD_MISSING(cfg, "read_options", object, json::object());
         CHECK_AND_ADD_MISSING(cfg["read_options"], "verify_checksums", boolean, false);
         CHECK_AND_ADD_MISSING(cfg["read_options"], "fill_cache", boolean, true);
@@ -519,6 +520,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
         m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
         m_use_write_batch = m_config["write_options"]["use_write_batch"].get<bool>();
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
     leveldb::DB*          m_db;

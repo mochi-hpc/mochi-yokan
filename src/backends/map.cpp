@@ -673,6 +673,8 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(m_config["use_lock"].get<bool>())
             ABT_rwlock_create(&m_lock);
         m_db = new map_type(cmp_fun, allocator(m_node_allocator));
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
     map_type*          m_db;

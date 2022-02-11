@@ -708,6 +708,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
     unqlite*   m_db;

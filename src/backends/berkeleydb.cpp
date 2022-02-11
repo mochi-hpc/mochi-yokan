@@ -97,6 +97,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         uint32_t db_env_flags =
                 DB_CREATE     |
+                DB_PRIVATE    |
                 DB_RECOVER    |
                 DB_INIT_LOCK  |
                 DB_INIT_LOG   |
@@ -688,7 +689,10 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     : m_config(std::move(cfg))
     , m_db_type(db_type)
     , m_db_env(env)
-    , m_db(db) {}
+    , m_db(db) {
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
+    }
 };
 
 }

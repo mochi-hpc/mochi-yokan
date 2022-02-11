@@ -797,7 +797,10 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     TkrzwDatabase(json config, tkrzw::DBM* db)
     : m_config(std::move(config))
     , m_db(db)
-    {}
+    {
+        auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
+        if(disable_doc_mixin_lock) disableDocMixinLock();
+    }
 };
 
 }
