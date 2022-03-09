@@ -17,6 +17,7 @@ add_library(coverage_config INTERFACE)
 
 option (ENABLE_COVERAGE   "Enable coverage reporting" OFF)
 option (ENABLE_TESTS      "Build tests" OFF)
+option (ENABLE_BENCHMARK  "Build benchmark" OFF)
 option (ENABLE_BEDROCK    "Build bedrock module" OFF)
 option (ENABLE_LEVELDB    "Build with leveldb support" OFF)
 option (ENABLE_ROCKSDB    "Build with rocksdb support" OFF)
@@ -180,7 +181,10 @@ else ()
 endif()
 
 add_subdirectory (bin)
-add_subdirectory (benchmark)
+
+if (${ENABLE_BENCHMARK})
+  add_subdirectory (benchmark)
+endif (${ENABLE_BENCHMARK})
 
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)

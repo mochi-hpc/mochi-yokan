@@ -1,4 +1,5 @@
 #include <yokan/cxx/client.hpp>
+#include <yokan/cxx/collection.hpp>
 #include <tclap/CmdLine.h>
 #include <functional>
 #include <unordered_map>
@@ -55,6 +56,7 @@ struct options {
     std::string prefix;
     uint8_t     prefix_freq;
     bool        no_remove;
+    bool        no_rdma;
     unsigned    batch_size;
 };
 
@@ -71,6 +73,15 @@ void fill_reference_map(const options& opt, std::unordered_map<std::string, std:
         }
         val = gen_random_string(vsize);
         map.emplace(std::move(key), std::move(val));
+    }
+}
+
+void fill_reference_vector(const options& opt, std::vector<std::string>& vec) {
+    for(size_t i=0; i < opt.num_items; i++) {
+        auto vsize = opt.val_sizes.min + (rand() % (opt.val_sizes.max - opt.val_sizes.min + 1));
+        std::string val;
+        val = gen_random_string(vsize);
+        vec.push_back(std::move(val));
     }
 }
 
@@ -172,9 +183,11 @@ class PutBenchmark : public Benchmark {
     void setUp() override {}
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& pair : m_ref) {
             m_db->put(pair.first.data(), pair.first.size(),
-                      pair.second.data(), pair.second.size());
+                      pair.second.data(), pair.second.size(),
+                      mode);
         }
     }
 
@@ -221,13 +234,14 @@ class PutMultiBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& kptrs = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             const auto& vptrs = std::get<2>(batch);
             const auto& vsize = std::get<3>(batch);
             m_db->putMulti(kptrs.size(), kptrs.data(), ksize.data(),
-                           vptrs.data(), vsize.data());
+                           vptrs.data(), vsize.data(), mode);
         }
     }
 
@@ -274,13 +288,14 @@ class PutPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& keys  = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             const auto& vals  = std::get<2>(batch);
             const auto& vsize = std::get<3>(batch);
             m_db->putPacked(ksize.size(), keys.data(), ksize.data(),
-                            vals.data(), vsize.data());
+                            vals.data(), vsize.data(), mode);
         }
     }
 
@@ -313,11 +328,12 @@ class GetBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         size_t vsize;
         for(auto& pair : m_ref) {
             vsize = m_buffer.size();
             m_db->get(pair.first.data(), pair.first.size(),
-                      m_buffer.data(), &vsize);
+                      m_buffer.data(), &vsize, mode);
         }
     }
 
@@ -372,13 +388,14 @@ class GetMultiBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& kptrs = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             auto& vptrs = std::get<2>(batch);
             auto& vsize = std::get<3>(batch);
             m_db->getMulti(kptrs.size(), kptrs.data(), ksize.data(),
-                           vptrs.data(), vsize.data());
+                           vptrs.data(), vsize.data(), mode);
         }
     }
 
@@ -428,11 +445,13 @@ class GetPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& keys  = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             m_db->getPacked(ksize.size(), keys.data(), ksize.data(),
-                            m_buffer.size(), m_buffer.data(), m_vsizes.data());
+                            m_buffer.size(), m_buffer.data(), m_vsizes.data(),
+                            mode);
         }
     }
 
@@ -462,8 +481,9 @@ class LengthBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& pair : m_ref) {
-            m_db->length(pair.first.data(), pair.first.size());
+            m_db->length(pair.first.data(), pair.first.size(), mode);
         }
     }
 
@@ -510,11 +530,12 @@ class LengthMultiBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& kptrs = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             m_db->lengthMulti(kptrs.size(), kptrs.data(), ksize.data(),
-                              m_vsizes.data());
+                              m_vsizes.data(), mode);
         }
     }
 
@@ -561,11 +582,12 @@ class LengthPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& keys  = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
             m_db->lengthPacked(ksize.size(), keys.data(), ksize.data(),
-                               m_vsizes.data());
+                               m_vsizes.data(), mode);
         }
     }
 
@@ -602,8 +624,9 @@ class ExistsBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& pair : m_ref) {
-            m_db->exists(pair.first.data(), pair.first.size());
+            m_db->exists(pair.first.data(), pair.first.size(), mode);
         }
     }
 
@@ -651,10 +674,11 @@ class ExistsMultiBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& kptrs = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
-            m_db->existsMulti(kptrs.size(), kptrs.data(), ksize.data());
+            m_db->existsMulti(kptrs.size(), kptrs.data(), ksize.data(), mode);
         }
     }
 
@@ -699,10 +723,11 @@ class ExistsPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& keys  = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
-            m_db->existsPacked(ksize.size(), keys.data(), ksize.data());
+            m_db->existsPacked(ksize.size(), keys.data(), ksize.data(), mode);
         }
     }
 
@@ -732,8 +757,9 @@ class EraseBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& pair : m_ref) {
-            m_db->erase(pair.first.data(), pair.first.size());
+            m_db->erase(pair.first.data(), pair.first.size(), mode);
         }
     }
 
@@ -775,10 +801,11 @@ class EraseMultiBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& kptrs = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
-            m_db->eraseMulti(kptrs.size(), kptrs.data(), ksize.data());
+            m_db->eraseMulti(kptrs.size(), kptrs.data(), ksize.data(), mode);
         }
     }
 
@@ -820,10 +847,11 @@ class ErasePackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         for(auto& batch : m_batches) {
             const auto& keys  = std::get<0>(batch);
             const auto& ksize = std::get<1>(batch);
-            m_db->erasePacked(ksize.size(), keys.data(), ksize.data());
+            m_db->erasePacked(ksize.size(), keys.data(), ksize.data(), mode);
         }
     }
 
@@ -871,6 +899,7 @@ class ListKeysBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         std::string start_key;
         auto& prefix = getOptions().prefix;
         auto batch_size = getOptions().batch_size;
@@ -883,7 +912,8 @@ class ListKeysBenchmark : public Benchmark {
                            prefix.size(),
                            batch_size,
                            kptrs.data(),
-                           ksize.data());
+                           ksize.data(),
+                           mode);
             for(unsigned i = 0; i < batch_size; i++) {
                 if(ksize[i] == YOKAN_NO_MORE_KEYS)
                     return;
@@ -932,6 +962,7 @@ class ListKeysPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         std::string start_key;
         auto& prefix = getOptions().prefix;
         auto batch_size = getOptions().batch_size;
@@ -945,7 +976,8 @@ class ListKeysPackedBenchmark : public Benchmark {
                                  batch_size,
                                  keys.data(),
                                  keys.size(),
-                                 ksize.data());
+                                 ksize.data(),
+                                 mode);
             size_t koffset = 0;
             for(unsigned i = 0; i < batch_size; i++) {
                 if(ksize[i] == YOKAN_NO_MORE_KEYS)
@@ -1009,6 +1041,7 @@ class ListKeyValsBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         std::string start_key;
         auto& prefix = getOptions().prefix;
         auto batch_size = getOptions().batch_size;
@@ -1025,7 +1058,8 @@ class ListKeyValsBenchmark : public Benchmark {
                               kptrs.data(),
                               ksize.data(),
                               vptrs.data(),
-                              vsize.data());
+                              vsize.data(),
+                              mode);
             for(unsigned i = 0; i < batch_size; i++) {
                 if(ksize[i] == YOKAN_NO_MORE_KEYS)
                     return;
@@ -1078,6 +1112,7 @@ class ListKeyValsPackedBenchmark : public Benchmark {
     }
 
     void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
         std::string start_key;
         auto& prefix = getOptions().prefix;
         auto batch_size = getOptions().batch_size;
@@ -1096,7 +1131,8 @@ class ListKeyValsPackedBenchmark : public Benchmark {
                                     ksize.data(),
                                     vals.data(),
                                     vals.size(),
-                                    vsize.data());
+                                    vsize.data(),
+                                    mode);
             size_t koffset = 0;
             for(unsigned i = 0; i < batch_size; i++) {
                 if(ksize[i] == YOKAN_NO_MORE_KEYS)
@@ -1114,6 +1150,149 @@ class ListKeyValsPackedBenchmark : public Benchmark {
     }
 };
 REGISTER_BENCHMARK(ListKeyValsPackedBenchmark, list_keyvals_packed);
+
+/**
+ * @brief STORE benchmark
+ */
+class StoreBenchmark : public Benchmark {
+
+    std::vector<std::string> m_ref;
+    std::shared_ptr<yokan::Database> m_db;
+    std::shared_ptr<yokan::Collection> m_coll;
+
+    public:
+
+    StoreBenchmark(std::shared_ptr<yokan::Database> db, const options& opt)
+    : Benchmark(opt), m_db(std::move(db)),
+      m_coll(std::make_shared<yokan::Collection>("bench", *m_db)) {
+        fill_reference_vector(opt, m_ref);
+    }
+
+    void setUp() override {
+        m_db->createCollection("bench");
+    }
+
+    void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
+        for(auto& doc : m_ref) {
+            m_coll->store(doc.data(), doc.size(), mode);
+        }
+    }
+
+    void tearDown() override {
+        m_db->dropCollection("bench");
+    }
+};
+REGISTER_BENCHMARK(StoreBenchmark, store);
+
+/**
+ * @brief STORE-MULTI benchmark
+ */
+class StoreMultiBenchmark : public Benchmark {
+
+    std::vector<std::string> m_ref;
+    std::shared_ptr<yokan::Database> m_db;
+    std::shared_ptr<yokan::Collection> m_coll;
+    std::vector<std::tuple<std::vector<yk_id_t>,     // doc id
+                           std::vector<const void*>, // val ptrs
+                           std::vector<size_t>>>     // val sizes
+                               m_batches;
+
+    public:
+
+    StoreMultiBenchmark(std::shared_ptr<yokan::Database> db, const options& opt)
+    : Benchmark(opt), m_db(std::move(db)),
+      m_coll(std::make_shared<yokan::Collection>("bench", *m_db)) {
+        fill_reference_vector(opt, m_ref);
+    }
+
+    void setUp() override {
+        unsigned batch_size = getOptions().batch_size;
+        if(batch_size == 0) batch_size = m_ref.size();
+        m_batches.resize((m_ref.size() + batch_size - 1) / batch_size);
+        unsigned i = 0;
+        for(auto& doc : m_ref) {
+            unsigned k = i % batch_size;
+            auto& batch = m_batches[k];
+            std::get<0>(batch).push_back(-1);
+            std::get<1>(batch).push_back(doc.data());
+            std::get<2>(batch).push_back(doc.size());
+            i += 1;
+        }
+        m_db->createCollection("bench");
+    }
+
+    void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
+        for(auto& batch : m_batches) {
+            auto& ids   = std::get<0>(batch);
+            const auto& vptrs = std::get<1>(batch);
+            const auto& vsize = std::get<2>(batch);
+            auto count = vsize.size();
+            m_coll->storeMulti(count, vptrs.data(), vsize.data(), ids.data(), mode);
+        }
+    }
+
+    void tearDown() override {
+        m_db->dropCollection("bench");
+    }
+};
+REGISTER_BENCHMARK(StoreMultiBenchmark, store_multi);
+
+/**
+ * @brief STORE-PACKED benchmark
+ */
+class StorePackedBenchmark : public Benchmark {
+
+    std::vector<std::string> m_ref;
+    std::shared_ptr<yokan::Database> m_db;
+    std::shared_ptr<yokan::Collection> m_coll;
+    std::vector<std::tuple<std::vector<yk_id_t>, // ids
+                           std::string,          // val ptrs
+                           std::vector<size_t>>> // val sizes
+                               m_batches;
+
+    public:
+
+    StorePackedBenchmark(std::shared_ptr<yokan::Database> db, const options& opt)
+    : Benchmark(opt), m_db(std::move(db)),
+      m_coll(std::make_shared<yokan::Collection>("bench", *m_db)) {
+        fill_reference_vector(opt, m_ref);
+    }
+
+    void setUp() override {
+        unsigned batch_size = getOptions().batch_size;
+        if(batch_size == 0) batch_size = m_ref.size();
+        m_batches.resize((m_ref.size() + batch_size - 1) / batch_size);
+        unsigned i = 0;
+        for(auto& doc : m_ref) {
+            unsigned k = i/batch_size;
+            auto& batch = m_batches[k];
+            std::get<0>(batch).push_back(-1);
+            std::get<1>(batch) += doc;
+            std::get<2>(batch).push_back(doc.size());
+            i += 1;
+        }
+        m_db->createCollection("bench");
+    }
+
+    void run() override {
+        int32_t mode = getOptions().no_rdma ? YOKAN_MODE_DEFAULT : YOKAN_MODE_NO_RDMA;
+        for(auto& batch : m_batches) {
+            auto& ids   = std::get<0>(batch);
+            const auto& vals  = std::get<1>(batch);
+            const auto& vsize = std::get<2>(batch);
+            auto count = ids.size();
+            m_coll->storePacked(count, vals.data(), vsize.data(),
+                                ids.data(), mode);
+        }
+    }
+
+    void tearDown() override {
+        m_db->dropCollection("bench");
+    }
+};
+REGISTER_BENCHMARK(StorePackedBenchmark, store_packed);
 
 static options parse_arguments(int argc, char** argv);
 
@@ -1250,6 +1429,8 @@ static options parse_arguments(int argc, char** argv) {
             "b", "batch-size", "Batch size for operations that acces multiple items", false, 0, "integer");
         TCLAP::SwitchArg noRemoveArg(
             "", "no-remove", "Do not remove stored key/value on teardown");
+        TCLAP::SwitchArg noRDMAArg(
+            "", "no-rdma", "Do not use RDMA when possible");
 
         cmd.add(operationArg);
         cmd.add(keySizesArg);
@@ -1265,6 +1446,7 @@ static options parse_arguments(int argc, char** argv) {
         cmd.add(prefixFreqArg);
         cmd.add(batchSizeArg);
         cmd.add(noRemoveArg);
+        cmd.add(noRDMAArg);
 
         cmd.parse(argc, argv);
 
@@ -1282,6 +1464,7 @@ static options parse_arguments(int argc, char** argv) {
         opt.prefix_freq    = prefixFreqArg.getValue();
         opt.batch_size     = batchSizeArg.getValue();
         opt.no_remove      = noRemoveArg.getValue();
+        opt.no_rdma        = noRDMAArg.getValue();
 
         if(opt.prefix_freq > 100) {
             throw TCLAP::ArgException(
