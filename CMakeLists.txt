@@ -184,8 +184,8 @@ add_subdirectory (benchmark)
 
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)
-set (YOKAN_VERSION_MINOR 1)
-set (YOKAN_VERSION_PATCH 0)
+set (YOKAN_VERSION_MINOR 2)
+set (YOKAN_VERSION_PATCH 4)
 set (YOKAN_VERSION
      "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
