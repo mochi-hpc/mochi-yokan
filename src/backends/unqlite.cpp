@@ -283,39 +283,43 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         ScopedReadLock lock(m_lock);
 
         struct CallbackArgs {
+            size_t  buf_size;
             size_t* val_size;
             void*   val_umem;
-            bool*   buf_too_small;
         };
 
         auto Callback = [](const void *pData,unsigned int iDataLen,void *pUserData) -> int {
                             auto args = static_cast<CallbackArgs*>(pUserData);
-                            if(*(args->buf_too_small) || iDataLen > *(args->val_size))
+                            if(iDataLen > args->buf_size) {
                                 *(args->val_size) = BufTooSmall;
-                            else {
+                                return UNQLITE_ABORT;
+                            } else {
                                 std::memcpy(args->val_umem, pData, iDataLen);
-                                *(args->val_size) = iDataLen;
+                                *(args->val_size) += iDataLen;
+                                args->buf_size -= iDataLen;
+                                args->val_umem = ((char*)args->val_umem) + iDataLen;
+                                return UNQLITE_OK;
                             }
-                            return UNQLITE_OK;
                         };
 
         if(!packed) {
-
-            bool buf_too_small = false;
 
             for(size_t i = 0; i < ksizes.size; i++) {
 
                 auto key_umem = keys.data + key_offset;
                 auto key_size = ksizes[i];
                 auto original_vsize = vsizes[i];
+                vsizes[i] = 0;
 
-                CallbackArgs args{ vsizes.data + i, vals.data + val_offset, &buf_too_small };
+                CallbackArgs args{ original_vsize, vsizes.data + i, vals.data + val_offset };
 
                 int ret = unqlite_kv_fetch_callback(
                         m_db, key_umem, key_size, Callback,
                         static_cast<void*>(&args));
 
-                if(ret != UNQLITE_OK) {
+                // UNQLITE_ABORT is returned by the callback
+                // when the buffer is too small
+                if(ret != UNQLITE_OK && ret != UNQLITE_ABORT) {
                     if(ret == UNQLITE_NOTFOUND) {
                         vsizes[i] = KeyNotFound;
                     } else {
@@ -330,21 +334,19 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } else { // if packed
 
             size_t val_remaining_size = vals.size;
-            bool buf_too_small = false;
-
             for(size_t i = 0; i < ksizes.size; i++) {
 
                 auto key_umem = keys.data + key_offset;
                 auto key_size = ksizes[i];
-                vsizes[i] = val_remaining_size;
+                vsizes[i] = 0;
 
-                CallbackArgs args{ vsizes.data + i, vals.data + val_offset, &buf_too_small };
+                CallbackArgs args{ val_remaining_size, vsizes.data + i, vals.data + val_offset };
 
                 int ret = unqlite_kv_fetch_callback(
                         m_db, key_umem, key_size,
                         Callback, static_cast<void*>(&args));
 
-                if(ret != UNQLITE_OK) {
+                if(ret != UNQLITE_OK && ret != UNQLITE_ABORT) {
                     if(ret == UNQLITE_NOTFOUND) {
                         vsizes[i] = KeyNotFound;
                     } else {
@@ -352,7 +354,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     }
                 } else {
                     if(vsizes[i] == BufTooSmall)
-                        buf_too_small = true;
+                        for(; i < ksizes.size; i++)
+                            vsizes[i] = BufTooSmall;
                     else {
                         val_offset += vsizes[i];
                         val_remaining_size -= vsizes[i];
