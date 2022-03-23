@@ -189,7 +189,7 @@ endif (${ENABLE_BENCHMARK})
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)
 set (YOKAN_VERSION_MINOR 2)
-set (YOKAN_VERSION_PATCH 4)
+set (YOKAN_VERSION_PATCH 5)
 set (YOKAN_VERSION
      "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
