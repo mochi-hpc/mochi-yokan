@@ -13,6 +13,7 @@
 struct test_context {
     margo_instance_id mid;
     hg_addr_t         addr;
+    const char*       db_name;
     const char*       backend_type;
     const char*       backend_config;
 };
@@ -20,6 +21,7 @@ struct test_context {
 static const char* valid_token = "ABCDEFGH";
 static const char* wrong_token = "HGFEDCBA";
 static const uint16_t provider_id = 42;
+static const char* db_name = "theDB";
 
 static void* test_context_setup(const MunitParameter params[], void* user_data)
 {
@@ -48,6 +50,7 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     munit_assert_not_null(context);
     context->mid  = mid;
     context->addr = addr;
+    context->db_name = db_name;
     context->backend_type = munit_parameters_get(params, "backend");
     context->backend_config = find_backend_config_for(context->backend_type);
     return context;
@@ -116,8 +119,9 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // test that we can open a database with correct type
-    ret = yk_open_database(admin, context->addr,
-            provider_id, valid_token, context->backend_type,
+    ret = yk_open_named_database(admin, context->addr,
+            provider_id, valid_token, context->db_name,
+            context->backend_type,
             context->backend_config, &id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -143,8 +147,9 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     munit_assert_ulong(count, ==, 0);
 
     // reopen a database
-    ret = yk_open_database(admin, context->addr,
-            provider_id, valid_token, context->backend_type,
+    ret = yk_open_named_database(admin, context->addr,
+            provider_id, valid_token,
+            context->db_name, context->backend_type,
             context->backend_config, &id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 

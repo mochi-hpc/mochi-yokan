@@ -52,6 +52,7 @@ static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* raw);
 /* Admin RPC types */
 
 MERCURY_GEN_PROC(open_database_in_t,
+        ((hg_string_t)(name))\
         ((hg_string_t)(type))\
         ((hg_string_t)(config))\
         ((hg_string_t)(token)))

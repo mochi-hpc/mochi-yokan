@@ -53,8 +53,8 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     ret = yk_admin_init(mid, &admin);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // open a database using the admin
-    ret = yk_open_database(admin, addr,
-            provider_id, token, backend_type,
+    ret = yk_open_named_database(admin, addr,
+            provider_id, token, "mydb", backend_type,
             backend_config, &id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create test context

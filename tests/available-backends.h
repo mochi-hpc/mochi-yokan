@@ -33,17 +33,17 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
-    "{\"name\":\"mydb\",\"disable_doc_mixin_lock\":true}",
-    "{\"name\":\"mydb\",\"disable_doc_mixin_lock\":true}",
-    "{\"name\":\"mydb\",\"disable_doc_mixin_lock\":true}",
-    "{\"name\":\"mydb\",\"disable_doc_mixin_lock\":true}",
+    "{\"disable_doc_mixin_lock\":true}",
+    "{\"disable_doc_mixin_lock\":true}",
+    "{\"disable_doc_mixin_lock\":true}",
+    "{\"disable_doc_mixin_lock\":true}",
 #ifdef YOKAN_HAS_LEVELDB
-    "{\"path\":\"/tmp/leveldb-test\",\"name\":\"mydb\","
+    "{\"path\":\"/tmp/leveldb-test\","
     " \"disable_doc_mixin_lock\":true,"
-    " \"create_if_missing\":true,\"name\":\"mydb\"}",
+    " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_LMDB
-    "{\"path\":\"/tmp/lmdb-test\",\"name\":\"mydb\","
+    "{\"path\":\"/tmp/lmdb-test\","
     " \"disable_doc_mixin_lock\":true,"
     " \"create_if_missing\":true}",
 #endif
@@ -52,33 +52,28 @@ static const char* backend_configs[] = {
     " \"file\":\"my-bdb\","
     " \"disable_doc_mixin_lock\":true,"
     " \"create_if_missing\":true,"
-    " \"name\":\"mydb\","
     " \"type\":\"btree\"}",
 #endif
 #ifdef YOKAN_HAS_ROCKSDB
     "{\"path\":\"/tmp/rocksdb-test\","
-    " \"name\":\"mydb\","
     " \"disable_doc_mixin_lock\":true,"
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_GDBM
     "{\"path\":\"/tmp/gdbm-test\","
-    " \"name\":\"mydb\","
     " \"disable_doc_mixin_lock\":true,"
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_PMEMKV
-    "{\"name\":\"mydb\"}",
+    "{}",
 #endif
 #ifdef YOKAN_HAS_TKRZW
     "{\"path\":\"/tmp/trkzw-test\","
-    " \"name\":\"mydb\","
     " \"disable_doc_mixin_lock\":true,"
     " \"type\":\"tree\"}",
 #endif
 #ifdef YOKAN_HAS_UNQLITE
     "{\"path\":\":mem:\","
-    "\"name\":\"mydb\","
     " \"disable_doc_mixin_lock\":true,"
     "\"mode\":\"memory\"}",
 #endif

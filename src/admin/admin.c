@@ -50,11 +50,12 @@ yk_return_t yk_admin_finalize(yk_admin_t admin)
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_open_database(
+yk_return_t yk_open_named_database(
         yk_admin_t admin,
         hg_addr_t address,
         uint16_t provider_id,
         const char* token,
+        const char* name,
         const char* type,
         const char* config,
         yk_database_id_t* id)
@@ -66,6 +67,7 @@ yk_return_t yk_open_database(
     yk_return_t ret;
 
     in.type   = (char*)type;
+    in.name   = (char*)name;
     in.config = (char*)config;
     in.token  = (char*)token;
 

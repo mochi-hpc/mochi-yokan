@@ -48,6 +48,7 @@ typedef struct yk_provider {
 
     /* Databases */
     std::unordered_map<yk_database_id_t, yk_database_t> dbs;  // Databases
+    std::unordered_map<std::string, yk_database_id_t> db_names;  // Databases names
     // Note: in the above map, the std::string keys are actually uuids (32 bytes)
 
     /* RPC identifiers for admins */
@@ -167,7 +168,7 @@ DECLARE_MARGO_RPC_HANDLER(yk_doc_list_direct_ult)
 void yk_doc_list_direct_ult(hg_handle_t h);
 
 static inline yk_database_t find_database(yk_provider_t provider,
-                                           yk_database_id_t* db_id)
+                                          yk_database_id_t* db_id)
 {
     auto it = provider->dbs.find(*db_id);
     if(it == provider->dbs.end()) return nullptr;

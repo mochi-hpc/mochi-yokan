@@ -432,6 +432,14 @@ void yk_open_database_ult(hg_handle_t h)
         return;
     }
 
+    if(in.name && in.name[0]) {
+        if(provider->db_names.count(std::string(in.name))) {
+            YOKAN_LOG_ERROR(mid, "a database with name %s already exists in this provider", in.name);
+            out.ret = YOKAN_ERR_INVALID_ARGS;
+            return;
+        }
+    }
+
     uuid_generate(id.uuid);
 
     auto status = yokan::DatabaseFactory::makeDatabase(in.type, in.config, &database);
@@ -441,6 +449,9 @@ void yk_open_database_ult(hg_handle_t h)
         return;
     }
     provider->dbs[id] = database;
+    if(in.name && in.name[0]) {
+        provider->db_names[std::string(in.name)] = id;
+    }
 
     out.ret = YOKAN_SUCCESS;
     out.id = id;
@@ -485,6 +496,13 @@ void yk_close_database_ult(hg_handle_t h)
 
     delete provider->dbs[in.id];
     provider->dbs.erase(in.id);
+
+    auto it = std::find_if(provider->db_names.begin(),
+                           provider->db_names.end(),
+                           [&in](auto& p) { return p.second == in.id; });
+    if(it != provider->db_names.end())
+        provider->db_names.erase(it);
+
     out.ret = YOKAN_SUCCESS;
 
     char db_id_str[37];
@@ -525,6 +543,12 @@ void yk_destroy_database_ult(hg_handle_t h)
     database->destroy();
     delete database;
     provider->dbs.erase(in.id);
+
+    auto it = std::find_if(provider->db_names.begin(),
+                           provider->db_names.end(),
+                           [&in](auto& p) { return p.second == in.id; });
+    if(it != provider->db_names.end())
+        provider->db_names.erase(it);
 
     char db_id_str[37];
     yk_database_id_to_string(in.id, db_id_str);
@@ -601,19 +625,11 @@ void yk_find_by_name_ult(hg_handle_t h)
     DEFER(margo_free_input(h, &in));
 
     const auto name = std::string(in.db_name);
-    auto it = std::find_if(provider->dbs.begin(), provider->dbs.end(),
-    [&name](const auto& pair){
-        auto db = pair.second;
-        auto config = json::parse(db->config());
-        if(!config.contains("name")) return false;
-        if(!config["name"].is_string()) return false;
-        return config["name"] == name;
-    });
-    if(it == provider->dbs.end()) {
+    auto it = provider->db_names.find(name);
+    if(it == provider->db_names.end())
         out.ret = YOKAN_ERR_INVALID_DATABASE;
-    } else {
-        out.db_id = it->first;
-    }
+    else
+        out.db_id = it->second;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_find_by_name_ult)
 
@@ -641,6 +657,12 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         if(not db.contains("type")) {
             YOKAN_LOG_ERROR(provider->mid,
                 "\"type\" field not found in database configuration");
+            return false;
+        }
+        if(db.contains("name")) {
+            if(!db["name"].is_string())
+                YOKAN_LOG_ERROR(provider->mid,
+                    "\"name\" field of database should be a string");
             return false;
         }
         auto full_type = db["type"].get<std::string>();
@@ -673,6 +695,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         yk_database_t database;
         uuid_generate(id.uuid);
         auto type = db["type"].get<std::string>();
+        auto name = db.value("name", "");
         auto& initial_db_config =  db["config"];
         auto config = initial_db_config.dump();
         auto status = yokan::DatabaseFactory::makeDatabase(type, config, &database);
@@ -691,6 +714,8 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         db["__id__"] = std::string(db_id);
         db["config"] = std::move(final_db_config);
         provider->dbs[id] = database;
+        if(!name.empty())
+            provider->db_names[name] = id;
 
         YOKAN_LOG_INFO(provider->mid, "opened database %s", db_id);
     }

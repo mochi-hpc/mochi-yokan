@@ -52,6 +52,21 @@ class Admin {
         return id;
     }
 
+    yk_database_id_t openNamedDatabase(
+            hg_addr_t address,
+            uint16_t provider_id,
+            const char* token,
+            const char* name,
+            const char* type,
+            const char* config) const {
+        yk_database_id_t id;
+        auto ret = yk_open_named_database(
+            m_admin, address, provider_id,
+            token, name, type, config, &id);
+        YOKAN_CONVERT_AND_THROW(ret);
+        return id;
+    }
+
     void closeDatabase(
             hg_addr_t address,
             uint16_t provider_id,
