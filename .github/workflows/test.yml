@@ -51,8 +51,7 @@ jobs:
       run: |
         eval `spack env activate --sh .` &&
         mkdir build && cd build &&
-        cmake .. -DENABLE_COVERAGE=ON \
-                 -DENABLE_TESTS=ON \
+        cmake .. -DENABLE_TESTS=ON \
                  -DCMAKE_BUILD_TYPE=Debug \
                  -DENABLE_LEVELDB=ON \
                  -DENABLE_ROCKSDB=ON \
