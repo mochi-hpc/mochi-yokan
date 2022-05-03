@@ -15,4 +15,7 @@ spack:
   - unqlite@master
   - lua-sol2
   - py-pybind11
+  - mochi-margo
+  - mercury~boostsys ^libfabric fabrics=tcp,rxm
+  - py-mochi-margo
   concretization: together
