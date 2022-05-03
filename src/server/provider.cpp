@@ -660,10 +660,11 @@ static inline bool open_backends_from_config(yk_provider_t provider)
             return false;
         }
         if(db.contains("name")) {
-            if(!db["name"].is_string())
+            if(!db["name"].is_string()) {
                 YOKAN_LOG_ERROR(provider->mid,
                     "\"name\" field of database should be a string");
-            return false;
+                return false;
+            }
         }
         auto full_type = db["type"].get<std::string>();
         auto type = full_type;
