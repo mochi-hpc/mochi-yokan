@@ -106,7 +106,6 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         SET_AND_COMPLETE(cfg, wal_dir, std::string());
         SET_AND_COMPLETE(cfg, delete_obsolete_files_period_micros, 6ULL * 60 * 60 * 1000000);
         SET_AND_COMPLETE(cfg, max_background_jobs, 2);
-        SET_AND_COMPLETE(cfg, base_background_compactions, -1);
         SET_AND_COMPLETE(cfg, max_background_compactions, -1);
         SET_AND_COMPLETE(cfg, max_subcompactions, 1);
         SET_AND_COMPLETE(cfg, max_background_flushes, -1);
@@ -131,7 +130,6 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         SET_AND_COMPLETE(cfg, advise_random_on_open, true);
         SET_AND_COMPLETE(cfg, db_write_buffer_size, (size_t)0);
         // TODO access_hint_on_compaction_start enumerator
-        SET_AND_COMPLETE(cfg, new_table_reader_for_compaction_inputs, false);
         SET_AND_COMPLETE(cfg, compaction_readahead_size, (size_t)0);
         // TODO many more options
         SET_AND_COMPLETE(cfg, level0_file_num_compaction_trigger, 4);
