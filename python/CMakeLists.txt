@@ -18,7 +18,9 @@ target_link_libraries (pyyokan_server PRIVATE pybind11::module yokan-server PRIV
 pybind11_extension (pyyokan_server)
 pybind11_strip (pyyokan_server)
 
+set (PY_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}
+
 install (TARGETS pyyokan_common pyyokan_client pyyokan_admin pyyokan_server
          EXPORT yokan-targets
-         ARCHIVE DESTINATION lib/python3/dist-packages
-         LIBRARY DESTINATION lib/python3/dist-packages)
+         ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
+         LIBRARY DESTINATION lib/python${PY_VERSION}/site-packages)
