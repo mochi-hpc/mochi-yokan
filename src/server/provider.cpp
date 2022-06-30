@@ -11,6 +11,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include "../buffer/default_bulk_cache.hpp"
+#include "../buffer/keep_all_bulk_cache.hpp"
 #include <string>
 
 static void yk_finalize_provider(void* p);
@@ -64,11 +65,41 @@ yk_return_t yk_provider_register(
     } else {
         config = json::object();
     }
+
+    // checking databases field
     if(not config.contains("databases"))
         config["databases"] = json::array();
     if(not config["databases"].is_array()) {
         YOKAN_LOG_ERROR(mid, "\"databases\" field in configuration is not an array");
         return YOKAN_ERR_INVALID_CONFIG;
+    }
+
+    // checking buffer_cache field
+    if(not config.contains("buffer_cache")) {
+        config["buffer_cache"] = json::object();
+        if(a.cache)
+            config["buffer_cache"]["type"] = "external";
+        else
+            config["buffer_cache"]["type"] = "default";
+    }
+    if(not config["buffer_cache"].is_object()) {
+        YOKAN_LOG_ERROR(mid, "\"buffer_cache\" field in configuration is not an object");
+        return YOKAN_ERR_INVALID_CONFIG;
+    }
+    if(not config["buffer_cache"].contains("type")) {
+        YOKAN_LOG_ERROR(mid, "\"buffer_cache\" needs a \"type\" field");
+        return YOKAN_ERR_INVALID_CONFIG;
+    }
+    if(not config["buffer_cache"]["type"].is_string()) {
+        YOKAN_LOG_ERROR(mid, "\"type\" field in \"buffer_cache\" should be a string");
+        return YOKAN_ERR_INVALID_CONFIG;
+    }
+    if(a.cache && (config["buffer_cache"]["type"] != "external")) {
+        YOKAN_LOG_WARNING(mid, "External buffer_cache provided but type is "
+            "set to \"%s\" in configuration",
+            config["buffer_cache"]["type"].get_ref<const std::string&>().c_str());
+        config["buffer_cache"] = json::object();
+        config["buffer_cache"]["type"] = "external";
     }
 
     p = new yk_provider;
@@ -90,10 +121,23 @@ yk_return_t yk_provider_register(
     if(a.cache) {
         p->bulk_cache = *a.cache;
     } else {
-        p->bulk_cache = yk_default_bulk_cache;
+        auto& buffer_cache_type = config["buffer_cache"]["type"].get_ref<const std::string&>();
+        if(buffer_cache_type == "default")
+            p->bulk_cache = yk_default_bulk_cache;
+        else if(buffer_cache_type == "keep_all")
+            p->bulk_cache = yk_keep_all_bulk_cache;
+        /*
+        else if(buffer_cache_type == "lru")
+            p->bulk_cache = yk_lru_bulk_cache;
+            */
+        else {
+            YOKAN_LOG_ERROR(mid, "Invalid buffer_cache type \"%s\"", buffer_cache_type.c_str());
+            delete p;
+            return YOKAN_ERR_INVALID_CONFIG;
+        }
     }
-    // TODO pass a configuration field
-    p->bulk_cache_data = p->bulk_cache.init(mid, NULL);
+    p->bulk_cache_data = p->bulk_cache.init(mid,
+        config["buffer_cache"].dump().c_str());
     if(!p->bulk_cache_data) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(mid, "failed to initialize bulk cache");

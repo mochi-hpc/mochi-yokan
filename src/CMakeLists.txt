@@ -21,13 +21,14 @@ set (server-src-files
      server/doc_length.cpp
      server/doc_list.cpp
      server/util/filters.cpp
-     buffer/default_bulk_cache.cpp)
+     buffer/default_bulk_cache.cpp
+     buffer/keep_all_bulk_cache.cpp)
 
 if (ENABLE_LUA)
-     list(APPEND server-src-files
-          server/util/lua-cjson/fpconv.c
-          server/util/lua-cjson/lua_cjson.c
-          server/util/lua-cjson/strbuf.c)
+     list (APPEND server-src-files
+           server/util/lua-cjson/fpconv.c
+           server/util/lua-cjson/lua_cjson.c
+           server/util/lua-cjson/strbuf.c)
 endif (ENABLE_LUA)
 
 set (backend-src-files
@@ -38,15 +39,15 @@ set (backend-src-files
      backends/set.cpp
      backends/unordered_set.cpp)
 
-set(DB_DEPENDENCIES "")
+set (DB_DEPENDENCIES "")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
         list (APPEND DB_DEPENDENCIES c++fs)
-    endif()
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list (APPEND DB_DEPENDENCIES stdc++fs)
-endif()
+endif ()
 
 if (ENABLE_LEVELDB)
     list (APPEND backend-src-files backends/leveldb.cpp)
@@ -205,15 +206,15 @@ set_target_properties (yokan-bedrock-module
 endif ()
 
 # installation stuff (packaging and install commands)
-write_basic_package_version_file(
+write_basic_package_version_file (
     "yokan-config-version.cmake"
     VERSION ${YOKAN_VERSION}
     COMPATIBILITY AnyNewerVersion)
 
 # generate our config file for find_package()
-set(INCLUDE_INSTALL_DIR include/)
-set(LIB_INSTALL_DIR lib/)
-configure_package_config_file(yokan-config.cmake.in
+set (INCLUDE_INSTALL_DIR include/)
+set (LIB_INSTALL_DIR lib/)
+configure_package_config_file (yokan-config.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/yokan-config.cmake
   INSTALL_DESTINATION ${LIB_INSTALL_DIR}/yokan/cmake
   PATH_VARS INCLUDE_INSTALL_DIR)
