@@ -6,6 +6,7 @@
 #include "yokan/bulk-cache.h"
 #include "../common/logging.h"
 #include <atomic>
+#include <new>
 
 namespace yokan {
 
@@ -47,7 +48,16 @@ yk_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
 
     auto buffer = new yk_buffer{size, mode, nullptr, HG_BULK_NULL};
     cache->num_allocated += 1;
-    buffer->data           = new char[size];
+    buffer->data           = new (std::nothrow) char[size];
+    if(!buffer->data) {
+        // LCOV_EXCL_START
+        YOKAN_LOG_ERROR(cache->mid,
+            "Allocation of %lu-byte buffer failed in default_bulk_cache",
+            size);
+        delete buffer;
+        return nullptr;
+        // LCOV_EXCL_STOP
+    }
     void* buf_ptrs[1]      = { buffer->data };
     hg_size_t buf_sizes[1] = { size };
 
