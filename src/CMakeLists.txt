@@ -22,6 +22,7 @@ set (server-src-files
      server/doc_list.cpp
      server/util/filters.cpp
      buffer/default_bulk_cache.cpp
+     buffer/lru_bulk_cache.cpp
      buffer/keep_all_bulk_cache.cpp)
 
 if (ENABLE_LUA)

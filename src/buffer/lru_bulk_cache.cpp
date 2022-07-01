@@ -8,7 +8,8 @@
 #include <nlohmann/json.hpp>
 #include <atomic>
 #include <new>
-#include <set>
+#include <map>
+#include <list>
 
 namespace yokan {
 
@@ -23,18 +24,30 @@ struct bulk_less {
     }
 };
 
-struct keep_all_bulk_cache {
-    margo_instance_id                mid;
-    std::atomic<unsigned long>       num_allocated;
-    std::set<yk_buffer_t, bulk_less> buffer_set_readonly;
-    std::set<yk_buffer_t, bulk_less> buffer_set_writeonly;
-    std::set<yk_buffer_t, bulk_less> buffer_set_readwrite;
-    ABT_mutex                        buffer_set_mtx;
-    float                            margin;
+using list_t     = std::list<yk_buffer_t>;
+using iterator_t = list_t::iterator;
+using map_t      = std::map<yk_buffer_t, iterator_t, bulk_less>;
+
+struct lru_bulk_cache {
+    margo_instance_id          mid;
+    std::atomic<unsigned long> num_allocated;
+
+    list_t buffer_queue_readonly;
+    map_t  buffer_set_readonly;
+
+    list_t buffer_queue_writeonly;
+    map_t  buffer_set_writeonly;
+
+    list_t buffer_queue_readwrite;
+    map_t  buffer_set_readwrite;
+
+    ABT_mutex buffer_set_mtx;
+    float     margin;
+    size_t    capacity;
 };
 
-void* keep_all_bulk_cache_init(margo_instance_id mid, const char* config) {
-    auto cache = new keep_all_bulk_cache;
+void* lru_bulk_cache_init(margo_instance_id mid, const char* config) {
+    auto cache = new lru_bulk_cache;
     cache->mid = mid;
     cache->num_allocated = 0;
     auto cfg = json::parse(config);
@@ -45,12 +58,17 @@ void* keep_all_bulk_cache_init(margo_instance_id mid, const char* config) {
     } else {
         cache->margin = 0.0;
     }
+    if(cfg.contains("capacity") && cfg["capacity"].is_number_unsigned()) {
+        cache->capacity = cfg["capacity"].get<size_t>();
+    } else {
+        cache->capacity = 32;
+    }
     ABT_mutex_create(&cache->buffer_set_mtx);
     return cache;
 }
 
-void keep_all_bulk_cache_finalize(void* c) {
-    auto cache = static_cast<keep_all_bulk_cache*>(c);
+void lru_bulk_cache_finalize(void* c) {
+    auto cache = static_cast<lru_bulk_cache*>(c);
     auto num_allocated = cache->num_allocated.load();
     if(num_allocated != 0) {
         // LCOV_EXCL_START
@@ -59,15 +77,13 @@ void keep_all_bulk_cache_finalize(void* c) {
             num_allocated);
         // LCOV_EXCL_STOP
     }
-
     ABT_mutex_free(&cache->buffer_set_mtx);
-    for(auto& set_ref : {
-            std::ref(cache->buffer_set_readonly),
-            std::ref(cache->buffer_set_writeonly),
-            std::ref(cache->buffer_set_readwrite) }) {
-        for(auto it = set_ref.get().begin(); it != set_ref.get().end();) {
-            auto buffer = *it;
-            it = set_ref.get().erase(it);
+    for(auto& map : { std::ref(cache->buffer_set_readonly),
+                      std::ref(cache->buffer_set_writeonly),
+                      std::ref(cache->buffer_set_readwrite) }) {
+        for(auto it = map.get().cbegin(); it != map.get().cend(); ) {
+            auto buffer = it->first;
+            it = map.get().erase(it);
             margo_bulk_free(buffer->bulk);
             delete[] buffer->data;
             delete buffer;
@@ -76,8 +92,8 @@ void keep_all_bulk_cache_finalize(void* c) {
     delete cache;
 }
 
-yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
-    auto cache = static_cast<keep_all_bulk_cache*>(c);
+yk_buffer_t lru_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
+    auto cache = static_cast<lru_bulk_cache*>(c);
     if(size == 0) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
@@ -87,20 +103,26 @@ yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     }
 
     // try to find a buffer that's already allocated with the right size
-    std::set<yk_buffer_t, bulk_less>* set = nullptr;
-    if(mode == HG_BULK_READ_ONLY)
-        set = &cache->buffer_set_readonly;
-    else if(mode == HG_BULK_WRITE_ONLY)
-        set = &cache->buffer_set_writeonly;
-    else if(mode == HG_BULK_READWRITE)
-        set = &cache->buffer_set_readwrite;
+    map_t* map   = nullptr;
+    list_t* list = nullptr;
+    if(mode == HG_BULK_READ_ONLY) {
+        map = &cache->buffer_set_readonly;
+        list = &cache->buffer_queue_readonly;
+    } else if(mode == HG_BULK_WRITE_ONLY) {
+        map = &cache->buffer_set_writeonly;
+        list = &cache->buffer_queue_writeonly;
+    } else if(mode == HG_BULK_READWRITE) {
+        map = &cache->buffer_set_readwrite;
+        list = &cache->buffer_queue_readwrite;
+    }
 
     yk_buffer lbound{ size, mode, nullptr, HG_BULK_NULL };
     ABT_mutex_spinlock(cache->buffer_set_mtx);
-    auto it = set->lower_bound(&lbound);
-    if(it != set->end()) { // item found
-        auto result = *it;
-        set->erase(it);
+    auto it = map->lower_bound(&lbound);
+    if(it != map->end()) { // item found
+        auto result = it->first;
+        list->erase(it->second);
+        map->erase(it);
         ABT_mutex_unlock(cache->buffer_set_mtx);
         return result;
     }
@@ -116,7 +138,7 @@ yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     if(!buffer->data) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
-            "Allocation of %lu-byte buffer failed in keep_all_bulk_cache",
+            "Allocation of %lu-byte buffer failed in lru_bulk_cache",
             buf_size);
         delete buffer;
         return nullptr;
@@ -140,16 +162,32 @@ yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     return buffer;
 }
 
-void keep_all_bulk_cache_release(void* c, yk_buffer_t buffer) {
-    auto cache = static_cast<keep_all_bulk_cache*>(c);
+void lru_bulk_cache_release(void* c, yk_buffer_t buffer) {
+    auto cache = static_cast<lru_bulk_cache*>(c);
     cache->num_allocated -= 1;
+
+    static auto release = [](lru_bulk_cache* cache, map_t& map, list_t& list, yk_buffer_t buffer) {
+        list.push_front(buffer);
+        auto it = list.begin();
+        map.emplace(buffer, it);
+        if(list.size() > cache->capacity) {
+            auto oldest_buffer = list.back();
+            list.pop_back();
+            auto it = map.find(oldest_buffer);
+            map.erase(it);
+            margo_bulk_free(oldest_buffer->bulk);
+            delete[] oldest_buffer->data;
+            delete oldest_buffer;
+        }
+    };
+
     ABT_mutex_spinlock(cache->buffer_set_mtx);
     if(buffer->mode == HG_BULK_READ_ONLY) {
-        cache->buffer_set_readonly.insert(buffer);
+        release(cache, cache->buffer_set_readonly, cache->buffer_queue_readonly, buffer);
     } else if(buffer->mode == HG_BULK_WRITE_ONLY) {
-        cache->buffer_set_writeonly.insert(buffer);
+        release(cache, cache->buffer_set_writeonly, cache->buffer_queue_writeonly, buffer);
     } else if(buffer->mode == HG_BULK_READWRITE) {
-        cache->buffer_set_readwrite.insert(buffer);
+        release(cache, cache->buffer_set_readwrite, cache->buffer_queue_readwrite, buffer);
     }
     ABT_mutex_unlock(cache->buffer_set_mtx);
 }
@@ -158,11 +196,11 @@ void keep_all_bulk_cache_release(void* c, yk_buffer_t buffer) {
 
 extern "C" {
 
-yk_bulk_cache yk_keep_all_bulk_cache = {
-    yokan::keep_all_bulk_cache_init,
-    yokan::keep_all_bulk_cache_finalize,
-    yokan::keep_all_bulk_cache_get,
-    yokan::keep_all_bulk_cache_release
+yk_bulk_cache yk_lru_bulk_cache = {
+    yokan::lru_bulk_cache_init,
+    yokan::lru_bulk_cache_finalize,
+    yokan::lru_bulk_cache_get,
+    yokan::lru_bulk_cache_release
 };
 
 }

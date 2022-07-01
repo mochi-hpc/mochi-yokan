@@ -12,6 +12,7 @@
 #include "../common/checks.h"
 #include "../buffer/default_bulk_cache.hpp"
 #include "../buffer/keep_all_bulk_cache.hpp"
+#include "../buffer/lru_bulk_cache.hpp"
 #include <string>
 
 static void yk_finalize_provider(void* p);
@@ -126,10 +127,8 @@ yk_return_t yk_provider_register(
             p->bulk_cache = yk_default_bulk_cache;
         else if(buffer_cache_type == "keep_all")
             p->bulk_cache = yk_keep_all_bulk_cache;
-        /*
         else if(buffer_cache_type == "lru")
             p->bulk_cache = yk_lru_bulk_cache;
-            */
         else {
             YOKAN_LOG_ERROR(mid, "Invalid buffer_cache type \"%s\"", buffer_cache_type.c_str());
             delete p;
