@@ -219,7 +219,7 @@ extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
                                       std::accumulate(vsizes, vsizes+count, (size_t)0) };
     margo_instance_id mid = dbh->client->mid;
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     if(sizes[2] == 0)
         return YOKAN_ERR_INVALID_ARGS;
