@@ -42,9 +42,9 @@ static yk_return_t yk_put_direct(yk_database_handle_t dbh,
     in.vsizes.sizes = (size_t*)vsizes;
     in.vsizes.count = count;
     in.keys.data = (char*)keys;
-    in.keys.size = std::accumulate(ksizes, ksizes+count, 0);
+    in.keys.size = std::accumulate(ksizes, ksizes+count, (size_t)0);
     in.vals.data = (char*)values;
-    in.vals.size = std::accumulate(vsizes, vsizes+count, 0);
+    in.vals.size = std::accumulate(vsizes, vsizes+count, (size_t)0);
 
     if(in.vals.data == nullptr && in.vals.size != 0)
         return YOKAN_ERR_INVALID_ARGS;
@@ -140,8 +140,8 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
         if(count == 1) {
             return yk_put_direct(dbh, mode, count, keys[0], ksizes, values[0], vsizes);
         }
-        std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, 0));
-        std::vector<char> packed_vals(std::accumulate(vsizes, vsizes+count, 0));
+        std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, (size_t)0));
+        std::vector<char> packed_vals(std::accumulate(vsizes, vsizes+count, (size_t)0));
         size_t koffset = 0, voffset = 0;
         for(size_t i = 0; i < count; i++) {
             std::memcpy(packed_keys.data()+koffset, keys[i], ksizes[i]);
@@ -180,7 +180,7 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
         sizes.push_back(vsizes[i]);
     }
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READ_ONLY, &bulk);

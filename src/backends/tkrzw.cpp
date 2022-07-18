@@ -396,12 +396,12 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         size_t total_ksizes = std::accumulate(ksizes.data,
                                               ksizes.data + ksizes.size,
-                                              0);
+                                              (size_t)0);
         if(total_ksizes > keys.size) return Status::InvalidArg;
 
         size_t total_vsizes = std::accumulate(vsizes.data,
                                               vsizes.data + vsizes.size,
-                                              0);
+                                              (size_t)0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
         bool overwrite = !mode_new_only;

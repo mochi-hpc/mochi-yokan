@@ -183,7 +183,7 @@ extern "C" yk_return_t yk_list_keys(yk_database_handle_t dbh,
         sizes.push_back(ksizes[i]);
     }
 
-    size_t keys_buf_size = std::accumulate(ksizes, ksizes+count, 0);
+    size_t keys_buf_size = std::accumulate(ksizes, ksizes+count, (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READWRITE, &bulk);

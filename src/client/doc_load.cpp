@@ -145,7 +145,7 @@ extern "C" yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
                                       rbufsize };
     margo_instance_id mid = dbh->client->mid;
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (hg_size_t)0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     int seg_count = sizes[1] != 0 ? 2 : 1;
     hret = margo_bulk_create(mid, seg_count, ptrs.data(), sizes.data(),
@@ -188,7 +188,7 @@ extern "C" yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
         sizes.push_back(rsizes[i]);
     }
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READWRITE, &bulk);

@@ -38,7 +38,7 @@ static yk_return_t yk_erase_direct(yk_database_handle_t dbh,
     in.ksizes.sizes = (size_t*)ksizes;
     in.ksizes.count = count;
     in.keys.data = (char*)keys;
-    in.keys.size = std::accumulate(ksizes, ksizes+count, 0);
+    in.keys.size = std::accumulate(ksizes, ksizes+count, (size_t)0);
 
     hret = margo_create(mid, dbh->addr, dbh->client->erase_direct_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -138,7 +138,7 @@ extern "C" yk_return_t yk_erase_multi(yk_database_handle_t dbh,
         if(count == 1) {
             return yk_erase_direct(dbh, mode, 1, keys[0], ksizes);
         }
-        std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, 0));
+        std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, (size_t)0));
         size_t offset = 0;
         for(size_t i = 0; i < count; i++) {
             std::memcpy(packed_keys.data()+offset, keys[i], ksizes[i]);
@@ -166,7 +166,7 @@ extern "C" yk_return_t yk_erase_multi(yk_database_handle_t dbh,
         sizes.push_back(ksizes[i]);
     }
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (hg_size_t)0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READ_ONLY, &bulk);
@@ -198,7 +198,7 @@ extern "C" yk_return_t yk_erase_packed(yk_database_handle_t dbh,
                                       std::accumulate(ksizes, ksizes+count, (size_t)0) };
     margo_instance_id mid = dbh->client->mid;
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (hg_size_t)0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     if(sizes[1] == 0)
         return YOKAN_ERR_INVALID_ARGS;

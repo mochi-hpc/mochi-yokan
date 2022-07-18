@@ -42,7 +42,7 @@ static yk_return_t yk_doc_update_direct(yk_database_handle_t dbh,
     in.sizes.count = count;
     in.sizes.sizes = (size_t*)rsizes;
     in.docs.data   = (char*)records;
-    in.docs.size   = std::accumulate(rsizes, rsizes+count, 0);
+    in.docs.size   = std::accumulate(rsizes, rsizes+count, (size_t)0);
 
     if(in.docs.data == nullptr && in.docs.size != 0)
         return YOKAN_ERR_INVALID_ARGS;
@@ -132,7 +132,7 @@ extern "C" yk_return_t yk_doc_update_packed(yk_database_handle_t dbh,
                                       std::accumulate(rsizes, rsizes+count, (size_t)0) };
     margo_instance_id mid = dbh->client->mid;
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     if(sizes[1] != 0 && records == nullptr)
         return YOKAN_ERR_INVALID_ARGS;
@@ -168,7 +168,7 @@ extern "C" yk_return_t yk_doc_update_multi(yk_database_handle_t dbh,
             return yk_doc_update_direct(dbh, collection, mode,
                                         count, ids, records[0], rsizes);
         }
-        std::vector<char> packed_records(std::accumulate(rsizes, rsizes+count, 0));
+        std::vector<char> packed_records(std::accumulate(rsizes, rsizes+count, (size_t)0));
         size_t offset = 0;
         for(size_t i = 0; i < count; i++) {
             std::memcpy(packed_records.data()+offset, records[i], rsizes[i]);
@@ -196,7 +196,7 @@ extern "C" yk_return_t yk_doc_update_multi(yk_database_handle_t dbh,
         sizes.push_back(rsizes[i]);
     }
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READ_ONLY, &bulk);

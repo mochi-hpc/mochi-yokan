@@ -42,7 +42,7 @@ static yk_return_t yk_get_direct(yk_database_handle_t dbh,
     in.ksizes.sizes = (size_t*)ksizes;
     in.ksizes.count = count;
     in.keys.data    = (char*)keys;
-    in.keys.size    = std::accumulate(ksizes, ksizes+count, 0);
+    in.keys.size    = std::accumulate(ksizes, ksizes+count, (size_t)0);
 
     out.vsizes.sizes = vsizes;
     out.vsizes.count = count;
@@ -188,7 +188,7 @@ extern "C" yk_return_t yk_get_multi(yk_database_handle_t dbh,
         sizes.push_back(vsizes[i]);
     }
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), 0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     hret = margo_bulk_create(mid, ptrs.size(), ptrs.data(), sizes.data(),
                              HG_BULK_READWRITE, &bulk);
@@ -228,7 +228,7 @@ extern "C" yk_return_t yk_get_packed(yk_database_handle_t dbh,
                                       vbufsize };
     margo_instance_id mid = dbh->client->mid;
 
-    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (hg_size_t)0);
+    size_t total_size = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
 
     if(sizes[2] == 0)
         return YOKAN_ERR_INVALID_ARGS;
