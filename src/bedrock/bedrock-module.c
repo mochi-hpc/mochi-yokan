@@ -5,6 +5,7 @@
  */
 #include <bedrock/module.h>
 #include <string.h>
+#include <stdlib.h>
 #include "yokan/server.h"
 #include "yokan/client.h"
 #include "yokan/admin.h"
