@@ -188,7 +188,7 @@ if (${ENABLE_BENCHMARK})
 endif (${ENABLE_BENCHMARK})
 
 if (${ENABLE_YCSB})
-  find_package (YCSBCppInterface CONFIG REQUIRED)
+  find_package (ycsb-cpp-interface CONFIG REQUIRED)
   add_subdirectory (ycsb)
 endif (${ENABLE_YCSB})
 

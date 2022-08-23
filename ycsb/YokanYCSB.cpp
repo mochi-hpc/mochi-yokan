@@ -8,6 +8,7 @@
 #include <yokan/cxx/client.hpp>
 #include <yokan/cxx/database.hpp>
 
+#include <algorithm>
 #include <map>
 #include <unordered_map>
 #include <string>
@@ -30,13 +31,21 @@ class YokanDB : public ycsb::DB {
     yokan::Client     m_client;
     yokan::Database   m_db;
 
+    mutable struct {
+        size_t num_samples  = 0;
+        double avg_key_size = 0.0;
+        size_t max_key_size = 0;
+        double avg_val_size = 0.0;
+        size_t max_val_size = 0;
+    } m_stats;
+
     public:
 
 #define CHECK_MISSING_PROPERTY(__name__)           \
     do {                                           \
         if(it == properties.end()) {               \
             std::cerr << "[ERROR] Missing "        \
-               __name__ "  property" << std::endl; \
+               __name__ " property" << std::endl; \
             return nullptr;                        \
         }                                          \
     } while(0)
@@ -109,6 +118,10 @@ class YokanDB : public ycsb::DB {
             margo_finalize(mid);
         }
 
+        for(const auto& p : properties) {
+            std::cout << "[DEBUG] Property " << p.first << "=" << p.second << std::endl;
+        }
+
         return new YokanDB(mid, std::move(client), std::move(db));
     }
 
@@ -125,82 +138,269 @@ class YokanDB : public ycsb::DB {
 
     ycsb::Status read(ycsb::StringView table,
                       ycsb::StringView key,
-                      const std::vector<ycsb::StringView>& fields,
+                      const std::unordered_set<ycsb::StringView>& fields,
                       ycsb::DB::Record& result) const override {
-        // TODO
         (void)table;
-        (void)key;
-        (void)fields;
-        (void)result;
+        try {
+            size_t record_length = m_db.length(key.data(), key.size());
+
+            std::vector<char> serialized(record_length);
+            m_db.get(key.data(), key.size(), serialized.data(), &record_length);
+
+            deserializeRecord<ycsb::StringBuffer>(
+                ycsb::StringView(serialized.data(), serialized.size()),
+                result, &fields);
+
+            m_stats.max_key_size = std::max(m_stats.max_key_size, key.size());
+            m_stats.max_val_size = std::max(m_stats.max_val_size, record_length);
+            double r1 = (double)m_stats.num_samples / ((double)m_stats.num_samples+1.0);
+            double r2 = 1.0 / ((double)m_stats.num_samples+1.0);
+            m_stats.avg_key_size = r1*m_stats.avg_key_size + r2*key.size();
+            m_stats.avg_val_size = r1*m_stats.avg_val_size + r2*record_length;
+
+        } catch(const yokan::Exception& ex) {
+            return ycsb::Status("yokan::Exception", ex.what());
+        }
         return ycsb::Status::OK();
     }
 
     ycsb::Status read(ycsb::StringView table,
                       ycsb::StringView key,
                       ycsb::DB::Record& result) const override {
-        // TODO
         (void)table;
-        (void)key;
-        (void)result;
+        try {
+            size_t record_length = m_db.length(key.data(), key.size());
+
+            std::vector<char> serialized(record_length);
+            m_db.get(key.data(), key.size(), serialized.data(), &record_length);
+
+            deserializeRecord<ycsb::StringBuffer>(
+                ycsb::StringView(serialized.data(), serialized.size()),
+                result);
+
+            m_stats.max_key_size = std::max(m_stats.max_key_size, key.size());
+            m_stats.max_val_size = std::max(m_stats.max_val_size, record_length);
+            double r1 = (double)m_stats.num_samples / ((double)m_stats.num_samples+1.0);
+            double r2 = 1.0 / ((double)m_stats.num_samples+1.0);
+            m_stats.avg_key_size = r1*m_stats.avg_key_size + r2*key.size();
+            m_stats.avg_val_size = r1*m_stats.avg_val_size + r2*record_length;
+
+        } catch(const yokan::Exception& ex) {
+            return ycsb::Status("yokan::Exception", ex.what());
+        }
+        return ycsb::Status::OK();
+    }
+
+    ycsb::Status _scan(ycsb::StringView table,
+                       ycsb::StringView startKey,
+                       int recordCount,
+                       std::vector<ycsb::DB::Record>& result,
+                       const std::unordered_set<ycsb::StringView>* fields = nullptr) const {
+        (void)table;
+
+        size_t estimated_val_size = 2048;
+        size_t estimated_key_size = 2048;
+
+        std::string startKeyStr = static_cast<std::string>(startKey);
+        int32_t mode            = YOKAN_MODE_INCLUSIVE;
+
+        try {
+            while(recordCount != 0) {
+
+                size_t vals_buffer_size = estimated_val_size*recordCount;
+                size_t keys_buffer_size = estimated_key_size*recordCount;
+
+                std::vector<char>   keys_buffer(keys_buffer_size);
+                std::vector<size_t> keys_sizes(recordCount, 0);
+                std::vector<char>   vals_buffer(vals_buffer_size);
+                std::vector<size_t> vals_sizes(recordCount, 0);
+
+                m_db.listKeyValsPacked(
+                    startKeyStr.data(), startKeyStr.size(),
+                    nullptr, 0,
+                    recordCount,
+                    keys_buffer.data(),
+                    keys_buffer_size,
+                    keys_sizes.data(),
+                    vals_buffer.data(),
+                    vals_buffer_size,
+                    vals_sizes.data(),
+                    mode);
+
+                if(vals_sizes[0] == YOKAN_SIZE_TOO_SMALL) {
+                    estimated_val_size *= 2;
+                    continue;
+                }
+
+                if(keys_sizes[0] == YOKAN_SIZE_TOO_SMALL) {
+                    estimated_key_size *= 2;
+                    continue;
+                }
+
+                size_t recordsRead = 0;
+                size_t val_offset  = 0;
+                size_t key_offset  = 0;
+
+                auto last_key = ycsb::StringView(keys_buffer.data(), keys_sizes[0]);
+                auto last_val = ycsb::StringView(vals_buffer.data(), vals_sizes[0]);
+
+                for(size_t i = 0; i < (size_t)recordCount; i++) {
+                    if(keys_sizes[i] == YOKAN_NO_MORE_KEYS)
+                        return ycsb::Status::OK();
+
+                    if(vals_sizes[i] == YOKAN_SIZE_TOO_SMALL
+                    || keys_sizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                        break;
+                    }
+
+                    last_key = ycsb::StringView(keys_buffer.data()+key_offset, keys_sizes[i]);
+                    key_offset += keys_sizes[i];
+                    last_val = ycsb::StringView(vals_buffer.data()+val_offset, vals_sizes[i]);
+                    val_offset += vals_sizes[i];
+
+                    DB::Record record;
+                    deserializeRecord<ycsb::StringBuffer>(last_val, record, fields);
+
+                    result.push_back(std::move(record));
+                    recordsRead += 1;
+                }
+
+                recordCount -= recordsRead;
+                if(recordCount != 0) startKeyStr.assign(last_key.data(), last_key.size());
+                mode = YOKAN_MODE_DEFAULT;
+            }
+
+        } catch(const yokan::Exception& ex) {
+            return ycsb::Status("yokan::Exception", ex.what());
+        }
         return ycsb::Status::OK();
     }
 
     ycsb::Status scan(ycsb::StringView table,
                       ycsb::StringView startKey,
                       int recordCount,
-                      const std::vector<ycsb::StringView>& fields,
+                      const std::unordered_set<ycsb::StringView>& fields,
                       std::vector<ycsb::DB::Record>& result) const override {
-        // TODO
-        (void)table;
-        (void)startKey;
-        (void)recordCount;
-        (void)fields;
-        (void)result;
-        return ycsb::Status::OK();
+        return _scan(table, startKey, recordCount, result, &fields);
     }
 
     ycsb::Status scan(ycsb::StringView table,
                       ycsb::StringView startKey,
                       int recordCount,
                       std::vector<ycsb::DB::Record>& result) const override {
-        // TODO
-        (void)table;
-        (void)startKey;
-        (void)recordCount;
-        (void)result;
-        return ycsb::Status::OK();
+        return _scan(table, startKey, recordCount, result);
     }
 
     ycsb::Status update(ycsb::StringView table,
                         ycsb::StringView key,
-                        const std::vector<ycsb::StringView>& fields,
-                        const std::vector<ycsb::StringView>& values) override {
-        // TODO
+                        const RecordView& recordUpdate) override {
         (void)table;
-        (void)key;
-        (void)fields;
-        (void)values;
-        return ycsb::Status::OK();
+        ycsb::DB::Record existingRecord;
+        ycsb::DB::RecordView newRecord = recordUpdate;
+        auto status = read(table, key, existingRecord);
+        if(status.name != "OK") return status;
+        for(auto& p : existingRecord) {
+            auto sw = ycsb::StringView(p.second->data(), p.second->size());
+            // emplace does not do anything if the field already exists
+            newRecord.emplace(ycsb::StringView(p.first.data(), p.first.size()),
+                              ycsb::StringView(p.second->data(), p.second->size()));
+        }
+        return insert(table, key, newRecord);
     }
 
     ycsb::Status insert(ycsb::StringView table,
                         ycsb::StringView key,
-                        const std::vector<ycsb::StringView>& fields,
-                        const std::vector<ycsb::StringView>& values) override {
-        // TODO
+                        const RecordView& record) override {
         (void)table;
-        (void)key;
-        (void)fields;
-        (void)values;
+        auto serialized_record = serializeRecord(record);
+        try {
+            m_db.put(key.data(), key.size(),
+                 serialized_record.data(), serialized_record.size());
+        } catch(const yokan::Exception& ex) {
+            return ycsb::Status("yokan::Exception", ex.what());
+        }
         return ycsb::Status::OK();
     }
 
     ycsb::Status erase(ycsb::StringView table,
                        ycsb::StringView key) override {
-        // TODO
         (void)table;
-        (void)key;
+        try {
+            m_db.erase(key.data(), key.size());
+        } catch(const yokan::Exception& ex) {
+            return ycsb::Status("yokan::Exception", ex.what());
+        }
         return ycsb::Status::OK();
+    }
+
+    private:
+
+    static std::vector<char> serializeRecord(const RecordView& record) {
+        std::vector<char> result;
+        size_t required_size = 0;
+        for(auto& p : record) {
+            required_size += 2*sizeof(size_t) + p.first.size() + p.second.size();
+        }
+        result.resize(required_size);
+        char* ptr = result.data();
+        size_t s;
+        for(auto& p : record) {
+            s = p.first.size();
+            std::memcpy(ptr, &s, sizeof(s));
+            ptr += sizeof(s);
+
+            std::memcpy(ptr, p.first.data(), s);
+            ptr += s;
+
+            s = p.second.size();
+            std::memcpy(ptr, &s, sizeof(s));
+            ptr += sizeof(s);
+
+            std::memcpy(ptr, p.second.data(), s);
+            ptr += s;
+        }
+        return result;
+    }
+
+    template<typename BufferType>
+    static void deserializeRecord(
+            const ycsb::StringView& serialized,
+            ycsb::DB::Record& record,
+            const std::unordered_set<ycsb::StringView>* fields = nullptr) {
+        size_t remaining_size = serialized.size();
+        const char* ptr = serialized.data();
+        size_t field_size, value_size;
+        const char* field;
+        const char* value;
+        while(remaining_size > 0) {
+
+            if(remaining_size < sizeof(field_size)) break;
+            std::memcpy(&field_size, ptr, sizeof(field_size));
+            ptr += sizeof(field_size);
+            remaining_size -= sizeof(field_size);
+
+            if(remaining_size < field_size) break;
+            field = ptr;
+            ptr += field_size;
+            remaining_size -= field_size;
+
+            if(remaining_size < sizeof(value_size)) break;
+            std::memcpy(&value_size, ptr, sizeof(value_size));
+            ptr += sizeof(value_size);
+            remaining_size -= sizeof(value_size);
+
+            if(remaining_size < value_size) break;
+            value = ptr;
+            ptr += value_size;
+            remaining_size -= value_size;
+
+            if(fields && !fields->count(ycsb::StringView(field, field_size)))
+                continue;
+
+            record.emplace(
+                std::string(field, field_size),
+                std::make_unique<BufferType>(value, value_size));
+        }
     }
 
 };

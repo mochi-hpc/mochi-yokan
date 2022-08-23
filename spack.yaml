@@ -18,6 +18,7 @@ spack:
   - mochi-margo
   - mercury@2.1.0 ~boostsys ^libfabric fabrics=tcp,rxm
   - py-mochi-margo
+  - mochi-bedrock
   - ycsb-cpp-interface
   concretizer:
     unify: true
