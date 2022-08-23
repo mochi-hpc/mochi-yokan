@@ -28,6 +28,7 @@ option (ENABLE_GDBM       "Build with gdbm support" OFF)
 option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
 option (ENABLE_LUA        "Build with Lua support" OFF)
 option (ENABLE_PYTHON     "Build the Python module" OFF)
+option (ENABLE_YCSB       "Build the YCSB adaptor" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -186,10 +187,15 @@ if (${ENABLE_BENCHMARK})
   add_subdirectory (benchmark)
 endif (${ENABLE_BENCHMARK})
 
+if (${ENABLE_YCSB})
+  find_package (YCSBCppInterface CONFIG REQUIRED)
+  add_subdirectory (ycsb)
+endif (${ENABLE_YCSB})
+
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)
 set (YOKAN_VERSION_MINOR 2)
-set (YOKAN_VERSION_PATCH 5)
+set (YOKAN_VERSION_PATCH 8)
 set (YOKAN_VERSION
      "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
