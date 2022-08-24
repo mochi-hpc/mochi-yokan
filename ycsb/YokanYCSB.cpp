@@ -118,10 +118,6 @@ class YokanDB : public ycsb::DB {
             margo_finalize(mid);
         }
 
-        for(const auto& p : properties) {
-            std::cout << "[DEBUG] Property " << p.first << "=" << p.second << std::endl;
-        }
-
         return new YokanDB(mid, std::move(client), std::move(db));
     }
 
