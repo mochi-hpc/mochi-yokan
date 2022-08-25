@@ -5,6 +5,7 @@
  */
 #include "yokan/backend.hpp"
 #include "yokan/doc-mixin.hpp"
+#include "../common/logging.h"
 #include "../common/modes.hpp"
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
@@ -81,7 +82,10 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         do { try {                                                     \
             options.__field__ = __json__.value(#__field__, __value__); \
             __json__[#__field__] = options.__field__;                  \
-        } catch(...) {                                                 \
+        } catch(std::exception& ex) {                                  \
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,                       \
+                "Exception when handling field " #__field__            \
+                " in database configuration: %s", ex.what());          \
             return Status::InvalidConf;                                \
         } } while(0)
 
@@ -89,6 +93,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         do { if(!__json__.contains(__field__)) {                          \
             __json__[__field__] = __default__;                            \
         } else if(!__json__[__field__].is_##__type__()) {                 \
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,                          \
+                "Field " #__field__ " in database configuration has "     \
+                "incorrect type (expected " #__type__ " )");              \
             return Status::InvalidConf;                                   \
         } } while(0)
 
@@ -167,33 +174,56 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(cfg.contains("db_paths")) {
             auto& db_paths = cfg["db_paths"];
             if(!db_paths.is_array()) {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL, "db_paths should be of array type");
                 return Status::InvalidConf;
             }
             for(auto& p : db_paths) {
-                if(!p.is_object())
+                if(!p.is_object()) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "db_paths entries should be of object type");
                     return Status::InvalidConf;
-                if(!p.contains("path") || !p.contains("target_size"))
+                }
+                if(!p.contains("path") || !p.contains("target_size")) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "db_paths entries should contain path and target_size fields");
                     return Status::InvalidConf;
-                if(!p["path"].is_string())
+                }
+                if(!p["path"].is_string()) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "path should be a string");
                     return Status::InvalidConf;
-                if(!p["target_size"].is_number_unsigned())
+                }
+                if(!p["target_size"].is_number_unsigned()) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "target_size should be an unsigned integer");
                     return Status::InvalidConf;
+                }
                 options.db_paths.emplace_back(
                         p["path"].get<std::string>(),
                         p["target_size"].get<uint64_t>());
             }
         }
-        if(!cfg.contains("path"))
+        if(!cfg.contains("path")) {
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                "path field not found in database configuration");
             return Status::InvalidConf;
-        if(!cfg["path"].is_string())
+        }
+        if(!cfg["path"].is_string()) {
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                "path field should be a string");
             return Status::InvalidConf;
+        }
         auto path = cfg["path"].get<std::string>();
 
         rocksdb::Status status;
         rocksdb::DB* db = nullptr;
         status = rocksdb::DB::Open(options, path, &db);
-        if(!status.ok())
+        if(!status.ok()) {
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                "Could not open RocksDB database: %s",
+                status.getState());
             return convertStatus(status);
+        }
 
         *kvs = new RocksDBDatabase(db, std::move(cfg));
 
