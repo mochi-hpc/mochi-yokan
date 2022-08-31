@@ -487,7 +487,7 @@ static inline hg_return_t hg_proc_yk_database_id_t(
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)
 {
     hg_return_t ret;
-    hg_size_t count;
+    hg_size_t count = 0;
     switch(hg_proc_get_op(proc)) {
         case HG_ENCODE:
             ret = hg_proc_hg_size_t(proc, &in->count);
@@ -522,7 +522,7 @@ static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)
 static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* in)
 {
     hg_return_t ret;
-    hg_size_t size;
+    hg_size_t size = 0;
     switch(hg_proc_get_op(proc)) {
     case HG_ENCODE:
         ret = hg_proc_hg_size_t(proc, &in->size);
