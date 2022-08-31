@@ -61,6 +61,7 @@ jobs:
                  -DENABLE_LMDB=ON \
                  -DENABLE_UNQLITE=ON \
                  -DENABLE_LUA=ON \
-                 -DENABLE_PYTHON=ON &&
+                 -DENABLE_PYTHON=ON \
+                 -DENABLE_YCSB=ON &&
         make &&
         ctest --output-on-failure
