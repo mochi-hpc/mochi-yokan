@@ -33,6 +33,55 @@ namespace fs = std::filesystem;
 namespace fs = std::experimental::filesystem;
 #endif
 
+class Logger : public rocksdb::Logger {
+
+    public:
+
+    Logger(margo_instance_id mid = MARGO_INSTANCE_NULL)
+    : rocksdb::Logger()
+    , m_mid(mid) {}
+
+    void Logv(const rocksdb::InfoLogLevel log_level, const char* format, va_list ap) override {
+        va_list ap_copy;
+        va_copy(ap_copy, ap);
+        int len = vsnprintf(NULL, 0, format, ap_copy);
+        if(len < 0) {
+            va_end(ap_copy);
+            return;
+        }
+        std::vector<char> buffer(len+1, 0);
+        vsnprintf(buffer.data(), len, format, ap);
+        switch(log_level) {
+        case rocksdb::DEBUG_LEVEL:
+            margo_debug(m_mid, buffer.data());
+            break;
+        case rocksdb::INFO_LEVEL:
+            margo_info(m_mid, buffer.data());
+            break;
+        case rocksdb::WARN_LEVEL:
+            margo_warning(m_mid, buffer.data());
+            break;
+        case rocksdb::ERROR_LEVEL:
+            margo_error(m_mid, buffer.data());
+            break;
+        case rocksdb::FATAL_LEVEL:
+            margo_critical(m_mid, buffer.data());
+            break;
+        case rocksdb::HEADER_LEVEL:
+            margo_info(m_mid, buffer.data());
+            break;
+        default:
+            break;
+        }
+        va_end(ap_copy);
+    }
+
+    private:
+
+    margo_instance_id m_mid;
+
+};
+
 class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
@@ -170,7 +219,38 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         CHECK_AND_ADD_MISSING(cfg["write_options"], "use_write_batch", boolean, false);
 
-        // TODO set logger, env, block_cache, and filter_policy...
+        if(cfg.contains("logger_redirects_to_margo")) {
+            auto& logger_redirects_to_margo = cfg["logger_redirects_to_margo"];
+            if(!logger_redirects_to_margo.is_boolean()) {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL, "logger_redirects_to_margo should be a boolean");
+                return Status::InvalidConf;
+            }
+            auto logger_redirects_to_margo_b = logger_redirects_to_margo.get<bool>();
+            if(logger_redirects_to_margo_b) {
+                options.info_log = std::make_shared<Logger>(MARGO_INSTANCE_NULL);
+            }
+        }
+        if(cfg.contains("info_log_level")) {
+            auto& info_log_level = cfg["info_log_level"];
+            if(!info_log_level.is_string()) {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL, "info_log_level should be a string");
+                return Status::InvalidConf;
+            }
+            auto info_log_level_str = info_log_level.get<std::string>();
+            if(info_log_level_str == "debug")  options.info_log_level = rocksdb::DEBUG_LEVEL;
+            else if(info_log_level_str == "info")   options.info_log_level = rocksdb::INFO_LEVEL;
+            else if(info_log_level_str == "warn")   options.info_log_level = rocksdb::WARN_LEVEL;
+            else if(info_log_level_str == "error")  options.info_log_level = rocksdb::ERROR_LEVEL;
+            else if(info_log_level_str == "fatal")  options.info_log_level = rocksdb::FATAL_LEVEL;
+            else if(info_log_level_str == "header") options.info_log_level = rocksdb::HEADER_LEVEL;
+            else {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL, "info_log_level should be debug, info, "
+                    "warn, error, fatal, or header");
+                return Status::InvalidConf;
+            }
+        }
+
+        // TODO set env, block_cache, and filter_policy...
         if(cfg.contains("db_paths")) {
             auto& db_paths = cfg["db_paths"];
             if(!db_paths.is_array()) {
