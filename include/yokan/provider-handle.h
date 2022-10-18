@@ -8,13 +8,21 @@
 
 #include <margo.h>
 #include <yokan/common.h>
+#include <yokan/client.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/**
+ * @brief Yokan Provider handle.
+ * These are not used directly in Yokan's client or admin API
+ * but can be supplied by Bedrock if another Mochi microservice
+ * needs one.
+ */
 struct yk_provider_handle {
     margo_instance_id mid;
+    yk_client_t       client;
     hg_addr_t         addr;
     uint16_t          provider_id;
 };
