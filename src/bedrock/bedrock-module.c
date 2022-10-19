@@ -68,6 +68,7 @@ static int yk_create_provider_handle(
     yk_client_t c = (yk_client_t)client;
     yk_provider_handle_t tmp = calloc(1, sizeof(*tmp));
     margo_addr_dup(c->mid, address, &(tmp->addr));
+    tmp->mid = c->mid;
     tmp->provider_id = provider_id;
     tmp->client = c;
     *ph = (bedrock_module_provider_handle_t)tmp;
