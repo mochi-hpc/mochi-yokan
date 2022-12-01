@@ -64,6 +64,10 @@ jobs:
                  -DENABLE_LUA=ON \
                  -DENABLE_PYTHON=ON &&
         make && make test
-    - name: Upload code coverage files
-      run: |
-        bash <(curl -s https://codecov.io/bash)
+
+    - name: Send coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        fail_ci_if_error: true
+        verbose: true
+        gcov: true
