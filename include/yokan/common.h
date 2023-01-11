@@ -51,6 +51,7 @@ extern "C" {
     X(YOKAN_ERR_MODE, "Invalid mode")                            \
     X(YOKAN_ERR_NONCONTIG, "Non-contiguous buffer")              \
     X(YOKAN_ERR_READONLY, "Read-only buffer")                    \
+    X(YOKAN_ERR_MIGRATED, "Database has migrated")               \
     X(YOKAN_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,
