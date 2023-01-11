@@ -15,6 +15,7 @@ typedef struct yk_admin {
    hg_id_t           close_database_id;
    hg_id_t           destroy_database_id;
    hg_id_t           list_databases_id;
+   hg_id_t           migrate_database_id;
 } yk_admin;
 
 #endif

@@ -71,6 +71,9 @@ endif ()
 
 if (${ENABLE_REMI})
     find_package (remi REQUIRED)
+    set (YOKAN_HAS_REMI ON)
+else ()
+    set (YOKAN_HAS_REMI OFF)
 endif ()
 
 # search for margo

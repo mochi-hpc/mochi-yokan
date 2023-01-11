@@ -3,6 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include "config.h"
 #include "yokan/server.h"
 #include "provider.hpp"
 #include "../common/types.h"
@@ -14,6 +15,11 @@
 #include "../buffer/keep_all_bulk_cache.hpp"
 #include "../buffer/lru_bulk_cache.hpp"
 #include <string>
+#ifdef YOKAN_HAS_REMI
+#include <remi/remi-client.h>
+#include <remi/remi-server.h>
+#include "migration.hpp"
+#endif
 
 static void yk_finalize_provider(void* p);
 
@@ -106,7 +112,7 @@ yk_return_t yk_provider_register(
     p = new yk_provider;
     if(p == NULL) {
         // LCOV_EXCL_START
-        YOKAN_LOG_ERROR(mid, "could not allocate memory for provider");
+        YOKAN_LOG_ERROR(mid, "Could not allocate memory for provider");
         return YOKAN_ERR_ALLOCATION;
         // LCOV_EXCL_STOP
     }
@@ -117,6 +123,33 @@ yk_return_t yk_provider_register(
     p->config = config;
     p->token = (a.token && strlen(a.token)) ? a.token : "";
 
+    /* REMI client and provider */
+#ifndef YOKAN_HAS_REMI
+    if(a.remi.client && !a.remi.provider) {
+        YOKAN_LOG_WARNING(mid,
+            "Yokan provider initialized with only a REMI client"
+            " will only be able to *send* databases to other providers");
+    } else if(!a.remi.client && a.remi.provider) {
+        YOKAN_LOG_WARNING(mid,
+            "Yokan provider initialized with only a REMI provider"
+            " will only be able to *receive* databases from other providers");
+    }
+    p->remi.client = a.remi.client;
+    p->remi.provider = a.remi.provider;
+    if(p->remi.provider) {
+        char remi_class[16];
+        sprintf(remi_class, "yokan/%05u", provider_id);
+        int remi_ret = remi_provider_register_migration_class(
+            p->remi.provider, remi_class, before_migration_cb,
+            after_migration_cb, nullptr, p);
+    }
+#else
+    if(a.remi.client || a.remi.provider) {
+        YOKAN_LOG_ERROR(mid,
+            "Provided REMI client or provider will be ignored because"
+            " Yokan wasn't built with REMI support");
+    }
+#endif
     /* Bulk cache */
     // TODO find a cache implementation in the configuration
     if(a.cache) {
@@ -173,6 +206,12 @@ yk_return_t yk_provider_register(
             yk_list_databases_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_databases_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_migrate_database",
+            migrate_database_in_t, migrate_database_out_t,
+            yk_migrate_database_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->migrate_database_id = id;
 
     /* Client RPCs */
 
@@ -645,6 +684,41 @@ void yk_list_databases_ult(hg_handle_t h)
     out.count = i;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_list_databases_ult)
+
+void yk_migrate_database_ult(hg_handle_t h)
+{
+    hg_return_t hret;
+    migrate_database_in_t  in;
+    migrate_database_out_t out;
+
+    DEFER(margo_destroy(h));
+    DEFER(margo_respond(h, &out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(h);
+    CHECK_MID(mid, margo_hg_handle_get_instance);
+
+    const struct hg_info* info = margo_get_info(h);
+    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
+    CHECK_PROVIDER(provider);
+
+    hret = margo_get_input(h, &in);
+    CHECK_HRET_OUT(hret, margo_get_input);
+    DEFER(margo_free_input(h, &in));
+
+    if(!check_token(provider, in.token)) {
+        YOKAN_LOG_ERROR(mid, "invalid token");
+        out.ret = YOKAN_ERR_INVALID_TOKEN;
+        return;
+    }
+
+    auto database = find_database(provider, &in.origin_id);
+    CHECK_DATABASE(database, in.origin_id);
+
+    // TODO
+
+    out.ret = YOKAN_ERR_OP_UNSUPPORTED; // TODO change to YOKAN_SUCCESS
+}
+DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
 
 void yk_find_by_name_ult(hg_handle_t h)
 {

@@ -23,6 +23,7 @@ yk_return_t yk_admin_init(margo_instance_id mid, yk_admin_t* admin)
         margo_registered_name(mid, "yk_close_database", &a->close_database_id, &flag);
         margo_registered_name(mid, "yk_destroy_database", &a->destroy_database_id, &flag);
         margo_registered_name(mid, "yk_list_databases", &a->list_databases_id, &flag);
+        margo_registered_name(mid, "yk_migrate_databases", &a->migrate_database_id, &flag);
         /* Get more existing RPCs... */
     } else {
         a->open_database_id =
@@ -37,7 +38,9 @@ yk_return_t yk_admin_init(margo_instance_id mid, yk_admin_t* admin)
         a->list_databases_id =
             MARGO_REGISTER(mid, "yk_list_databases",
             list_databases_in_t, list_databases_out_t, NULL);
-        /* Register more RPCs ... */
+        a->migrate_database_id =
+            MARGO_REGISTER(mid, "yk_migrate_database",
+            migrate_database_in_t, migrate_database_out_t, NULL);
     }
 
     *admin = a;
@@ -246,6 +249,70 @@ yk_return_t yk_list_databases(
         *count = out.count;
         memcpy(ids, out.ids, out.count*sizeof(*ids));
     }
+
+    margo_free_output(h, &out);
+    margo_destroy(h);
+    return ret;
+}
+
+yk_return_t yk_migrate_database(
+        yk_admin_t admin,
+        hg_addr_t origin_address,
+        uint16_t origin_provider_id,
+        yk_database_id_t origin_id,
+        hg_addr_t target_address,
+        uint16_t target_provider_id,
+        const char* token,
+        yk_database_id_t* target_id)
+{
+    hg_handle_t h;
+    migrate_database_in_t  in;
+    migrate_database_out_t out;
+    hg_return_t hret;
+    yk_return_t ret;
+
+    if(origin_address == HG_ADDR_NULL || target_address == HG_ADDR_NULL)
+        return YOKAN_ERR_INVALID_ARGS;
+
+    char target_addr_str[256] = {0};
+    hg_size_t target_addr_str_size = 256;
+    hret = margo_addr_to_string(admin->mid, target_addr_str, &target_addr_str_size, target_address);
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
+        return YOKAN_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
+    in.target_address = target_addr_str;
+
+    memcpy(&in.origin_id, &origin_id, sizeof(origin_id));
+    in.token  = (char*)token;
+    in.target_provider_id = target_provider_id;
+
+    hret = margo_create(admin->mid, origin_address, admin->migrate_database_id, &h);
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
+        return YOKAN_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
+
+    hret = margo_provider_forward(origin_provider_id, h, &in);
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
+        margo_destroy(h);
+        return YOKAN_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
+
+    hret = margo_get_output(h, &out);
+    if(hret != HG_SUCCESS) {
+        // LCOV_EXCL_START
+        margo_destroy(h);
+        return YOKAN_ERR_FROM_MERCURY;
+        // LCOV_EXCL_STOP
+    }
+
+    ret = out.ret;
+    if(target_id && ret == YOKAN_SUCCESS) *target_id = out.target_id;
 
     margo_free_output(h, &out);
     margo_destroy(h);

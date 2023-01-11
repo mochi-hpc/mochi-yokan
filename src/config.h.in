@@ -21,6 +21,8 @@
 #cmakedefine YOKAN_HAS_UNQLITE
 #cmakedefine YOKAN_HAS_LUA
 
+#cmakedefine YOKAN_HAS_REMI
+
 #ifdef ENABLE_LOG_DEBUG
 #define ENABLE_LOG_ERROR
 #define ENABLE_LOG_INFO

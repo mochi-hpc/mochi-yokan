@@ -58,6 +58,7 @@ typedef struct yk_provider {
     hg_id_t close_database_id;
     hg_id_t destroy_database_id;
     hg_id_t list_databases_id;
+    hg_id_t migrate_database_id;
     /* RPC identifiers for clients */
     hg_id_t find_by_name_id;
     hg_id_t count_id;
@@ -110,6 +111,8 @@ DECLARE_MARGO_RPC_HANDLER(yk_destroy_database_ult)
 void yk_destroy_database_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_list_databases_ult)
 void yk_list_databases_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
+void yk_migrate_database_ult(hg_handle_t h);
 
 /* Client RPCs */
 DECLARE_MARGO_RPC_HANDLER(yk_find_by_name_ult)
