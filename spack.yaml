@@ -12,7 +12,6 @@ spack:
   - gdbm
   - lmdb
   - unqlite@master
-  - lua-sol2
   - py-pybind11
   - mochi-margo@main
   - mercury@2.1.0 ~boostsys ^libfabric fabrics=tcp,rxm
@@ -20,6 +19,7 @@ spack:
   - mochi-bedrock
   - ycsb-cpp-interface
   - rocksdb+rtti
+  - mochi-remi
   concretizer:
     unify: true
     reuse: false

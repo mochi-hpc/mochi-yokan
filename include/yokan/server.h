@@ -20,14 +20,21 @@ typedef struct yk_provider* yk_provider_t;
 #define YOKAN_PROVIDER_NULL ((yk_provider_t)NULL)
 #define YOKAN_PROVIDER_IGNORE ((yk_provider_t*)NULL)
 
+typedef struct remi_client* remi_client_t; // define without including <remi-client.h>
+typedef struct remi_provider* remi_provider_t; // define without including <remi-server.h>
+
 struct yk_provider_args {
-    const char*        token;  // Security token
-    const char*        config; // JSON configuration
-    ABT_pool           pool;   // Pool used to run RPCs
-    yk_bulk_cache_t   cache;  // cache implementation for bulk handles
+    const char*     token;  // Security token
+    const char*     config; // JSON configuration
+    ABT_pool        pool;   // Pool used to run RPCs
+    yk_bulk_cache_t cache;  // cache implementation for bulk handles
+    struct {
+        remi_client_t   client;
+        remi_provider_t provider;
+    } remi; // REMI information (yokan needs to be built with ENABLE_REMI)
 };
 
-#define YOKAN_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL }
+#define YOKAN_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL, {NULL, NULL} }
 
 /**
  * @brief Creates a new YOKAN provider. If YOKAN_PROVIDER_IGNORE

@@ -29,6 +29,7 @@ option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
 option (ENABLE_LUA        "Build with Lua support" OFF)
 option (ENABLE_PYTHON     "Build the Python module" OFF)
 option (ENABLE_YCSB       "Build the YCSB adaptor" OFF)
+option (ENABLE_REMI       "Build with REMI support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -66,6 +67,10 @@ find_package (PkgConfig REQUIRED)
 
 if (${ENABLE_BEDROCK})
     find_package (bedrock REQUIRED)
+endif ()
+
+if (${ENABLE_REMI})
+    find_package (remi REQUIRED)
 endif ()
 
 # search for margo

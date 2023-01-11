@@ -6,7 +6,9 @@
 #ifndef __PROVIDER_H
 #define __PROVIDER_H
 
+#include "yokan/server.h"
 #include "yokan/backend.hpp"
+#include "yokan/bulk-cache.h"
 #include <nlohmann/json.hpp>
 #include <margo.h>
 #include <uuid.h>
@@ -88,6 +90,13 @@ typedef struct yk_provider {
     hg_id_t doc_length_id;
     hg_id_t doc_list_id;
     hg_id_t doc_list_direct_id;
+
+    // REMI information
+    struct {
+        remi_provider_t provider;
+        remi_client_t   client;
+    } remi;
+
 } yk_provider;
 
 /* Admin RPCs */
