@@ -13,6 +13,7 @@
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
+#include <fstream>
 #include <map>
 #include <string>
 #include <cstring>
@@ -637,6 +638,61 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             valSizes[i] = YOKAN_NO_MORE_KEYS;
         }
 
+        return Status::OK;
+    }
+
+    struct MapMigrationHandle : public MigrationHandle {
+
+        MapDatabase&   m_db;
+        ScopedReadLock m_db_lock;
+        std::string    m_filename;
+        int            m_fd;
+        FILE*          m_file;
+
+        MapMigrationHandle(MapDatabase& db)
+        : m_db(db)
+        , m_db_lock(db.m_lock) {
+            // create temporary file name
+            char template_filename[] = "/dev/shm/yokan-map-XXXXXX";
+            m_filename = mktemp(template_filename);
+            // create temporary file
+            std::ofstream ofs(m_filename.c_str(), std::ofstream::out);
+            // write the map to it
+            if(m_db.m_db) {
+                for(const auto& p : *m_db.m_db) {
+                    size_t ksize = p.first.size();
+                    size_t vsize = p.second.size();
+                    const char* kdata = p.first.data();
+                    const char* vdata = p.second.data();
+                    ofs.write(reinterpret_cast<const char*>(&ksize), sizeof(ksize));
+                    ofs.write(kdata, ksize);
+                    ofs.write(reinterpret_cast<const char*>(&vsize), sizeof(vsize));
+                    ofs.write(vdata, vsize);
+                }
+            }
+        }
+
+        ~MapMigrationHandle() {
+            remove(m_filename.c_str());
+        }
+
+        std::string getRoot() const override {
+            return "";
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {m_filename};
+        }
+
+        void cancel() override {}
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        try {
+            mh.reset(new MapMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
         return Status::OK;
     }
 

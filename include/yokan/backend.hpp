@@ -16,6 +16,7 @@
 #include <yokan/common.h>
 #include <yokan/usermem.hpp>
 #include <yokan/filters.hpp>
+#include <yokan/migration.hpp>
 
 template <typename T> class __YOKANBackendRegistration;
 
@@ -553,6 +554,16 @@ class DatabaseInterface {
         (void)ids;
         (void)documents;
         (void)doc_sizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Set the provided unique_ptr to point to a MigrationHandle
+     * that can be used by the provider to retrieve the files used by
+     * the database.
+     */
+    virtual Status startMigration(std::unique_ptr<MigrationHandle>& mh) {
+        (void)mh;
         return Status::NotSupported;
     }
 
