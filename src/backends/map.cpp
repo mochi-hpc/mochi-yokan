@@ -147,10 +147,46 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+        if(files.size() != 1) return Status::InvalidArg;
+        auto filename = files.front();
+        std::ifstream ifs(filename.c_str(), std::ios::binary);
+        if(!ifs.good())
+            return Status::IOError;
+        auto remove_file = [&ifs,&filename]() {
+            ifs.close();
+            remove(filename.c_str());
+        };
+        auto status = create(config, kvs);
+        if(status != Status::OK) {
+            remove_file();
+            return status;
+        }
+        auto db = dynamic_cast<MapDatabase*>(*kvs);
+        ifs.seekg(0, std::ios::end);
+        size_t total_size = ifs.tellg();
+        ifs.clear();
+        ifs.seekg(0);
+        size_t size_read = 0;
+        while(size_read < total_size) {
+            size_t ksize, vsize;
+            std::vector<char> key, val;
+            ifs.read(reinterpret_cast<char*>(&ksize), sizeof(ksize));
+            key.resize(ksize);
+            ifs.read(key.data(), ksize);
+            ifs.read(reinterpret_cast<char*>(&vsize), sizeof(vsize));
+            val.resize(ksize);
+            ifs.read(val.data(), vsize);
+            if(ifs.fail()) {
+                remove_file();
+                return Status::IOError;
+            }
+            db->m_db->emplace(std::piecewise_construct,
+                    std::forward_as_tuple(key.data(), ksize, db->m_key_allocator),
+                    std::forward_as_tuple(val.data(), vsize, db->m_val_allocator));
+            size_read += 2*sizeof(ksize) + ksize + vsize;
+        }
+        remove_file();
+        return Status::OK;
     }
 
     // LCOV_EXCL_START
@@ -661,9 +697,10 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         , m_db_lock(db.m_lock) {
             // create temporary file name
             char template_filename[] = "/dev/shm/yokan-map-XXXXXX";
-            m_filename = mktemp(template_filename);
+            m_fd = mkstemp(template_filename);
+            m_filename = template_filename;
             // create temporary file
-            std::ofstream ofs(m_filename.c_str(), std::ofstream::out);
+            std::ofstream ofs(m_filename.c_str(), std::ofstream::out | std::ofstream::binary);
             // write the map to it
             if(m_db.m_db) {
                 for(const auto& p : *m_db.m_db) {
@@ -680,6 +717,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
 
         ~MapMigrationHandle() {
+            close(m_fd);
             remove(m_filename.c_str());
         }
 
