@@ -13,6 +13,7 @@
 #include <functional>
 #include <stdexcept>
 #include <memory>
+#include <list>
 #include <yokan/common.h>
 #include <yokan/usermem.hpp>
 #include <yokan/filters.hpp>
@@ -602,6 +603,15 @@ class DatabaseFactory {
         return make_fn[backendType](jsonConfig, kvs);
     }
 
+    static Status recoverDatabase(
+            const std::string& backendType,
+            const std::string& jsonConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+        if(!hasBackendType(backendType)) return Status::InvalidType;
+        return recover_fn[backendType](jsonConfig, files, kvs);
+    }
+
     /**
      * @brief Check if the backend type is available in the factory.
      *
@@ -619,6 +629,10 @@ class DatabaseFactory {
                 std::string,
                 std::function<Status(const std::string&,DatabaseInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
+    static std::unordered_map<
+                std::string,
+                std::function<Status(const std::string&,const std::list<std::string>&,DatabaseInterface**)>>
+        recover_fn; /*!< Map of factory functions for each backend type */
 };
 
 }
@@ -638,6 +652,10 @@ template <typename T> class __YOKANBackendRegistration {
         ::yokan::DatabaseFactory::make_fn[backend_name] =
             [](const std::string &config, ::yokan::DatabaseInterface** kvs) {
                 return T::create(config, kvs);
+            };
+        ::yokan::DatabaseFactory::recover_fn[backend_name] =
+            [](const std::string &config, const std::list<std::string>& files, ::yokan::DatabaseInterface** kvs) {
+                return T::recover(config, files, kvs);
             };
     }
 };

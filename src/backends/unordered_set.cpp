@@ -108,6 +108,13 @@ class UnorderedSetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
+        (void)config;
+        (void)files;
+        (void)kvs;
+        return Status::NotSupported;
+    }
+
     // LCOV_EXCL_START
     virtual std::string name() const override {
         return "unordered_set";
