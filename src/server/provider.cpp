@@ -3,6 +3,7 @@
  *
  * See COPYRIGHT in top-level directory.
  */
+#include <iostream>
 #include "config.h"
 #include "yokan/server.h"
 #include "provider.hpp"
@@ -714,9 +715,21 @@ void yk_migrate_database_ult(hg_handle_t h)
     auto database = find_database(provider, &in.origin_id);
     CHECK_DATABASE(database, in.origin_id);
 
-    // TODO
+    std::unique_ptr<yokan::MigrationHandle> mh;
+    auto status = database->startMigration(mh);
 
-    out.ret = YOKAN_ERR_OP_UNSUPPORTED; // TODO change to YOKAN_SUCCESS
+    if(status != yokan::Status::OK) {
+        out.ret = static_cast<decltype(out.ret)>(status);
+        return;
+    }
+
+    // TODO actually use REMI to transfer the files
+    std::cout << "MIGRATION files\n";
+    for(auto& f : mh->getFiles()) {
+        std::cout << f << "\n";
+    }
+
+    out.ret = YOKAN_SUCCESS;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
 

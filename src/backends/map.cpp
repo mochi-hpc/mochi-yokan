@@ -13,6 +13,7 @@
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <abt.h>
+#include <atomic>
 #include <fstream>
 #include <map>
 #include <string>
@@ -233,6 +234,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status count(int32_t mode, uint64_t* c) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         *c = m_db->size();
         return Status::OK;
     }
@@ -246,6 +248,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -279,6 +282,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -333,6 +337,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
 
             auto key_umem = UserMem{ keys.data + key_offset, ksizes[i] };
@@ -411,6 +416,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
         (void)mode;
+        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         bool mode_wait = mode & YOKAN_MODE_WAIT;
@@ -418,6 +424,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t key_offset = 0;
         size_t val_offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         if(!packed) {
 
@@ -502,6 +509,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -528,6 +536,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         using iterator = decltype(m_db->begin());
@@ -597,6 +606,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
@@ -691,6 +701,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         std::string    m_filename;
         int            m_fd;
         FILE*          m_file;
+        bool           m_cancel = false;
 
         MapMigrationHandle(MapDatabase& db)
         : m_db(db)
@@ -719,6 +730,10 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         ~MapMigrationHandle() {
             close(m_fd);
             remove(m_filename.c_str());
+            if(!m_cancel) {
+                m_db.m_migrated = true;
+                m_db.m_db->clear();
+            }
         }
 
         std::string getRoot() const override {
@@ -729,10 +744,13 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return {m_filename};
         }
 
-        void cancel() override {}
+        void cancel() override {
+            m_cancel = true;
+        }
     };
 
     Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
         try {
             mh.reset(new MapMigrationHandle(*this));
         } catch(...) {
@@ -785,6 +803,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     yk_allocator_t     m_key_allocator;
     yk_allocator_t     m_val_allocator;
     mutable KeyWatcher m_watcher;
+    std::atomic<bool>  m_migrated{false};
 };
 
 }

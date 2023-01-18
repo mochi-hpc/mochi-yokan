@@ -149,11 +149,15 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
     }
 
+    char new_root[128];
+    sprintf(new_root, "/tmp/migrated-%s", context->backend_type);
+
     // migrate the database to provider 2
     yk_database_id_t db_id2;
     ret = yk_migrate_database(
             context->yokan_admin, context->addr,
-            1, db_id1, context->addr, 2, NULL, &db_id2);
+            1, db_id1, context->addr, 2, NULL,
+            new_root, NULL, &db_id2);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // trying to access the database from provider 1 should get us an error

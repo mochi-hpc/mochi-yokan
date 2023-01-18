@@ -78,6 +78,7 @@ enum class Status : uint8_t {
     Canceled     = YOKAN_ERR_CANCELED,
     Permission   = YOKAN_ERR_PERMISSION,
     InvalidMode  = YOKAN_ERR_MODE,
+    Migrated     = YOKAN_ERR_MIGRATED,
     Other        = YOKAN_ERR_OTHER
 };
 
