@@ -647,6 +647,27 @@ class DatabaseFactory {
 
 template <typename T> class __YOKANBackendRegistration {
 
+
+    template<typename ... U> using void_t = void;
+
+    template<typename U> using recover_t = decltype(U::recover("", {}, nullptr));
+
+    template<typename U, typename = void_t<>>
+    struct has_recover : std::false_type {};
+
+    template<typename U>
+    struct has_recover<U, void_t<recover_t<U>>> : std::true_type {};
+
+    template<typename U, typename ... Args>
+    static auto call_recover(const std::true_type&, Args&&... args) {
+        return U::recover(std::forward<Args>(args)...);
+    }
+
+    template<typename U, typename ... Args>
+    static auto call_recover(const std::false_type&, Args&&... args) {
+        return yokan::Status::NotSupported;
+    }
+
     public:
 
     __YOKANBackendRegistration(const std::string &backend_name) {
@@ -656,7 +677,7 @@ template <typename T> class __YOKANBackendRegistration {
             };
         ::yokan::DatabaseFactory::recover_fn[backend_name] =
             [](const std::string &config, const std::list<std::string>& files, ::yokan::DatabaseInterface** kvs) {
-                return T::recover(config, files, kvs);
+                return call_recover<T>(has_recover<T>{}, config, files, kvs);
             };
     }
 };
