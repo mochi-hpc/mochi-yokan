@@ -125,7 +125,7 @@ yk_return_t yk_provider_register(
     p->token = (a.token && strlen(a.token)) ? a.token : "";
 
     /* REMI client and provider */
-#ifndef YOKAN_HAS_REMI
+#ifdef YOKAN_HAS_REMI
     if(a.remi.client && !a.remi.provider) {
         YOKAN_LOG_WARNING(mid,
             "Yokan provider initialized with only a REMI client"
@@ -691,6 +691,7 @@ void yk_migrate_database_ult(hg_handle_t h)
     hg_return_t hret;
     migrate_database_in_t  in;
     migrate_database_out_t out;
+    hg_addr_t target_addr = HG_ADDR_NULL;
 
     DEFER(margo_destroy(h));
     DEFER(margo_respond(h, &out));
@@ -715,6 +716,20 @@ void yk_migrate_database_ult(hg_handle_t h)
     auto database = find_database(provider, &in.origin_id);
     CHECK_DATABASE(database, in.origin_id);
 
+    // lookup target address
+    hret = margo_addr_lookup(mid, in.target_address, &target_addr);
+    CHECK_HRET_OUT(hret, margo_addr_lookup);
+    DEFER(margo_addr_free(mid, target_addr));
+
+    // create REMI provider handle
+    remi_provider_handle_t remi_ph = NULL;
+    int rret = remi_provider_handle_create(
+        provider->remi.client, target_addr, in.target_provider_id,
+        &remi_ph);
+    CHECK_RRET_OUT(rret, remi_provider_handle_create);
+    DEFER(remi_provider_handle_release(remi_ph));
+
+    // create MigrationHandle from the database
     std::unique_ptr<yokan::MigrationHandle> mh;
     auto status = database->startMigration(mh);
 
@@ -723,10 +738,45 @@ void yk_migrate_database_ult(hg_handle_t h)
         return;
     }
 
-    // TODO actually use REMI to transfer the files
-    std::cout << "MIGRATION files\n";
-    for(auto& f : mh->getFiles()) {
-        std::cout << f << "\n";
+    // create REMI fileset
+    remi_fileset_t fileset = REMI_FILESET_NULL;
+    char remi_class[16];
+    sprintf(remi_class, "yokan/%05u", in.target_provider_id);
+    rret = remi_fileset_create(remi_class, mh->getRoot().c_str(), &fileset);
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_create, mh);
+    DEFER(remi_fileset_free(fileset));
+
+    // fill REMI fileset
+    for(const auto& file : mh->getFiles()) {
+        rret = remi_fileset_register_file(fileset, file.c_str());
+        CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_file, mh);
+    }
+
+    // register REMI metadata
+    rret = remi_fileset_register_metadata(fileset,
+        "extra_config", in.extra_config);
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
+    rret = remi_fileset_register_metadata(fileset,
+        "config", database->config().c_str());
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
+
+    // set xfer size
+    if(in.xfer_size) {
+        rret = remi_fileset_set_xfer_size(fileset, in.xfer_size);
+        CHECK_RRET_OUT_CANCEL(rret, remi_fileset_set_xfer_size, mh);
+    }
+
+    // issue migration
+    int remi_status = 0;
+    rret = remi_fileset_migrate(remi_ph, fileset, in.new_root,
+            REMI_KEEP_SOURCE, REMI_USE_MMAP, &remi_status);
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_migrate, mh);
+    if(remi_status) {
+        YOKAN_LOG_ERROR(mid, "REMI migration callback returned %d on target", remi_status);
+        YOKAN_LOG_ERROR(mid, "^ target was %s with provider id %d", in.target_address, in.target_provider_id);
+        out.ret = YOKAN_ERR_OTHER;
+        mh->cancel();
+        return;
     }
 
     out.ret = YOKAN_SUCCESS;

@@ -172,8 +172,7 @@ yk_return_t yk_migrate_database(
         hg_addr_t dest_addr,
         uint16_t dest_provider_id,
         const char* token,
-        const char* new_root,
-        const char* extra_config,
+        struct yk_migration_options* options,
         yk_database_id_t* new_id);
 
 #if defined(__cplusplus)

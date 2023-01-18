@@ -707,7 +707,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         : m_db(db)
         , m_db_lock(db.m_lock) {
             // create temporary file name
-            char template_filename[] = "/dev/shm/yokan-map-XXXXXX";
+            char template_filename[] = "/tmp/yokan-map-snapshot-XXXXXX";
             m_fd = mkstemp(template_filename);
             m_filename = template_filename;
             // create temporary file
@@ -737,11 +737,11 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
 
         std::string getRoot() const override {
-            return "";
+            return "/tmp";
         }
 
         std::list<std::string> getFiles() const override {
-            return {m_filename};
+            return {m_filename.substr(5)}; // remove /tmp/ from the name
         }
 
         void cancel() override {

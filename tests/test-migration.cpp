@@ -43,8 +43,8 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     mid = margo_init("ofi+tcp", MARGO_SERVER_MODE, 0, 0);
     munit_assert_not_null(mid);
     // set log level
-    margo_set_global_log_level(MARGO_LOG_CRITICAL);
-    margo_set_log_level(mid, MARGO_LOG_CRITICAL);
+    margo_set_global_log_level(MARGO_LOG_INFO);
+    margo_set_log_level(mid, MARGO_LOG_INFO);
     // get address of current process
     hret = margo_addr_self(mid, &addr);
     munit_assert_int(hret, ==, HG_SUCCESS);
@@ -64,6 +64,7 @@ static void* test_context_setup(const MunitParameter params[], void* user_data)
     // register yk provider
     struct yk_provider_args args = YOKAN_PROVIDER_ARGS_INIT;
     args.remi.provider = remi_providers[0];
+    args.remi.client = remi_client;
     args.token = NULL;
     yret = yk_provider_register(
             mid, 1, &args,
@@ -154,10 +155,13 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
 
     // migrate the database to provider 2
     yk_database_id_t db_id2;
+    yk_migration_options options;
+    options.new_root = new_root,
+    options.extra_config = "{}",
+    options.xfer_size = 0;
     ret = yk_migrate_database(
             context->yokan_admin, context->addr,
-            1, db_id1, context->addr, 2, NULL,
-            new_root, NULL, &db_id2);
+            1, db_id1, context->addr, 2, NULL, &options, &db_id2);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // trying to access the database from provider 1 should get us an error

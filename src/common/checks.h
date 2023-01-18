@@ -25,6 +25,25 @@
         } \
     } while(0)
 
+#define CHECK_RRET_OUT(__rret__, __fun__) \
+    do { \
+        if(__rret__ != REMI_SUCCESS) { \
+            YOKAN_LOG_ERROR(mid, #__fun__ " returned %d", __rret__); \
+            out.ret = YOKAN_ERR_FROM_REMI; \
+            return; \
+        } \
+    } while(0)
+
+#define CHECK_RRET_OUT_CANCEL(__rret__, __fun__, __mh__) \
+    do { \
+        if(__rret__ != REMI_SUCCESS) { \
+            YOKAN_LOG_ERROR(mid, #__fun__ " returned %d", __rret__); \
+            out.ret = YOKAN_ERR_FROM_REMI; \
+            (__mh__)->cancel(); \
+            return; \
+        } \
+    } while(0)
+
 #define CHECK_MID(__mid__, __fun__) \
     do { \
         if(__mid__ == MARGO_INSTANCE_NULL) { \

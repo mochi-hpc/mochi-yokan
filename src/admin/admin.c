@@ -263,8 +263,7 @@ yk_return_t yk_migrate_database(
         hg_addr_t target_address,
         uint16_t target_provider_id,
         const char* token,
-        const char* new_root,
-        const char* json_extra_config,
+        struct yk_migration_options* options,
         yk_database_id_t* target_id)
 {
     hg_handle_t h;
@@ -289,8 +288,9 @@ yk_return_t yk_migrate_database(
     memcpy(&in.origin_id, &origin_id, sizeof(origin_id));
     in.token  = (char*)token;
     in.target_provider_id = target_provider_id;
-    in.new_root = (char*)new_root;
-    in.extra_config = (char*)json_extra_config;
+    in.new_root = options ? (char*)options->new_root : NULL;
+    in.extra_config = options ? (char*)options->extra_config : NULL;
+    in.xfer_size = options ? options->xfer_size : 0;
 
     hret = margo_create(admin->mid, origin_address, admin->migrate_database_id, &h);
     if(hret != HG_SUCCESS) {
