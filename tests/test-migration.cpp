@@ -200,7 +200,7 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         size_t vsize = 16 * stores_values;
         ret = yk_get(dbh, 0, key, ksize, value, &vsize);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        munit_assert_int(vsize, ==, 10);
+        munit_assert_int(vsize, ==, strlen(expected));
         if(stores_values)
             munit_assert_string_equal(value, expected);
     }
@@ -215,8 +215,8 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
             1, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    // close the database in provider 2
-    ret = yk_close_database(
+    // destroy the database in provider 2
+    ret = yk_destroy_database(
             context->yokan_admin, context->addr,
             2, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
