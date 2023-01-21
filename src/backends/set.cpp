@@ -11,6 +11,7 @@
 #include "../common/modes.hpp"
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
+#include <fstream>
 #include <abt.h>
 #include <set>
 #include <string>
@@ -131,6 +132,49 @@ class SetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    static Status recover(
+            const std::string& name, const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files, DatabaseInterface** kvs) {
+        (void)migrationConfig;
+        if(files.size() != 1) return Status::InvalidArg;
+        auto filename = files.front();
+        std::ifstream ifs(filename.c_str(), std::ios::binary);
+        if(!ifs.good()) {
+            return Status::IOError;
+        }
+        auto remove_file = [&ifs,&filename]() {
+            ifs.close();
+            remove(filename.c_str());
+        };
+        auto status = create(name, config, kvs);
+        if(status != Status::OK) {
+            remove_file();
+            return status;
+        }
+        auto db = dynamic_cast<SetDatabase*>(*kvs);
+        ifs.seekg(0, std::ios::end);
+        size_t total_size = ifs.tellg();
+        ifs.clear();
+        ifs.seekg(0);
+        size_t size_read = 0;
+        std::vector<char> key;
+        while(size_read < total_size) {
+            size_t ksize;
+            ifs.read(reinterpret_cast<char*>(&ksize), sizeof(ksize));
+            key.resize(ksize);
+            ifs.read(key.data(), ksize);
+            if(ifs.fail()) {
+                remove_file();
+                return Status::IOError;
+            }
+            db->m_db->emplace(key.data(), ksize, db->m_key_allocator);
+            size_read += sizeof(ksize) + ksize;
+        }
+        remove_file();
+        return Status::OK;
+    }
+
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "set";
@@ -179,12 +223,14 @@ class SetDatabase : public DatabaseInterface {
 
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return;
         m_db->clear();
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         *c = m_db->size();
         return Status::OK;
     }
@@ -197,6 +243,7 @@ class SetDatabase : public DatabaseInterface {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             const UserMem key{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -229,6 +276,7 @@ class SetDatabase : public DatabaseInterface {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const UserMem key{ keys.data + offset, ksizes[i] };
@@ -258,6 +306,7 @@ class SetDatabase : public DatabaseInterface {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         if(vals.size != 0) return Status::InvalidArg;
 
@@ -277,6 +326,9 @@ class SetDatabase : public DatabaseInterface {
                                               (size_t)0);
         if(total_vsizes != 0) return Status::InvalidArg;
 
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
         if(mode_exist_only) {
             if(ksizes.size == 1) {
                 if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) == m_db->end())
@@ -292,7 +344,6 @@ class SetDatabase : public DatabaseInterface {
             }
         }
 
-        ScopedWriteLock lock(m_lock);
         for(size_t i = 0; i < ksizes.size; i++) {
             m_db->emplace(keys.data + key_offset,
                           ksizes[i], m_key_allocator);
@@ -313,6 +364,7 @@ class SetDatabase : public DatabaseInterface {
         (void)packed;
         size_t key_offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto mode_wait = mode & YOKAN_MODE_WAIT;
 
@@ -349,6 +401,7 @@ class SetDatabase : public DatabaseInterface {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -377,6 +430,7 @@ class SetDatabase : public DatabaseInterface {
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
@@ -451,6 +505,7 @@ class SetDatabase : public DatabaseInterface {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
@@ -533,6 +588,67 @@ class SetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    struct SetMigrationHandle : public MigrationHandle {
+
+        SetDatabase&   m_db;
+        ScopedReadLock m_db_lock;
+        std::string    m_filename;
+        int            m_fd;
+        FILE*          m_file;
+        bool           m_cancel = false;
+
+        SetMigrationHandle(SetDatabase& db)
+        : m_db(db)
+        , m_db_lock(db.m_lock) {
+            // create temporary file name
+            char template_filename[] = "/tmp/yokan-set-snapshot-XXXXXX";
+            m_fd = mkstemp(template_filename);
+            m_filename = template_filename;
+            // create temporary file
+            std::ofstream ofs(m_filename.c_str(), std::ofstream::out | std::ofstream::binary);
+            // write the map to it
+            if(m_db.m_db) {
+                for(const auto& key : *m_db.m_db) {
+                    size_t ksize = key.size();
+                    const char* kdata = key.data();
+                    ofs.write(reinterpret_cast<const char*>(&ksize), sizeof(ksize));
+                    ofs.write(kdata, ksize);
+                }
+            }
+        }
+
+        ~SetMigrationHandle() {
+            close(m_fd);
+            remove(m_filename.c_str());
+            if(!m_cancel) {
+                m_db.m_migrated = true;
+                m_db.m_db->clear();
+            }
+        }
+
+        std::string getRoot() const override {
+            return "/tmp";
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {m_filename.substr(5)}; // remove /tmp/ from the name
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new SetMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~SetDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
@@ -572,6 +688,7 @@ class SetDatabase : public DatabaseInterface {
     yk_allocator_t     m_node_allocator;
     yk_allocator_t     m_key_allocator;
     mutable KeyWatcher m_watcher;
+    bool               m_migrated = false;
 };
 
 }
