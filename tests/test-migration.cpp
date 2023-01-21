@@ -200,6 +200,7 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         size_t vsize = 16 * stores_values;
         ret = yk_get(dbh, 0, key, ksize, value, &vsize);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        munit_assert_int(vsize, ==, 10);
         if(stores_values)
             munit_assert_string_equal(value, expected);
     }

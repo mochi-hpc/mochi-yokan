@@ -127,9 +127,11 @@ void yk_get_ult(hg_handle_t h)
         // this is done using two concurrent bulk transfers
         margo_request req = MARGO_REQUEST_NULL;
         if(vals.size != 0) {
+            size_t xfer_size = remaining_vsize;
+            if(in.count == 1) xfer_size = vsizes[0];
             hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
                     in.bulk, in.offset + vals_offset,
-                    buffer->bulk, vals_offset, remaining_vsize, &req);
+                    buffer->bulk, vals_offset, xfer_size, &req);
             CHECK_HRET_OUT(hret, margo_bulk_itransfer);
         }
 
