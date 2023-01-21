@@ -46,7 +46,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -105,21 +105,20 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBDatabase(db, std::move(cfg));
+        *kvs = new LevelDBDatabase(db, std::move(cfg), name);
 
         return Status::OK;
     }
 
-    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+    // LCOV_EXCL_START
+    virtual std::string type() const override {
+        return "leveldb";
     }
+    // LCOV_EXCL_STOP
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "leveldb";
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -520,9 +519,10 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    LevelDBDatabase(leveldb::DB* db, json&& cfg)
+    LevelDBDatabase(leveldb::DB* db, json&& cfg, const std::string& name)
     : m_db(db)
-    , m_config(std::move(cfg)) {
+    , m_config(std::move(cfg))
+    , m_name(name) {
         m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
         m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
         m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
@@ -536,6 +536,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     leveldb::ReadOptions  m_read_options;
     leveldb::WriteOptions m_write_options;
     bool                  m_use_write_batch;
+    std::string           m_name;
 };
 
 }

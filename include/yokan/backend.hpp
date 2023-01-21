@@ -112,6 +112,13 @@ class DatabaseInterface {
      *
      * @return The name of the backend.
      */
+    virtual std::string type() const = 0;
+
+    /**
+     * @brief Get the name of the database.
+     *
+     * @return The name of the database.
+     */
     virtual std::string name() const = 0;
 
     /**
@@ -598,19 +605,22 @@ class DatabaseFactory {
      */
     static Status makeDatabase(
             const std::string& backendType,
+            const std::string& databaseName,
             const std::string& jsonConfig,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return make_fn[backendType](jsonConfig, kvs);
+        return make_fn[backendType](databaseName, jsonConfig, kvs);
     }
 
     static Status recoverDatabase(
             const std::string& backendType,
-            const std::string& jsonConfig,
+            const std::string& databaseName,
+            const std::string& dbConfig,
+            const std::string& migrationConfig,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return recover_fn[backendType](jsonConfig, files, kvs);
+        return recover_fn[backendType](databaseName, dbConfig, migrationConfig, files, kvs);
     }
 
     /**
@@ -628,11 +638,19 @@ class DatabaseFactory {
 
     static std::unordered_map<
                 std::string,
-                std::function<Status(const std::string&,DatabaseInterface**)>>
+                std::function<Status(
+                        const std::string&,
+                        const std::string&,
+                        DatabaseInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
     static std::unordered_map<
                 std::string,
-                std::function<Status(const std::string&,const std::list<std::string>&,DatabaseInterface**)>>
+                std::function<Status(
+                        const std::string&,
+                        const std::string&,
+                        const std::string&,
+                        const std::list<std::string>&,
+                        DatabaseInterface**)>>
         recover_fn; /*!< Map of factory functions for each backend type */
 };
 
@@ -650,7 +668,8 @@ template <typename T> class __YOKANBackendRegistration {
 
     template<typename ... U> using void_t = void;
 
-    template<typename U> using recover_t = decltype(U::recover("", {}, nullptr));
+    template<typename U> using recover_t =
+        decltype(U::recover("", "", "", {}, nullptr));
 
     template<typename U, typename = void_t<>>
     struct has_recover : std::false_type {};
@@ -664,7 +683,7 @@ template <typename T> class __YOKANBackendRegistration {
     }
 
     template<typename U, typename ... Args>
-    static auto call_recover(const std::false_type&, Args&&... args) {
+    static auto call_recover(const std::false_type&, Args&&...) {
         return yokan::Status::NotSupported;
     }
 
@@ -672,12 +691,16 @@ template <typename T> class __YOKANBackendRegistration {
 
     __YOKANBackendRegistration(const std::string &backend_name) {
         ::yokan::DatabaseFactory::make_fn[backend_name] =
-            [](const std::string &config, ::yokan::DatabaseInterface** kvs) {
-                return T::create(config, kvs);
+            [](const std::string& name, const std::string &config, ::yokan::DatabaseInterface** kvs) {
+                return T::create(name, config, kvs);
             };
         ::yokan::DatabaseFactory::recover_fn[backend_name] =
-            [](const std::string &config, const std::list<std::string>& files, ::yokan::DatabaseInterface** kvs) {
-                return call_recover<T>(has_recover<T>{}, config, files, kvs);
+            [](const std::string& name,
+               const std::string &database_config,
+               const std::string& migration_config,
+               const std::list<std::string>& files,
+               ::yokan::DatabaseInterface** kvs) {
+                return call_recover<T>(has_recover<T>{}, name, database_config, migration_config, files, kvs);
             };
     }
 };

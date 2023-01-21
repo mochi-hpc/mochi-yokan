@@ -55,7 +55,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_SET_DEFAULT(__cfg__, __field__, __type__, __default__) \
@@ -128,20 +128,19 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(status);
         }
 
-        *kvs = new BerkeleyDBDatabase(cfg, db_type, db_env, db);
+        *kvs = new BerkeleyDBDatabase(cfg, name, db_type, db_env, db);
         return Status::OK;
     }
 
-    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+    // LCOV_EXCL_START
+    virtual std::string type() const override {
+        return "berkeleydb";
     }
+    // LCOV_EXCL_STOP
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "berkeleydb";
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -687,16 +686,18 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    json   m_config;
-    int    m_db_type;
-    DbEnv* m_db_env = nullptr;
-    Db*    m_db = nullptr;
+    json        m_config;
+    int         m_db_type;
+    DbEnv*      m_db_env = nullptr;
+    Db*         m_db = nullptr;
+    std::string m_name;
 
-    BerkeleyDBDatabase(json cfg, int db_type, DbEnv* env, Db* db)
+    BerkeleyDBDatabase(json cfg, const std::string& name, int db_type, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
     , m_db_type(db_type)
     , m_db_env(env)
-    , m_db(db) {
+    , m_db(db)
+    , m_name(name) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }

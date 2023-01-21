@@ -263,8 +263,7 @@ yk_return_t yk_migrate_database(
         hg_addr_t target_address,
         uint16_t target_provider_id,
         const char* token,
-        struct yk_migration_options* options,
-        yk_database_id_t* target_id)
+        struct yk_migration_options* options)
 {
     hg_handle_t h;
     migrate_database_in_t  in;
@@ -315,8 +314,7 @@ yk_return_t yk_migrate_database(
         // LCOV_EXCL_STOP
     }
 
-    ret = out.ret;
-    if(target_id && ret == YOKAN_SUCCESS) *target_id = out.target_id;
+    ret = (yk_return_t)out.ret;
 
     margo_free_output(h, &out);
     margo_destroy(h);

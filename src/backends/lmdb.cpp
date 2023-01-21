@@ -67,7 +67,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -127,21 +127,20 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBDatabase(std::move(cfg), env, db);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db, name);
 
         return Status::OK;
     }
 
-    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+    // LCOV_EXCL_START
+    virtual std::string type() const override {
+        return "lmdb";
     }
+    // LCOV_EXCL_STOP
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "lmdb";
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -703,17 +702,19 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
+    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db, const std::string& name)
     : m_config(std::move(cfg))
     , m_env(env)
-    , m_db(db) {
+    , m_db(db)
+    , m_name(name) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    json     m_config;
-    MDB_env* m_env = nullptr;
-    MDB_dbi  m_db;
+    json        m_config;
+    MDB_env*    m_env = nullptr;
+    MDB_dbi     m_db;
+    std::string m_name;
 };
 
 }

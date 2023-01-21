@@ -117,7 +117,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
     }
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
             cfg = json::parse(config);
@@ -305,14 +305,20 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(status);
         }
 
-        *kvs = new RocksDBDatabase(db, std::move(cfg));
+        *kvs = new RocksDBDatabase(name, db, std::move(cfg));
 
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "rocksdb";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -716,8 +722,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    RocksDBDatabase(rocksdb::DB* db, json&& cfg)
-    : m_db(db)
+    RocksDBDatabase(const std::string& name, rocksdb::DB* db, json&& cfg)
+    : m_name(name)
+    , m_db(db)
     , m_config(std::move(cfg)) {
 
 #define GET_OPTION(__opt__, __cfg__, __field__) \
@@ -749,6 +756,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
+    std::string           m_name;
     rocksdb::DB*          m_db;
     json                  m_config;
     rocksdb::ReadOptions  m_read_options;

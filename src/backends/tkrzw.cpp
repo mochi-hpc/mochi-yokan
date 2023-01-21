@@ -61,7 +61,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_COMPLETE(__cfg__, __field__, __type__, __default__, __required__) \
@@ -264,20 +264,19 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             delete db;
             return convertStatus(status);
         }
-        *kvs = new TkrzwDatabase(std::move(cfg), db);
+        *kvs = new TkrzwDatabase(name, std::move(cfg), db);
         return Status::OK;
     }
 
-    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+    // LCOV_EXCL_START
+    virtual std::string type() const override {
+        return "tkrzw";
     }
+    // LCOV_EXCL_STOP
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "tkrzw";
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -798,11 +797,13 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
+    std::string m_name;
     json        m_config;
     tkrzw::DBM* m_db = nullptr;
 
-    TkrzwDatabase(json config, tkrzw::DBM* db)
-    : m_config(std::move(config))
+    TkrzwDatabase(const std::string& name, json config, tkrzw::DBM* db)
+    : m_name(name)
+    , m_config(std::move(config))
     , m_db(db)
     {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);

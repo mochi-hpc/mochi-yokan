@@ -143,6 +143,14 @@ yk_return_t yk_provider_register(
         int remi_ret = remi_provider_register_migration_class(
             p->remi.provider, remi_class, before_migration_cb,
             after_migration_cb, nullptr, p);
+        if(remi_ret != REMI_SUCCESS) {
+            YOKAN_LOG_ERROR(mid,
+                "Failed to register migration class in REMI:"
+                " remi_provider_register_migration_class returned %d",
+                remi_ret);
+            delete p;
+            return YOKAN_ERR_FROM_REMI;
+        }
     }
 #else
     if(a.remi.client || a.remi.provider) {
@@ -504,7 +512,7 @@ void yk_open_database_ult(hg_handle_t h)
     if(!check_token(provider, in.token)) {
         YOKAN_LOG_ERROR(mid, "invalid token");
         out.ret = YOKAN_ERR_INVALID_TOKEN;
-        return;;
+        return;
     }
 
     has_backend_type = yokan::DatabaseFactory::hasBackendType(in.type);
@@ -525,7 +533,8 @@ void yk_open_database_ult(hg_handle_t h)
 
     uuid_generate(id.uuid);
 
-    auto status = yokan::DatabaseFactory::makeDatabase(in.type, in.config, &database);
+    auto name = std::string{in.name ? in.name : ""};
+    auto status = yokan::DatabaseFactory::makeDatabase(in.type, name, in.config, &database);
     if(status != yokan::Status::OK) {
         YOKAN_LOG_ERROR(mid, "failed to open database of type %s", in.type);
         out.ret = static_cast<yk_return_t>(status);
@@ -753,11 +762,22 @@ void yk_migrate_database_ult(hg_handle_t h)
     }
 
     // register REMI metadata
+    char uuid[37];
+    uuid_unparse(in.origin_id.uuid, uuid);
     rret = remi_fileset_register_metadata(fileset,
-        "extra_config", in.extra_config);
+        "uuid", uuid);
     CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
     rret = remi_fileset_register_metadata(fileset,
-        "config", database->config().c_str());
+        "db_config", database->config().c_str());
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
+    rret = remi_fileset_register_metadata(fileset,
+        "type", database->type().c_str());
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
+    rret = remi_fileset_register_metadata(fileset,
+        "name", database->name().c_str());
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
+    rret = remi_fileset_register_metadata(fileset,
+        "migration_config", in.extra_config);
     CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_metadata, mh);
 
     // set xfer size
@@ -770,15 +790,16 @@ void yk_migrate_database_ult(hg_handle_t h)
     int remi_status = 0;
     rret = remi_fileset_migrate(remi_ph, fileset, in.new_root,
             REMI_KEEP_SOURCE, REMI_USE_MMAP, &remi_status);
-    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_migrate, mh);
     if(remi_status) {
         YOKAN_LOG_ERROR(mid, "REMI migration callback returned %d on target", remi_status);
         YOKAN_LOG_ERROR(mid, "^ target was %s with provider id %d", in.target_address, in.target_provider_id);
-        out.ret = YOKAN_ERR_OTHER;
+        out.ret = remi_status;
         mh->cancel();
         return;
     }
+    CHECK_RRET_OUT_CANCEL(rret, remi_fileset_migrate, mh);
 
+    out.target_id = in.origin_id;
     out.ret = YOKAN_SUCCESS;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
@@ -879,7 +900,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         auto name = db.value("name", "");
         auto& initial_db_config =  db["config"];
         auto config = initial_db_config.dump();
-        auto status = yokan::DatabaseFactory::makeDatabase(type, config, &database);
+        auto status = yokan::DatabaseFactory::makeDatabase(type, name, config, &database);
         if(status != yokan::Status::OK) {
             YOKAN_LOG_ERROR(provider->mid,
                 "failed to open database of type %s", type.c_str());

@@ -158,9 +158,7 @@ yk_return_t yk_list_databases(
  * @param[in] dest_addr Address of the destination provider.
  * @param[in] dest_provider_id Provider id of the destination provider.
  * @param[in] token Security token of the origin provider.
- * @param[in] new_root Optional new root to change the path of the DB at destination.
- * @param[in] extra_config Extra information in JSON form to carry out migration.
- * @param[out] new_id New id of the database after migration.
+ * @param[in] options Optional migration options.
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
@@ -172,8 +170,7 @@ yk_return_t yk_migrate_database(
         hg_addr_t dest_addr,
         uint16_t dest_provider_id,
         const char* token,
-        struct yk_migration_options* options,
-        yk_database_id_t* new_id);
+        struct yk_migration_options* options);
 
 #if defined(__cplusplus)
 }

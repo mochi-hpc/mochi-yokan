@@ -123,20 +123,24 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     yk_return_t ret;
 
     // open a database in provider 1
-    yk_database_id_t db_id1;
+    yk_database_id_t db_id;
     ret = yk_open_named_database(
             context->yokan_admin, context->addr,
             1, NULL, context->db_name,
             context->backend_type,
-            context->backend_config, &db_id1);
+            context->backend_config, &db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // create a database handle
     yk_database_handle_t dbh;
     ret = yk_database_handle_create(
         context->yokan_client,
-        context->addr, 1, db_id1, &dbh);
+        context->addr, 1, db_id, &dbh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    int stores_values = (strcmp(context->backend_type, "set") != 0)
+                     && (strcmp(context->backend_type, "unordered_set") != 0);
+    stores_values = stores_values ? 1 : 0;
 
     // write some values to it
     for(int i = 0; i < 10; i++) {
@@ -145,7 +149,7 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         sprintf(key, "key%05d", i);
         sprintf(value, "value%05d", i);
         size_t ksize = strlen(key);
-        size_t vsize = strlen(value);
+        size_t vsize = strlen(value) * stores_values;
         ret = yk_put(dbh, 0, key, ksize, value, vsize);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
     }
@@ -154,18 +158,24 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     sprintf(new_root, "/tmp/migrated-%s", context->backend_type);
 
     // migrate the database to provider 2
-    yk_database_id_t db_id2;
     yk_migration_options options;
     options.new_root = new_root,
     options.extra_config = "{}",
     options.xfer_size = 0;
     ret = yk_migrate_database(
             context->yokan_admin, context->addr,
-            1, db_id1, context->addr, 2, NULL, &options, &db_id2);
+            1, db_id, context->addr, 2, /* token */ NULL, &options);
+    if(ret == YOKAN_ERR_OP_UNSUPPORTED) {
+        yk_database_handle_release(dbh);
+        yk_close_database(
+            context->yokan_admin, context->addr,
+            1, NULL, db_id);
+        return MUNIT_SKIP;
+    }
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // trying to access the database from provider 1 should get us an error
-    ret = yk_put(dbh, 0, "abc", 3, "def", 3);
+    ret = yk_put(dbh, 0, "abc", 3, "def", 3 * stores_values);
     munit_assert_int(ret, ==, YOKAN_ERR_MIGRATED);
 
     // release handle
@@ -175,7 +185,7 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     // re-create database handle this time with provider 2
     ret = yk_database_handle_create(
         context->yokan_client,
-        context->addr, 2, db_id2, &dbh);
+        context->addr, 2, db_id, &dbh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // check that we can read the values from the migrated database
@@ -185,11 +195,13 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         char expected[16];
         sprintf(key, "key%05d", i);
         sprintf(expected, "value%05d", i);
+        memset(value, 0, 16);
         size_t ksize = strlen(key);
-        size_t vsize = 16;
+        size_t vsize = 16 * stores_values;
         ret = yk_get(dbh, 0, key, ksize, value, &vsize);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        munit_assert_string_equal(value, expected);
+        if(stores_values)
+            munit_assert_string_equal(value, expected);
     }
 
     // release handle
@@ -199,13 +211,13 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     // close the database in provider 1
     ret = yk_close_database(
             context->yokan_admin, context->addr,
-            1, NULL, db_id1);
+            1, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // close the database in provider 2
     ret = yk_close_database(
             context->yokan_admin, context->addr,
-            1, NULL, db_id2);
+            2, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     return MUNIT_OK;

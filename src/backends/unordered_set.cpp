@@ -42,7 +42,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, node_alloc;
@@ -104,20 +104,19 @@ class UnorderedSetDatabase : public DatabaseInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedSetDatabase(std::move(cfg), node_alloc, key_alloc);
+        *kvs = new UnorderedSetDatabase(name, std::move(cfg), node_alloc, key_alloc);
         return Status::OK;
     }
 
-    static Status recover(const std::string& config, const std::list<std::string>& files, DatabaseInterface** kvs) {
-        (void)config;
-        (void)files;
-        (void)kvs;
-        return Status::NotSupported;
+    // LCOV_EXCL_START
+    virtual std::string type() const override {
+        return "unordered_set";
     }
+    // LCOV_EXCL_STOP
 
     // LCOV_EXCL_START
     virtual std::string name() const override {
-        return "unordered_set";
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -312,10 +311,12 @@ class UnorderedSetDatabase : public DatabaseInterface {
     using hash_type = UnorderedSetDatabaseHash<key_type>;
     using unordered_set_type = std::unordered_set<key_type, hash_type, equal_type, allocator>;
 
-    UnorderedSetDatabase(json cfg,
-                     const yk_allocator_t& node_allocator,
-                     const yk_allocator_t& key_allocator)
-    : m_config(std::move(cfg))
+    UnorderedSetDatabase(const std::string& name,
+                         json cfg,
+                         const yk_allocator_t& node_allocator,
+                         const yk_allocator_t& key_allocator)
+    : m_name(name)
+    , m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     {
@@ -328,11 +329,12 @@ class UnorderedSetDatabase : public DatabaseInterface {
                 allocator(m_node_allocator));
     }
 
-    unordered_set_type* m_db;
-    json                m_config;
-    ABT_rwlock          m_lock = ABT_RWLOCK_NULL;
-    mutable yk_allocator_t     m_node_allocator;
-    mutable yk_allocator_t     m_key_allocator;
+    std::string            m_name;
+    unordered_set_type*    m_db;
+    json                   m_config;
+    ABT_rwlock             m_lock = ABT_RWLOCK_NULL;
+    mutable yk_allocator_t m_node_allocator;
+    mutable yk_allocator_t m_key_allocator;
 };
 
 }
