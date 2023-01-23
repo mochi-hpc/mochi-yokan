@@ -6,6 +6,7 @@ spack:
   - uuid
   - nlohmann-json
   - tclap
+  - lua-sol2
   - leveldb@1.22
   - berkeley-db+cxx+stl
   - tkrzw
