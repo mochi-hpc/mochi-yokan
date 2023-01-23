@@ -757,8 +757,13 @@ void yk_migrate_database_ult(hg_handle_t h)
 
     // fill REMI fileset
     for(const auto& file : mh->getFiles()) {
-        rret = remi_fileset_register_file(fileset, file.c_str());
-        CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_file, mh);
+        if(!file.empty() && file.back() == '/') {
+            rret = remi_fileset_register_directory(fileset, file.c_str());
+            CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_file, mh);
+        } else {
+            rret = remi_fileset_register_file(fileset, file.c_str());
+            CHECK_RRET_OUT_CANCEL(rret, remi_fileset_register_file, mh);
+        }
     }
 
     // register REMI metadata

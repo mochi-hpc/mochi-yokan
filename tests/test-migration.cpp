@@ -167,7 +167,7 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
             1, db_id, context->addr, 2, /* token */ NULL, &options);
     if(ret == YOKAN_ERR_OP_UNSUPPORTED) {
         yk_database_handle_release(dbh);
-        yk_close_database(
+        yk_destroy_database(
             context->yokan_admin, context->addr,
             1, NULL, db_id);
         return MUNIT_SKIP;
@@ -180,6 +180,12 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
 
     // release handle
     ret = yk_database_handle_release(dbh);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    // close the database in provider 1
+    ret = yk_close_database(
+            context->yokan_admin, context->addr,
+            1, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // re-create database handle this time with provider 2
@@ -208,12 +214,6 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
 
     // release handle
     ret = yk_database_handle_release(dbh);
-    munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
-    // close the database in provider 1
-    ret = yk_close_database(
-            context->yokan_admin, context->addr,
-            1, NULL, db_id);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     // destroy the database in provider 2
