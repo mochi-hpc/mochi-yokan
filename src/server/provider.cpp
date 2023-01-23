@@ -712,6 +712,7 @@ void yk_migrate_database_ult(hg_handle_t h)
     yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
     CHECK_PROVIDER(provider);
 
+#ifdef YOKAN_HAS_REMI
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
@@ -806,6 +807,9 @@ void yk_migrate_database_ult(hg_handle_t h)
 
     out.target_id = in.origin_id;
     out.ret = YOKAN_SUCCESS;
+#else
+    out.ret = YOKAN_ERR_OP_UNSUPPORTED;
+#endif
 }
 DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
 
