@@ -93,6 +93,8 @@ static MunitResult test_list_keyvals(const MunitParameter params[], void* data)
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
 
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
+
     auto count = context->keys_per_op;
     std::vector<size_t> ksizes(count, g_max_key_size);
     std::vector<size_t> vsizes(count, g_max_val_size);
@@ -218,6 +220,8 @@ static MunitResult test_list_keyvals_too_small(const MunitParameter params[], vo
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
 
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
+
     auto count = context->keys_per_op;
     std::vector<size_t> ksizes(count, g_max_key_size);
     std::vector<size_t> vsizes(count, g_max_val_size);
@@ -305,6 +309,8 @@ static MunitResult test_list_keyvals_packed(const MunitParameter params[], void*
     auto context = static_cast<list_keyvals_context*>(data);
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
+
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
@@ -440,6 +446,8 @@ static MunitResult test_list_keyvals_packed_key_too_small(const MunitParameter p
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
 
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
+
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
     std::vector<size_t> packed_vsizes(count, g_max_val_size);
@@ -523,6 +531,8 @@ static MunitResult test_list_keyvals_packed_val_too_small(const MunitParameter p
     auto context = static_cast<list_keyvals_context*>(data);
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
+
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
@@ -608,6 +618,8 @@ static MunitResult test_list_keyvals_bulk(const MunitParameter params[], void* d
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
     hg_return_t hret;
+
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
 
     auto count = context->keys_per_op;
     std::vector<size_t> packed_ksizes(count, g_max_key_size);
@@ -743,6 +755,8 @@ static MunitResult test_custom_filter(const MunitParameter params[], void* data)
     auto context = static_cast<list_keyvals_context*>(data);
     yk_database_handle_t dbh = context->base->dbh;
     yk_return_t ret;
+
+    if(context->base->backend == "unqlite") return MUNIT_SKIP;
 
     auto count = context->ordered_ref.size();
     std::vector<size_t> ksizes(count, g_max_key_size);

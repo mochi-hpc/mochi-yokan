@@ -39,6 +39,7 @@ struct doc_test_context {
     yk_database_handle_t     dbh;
     int32_t                  mode;
     std::vector<std::string> reference;
+    std::string              backend;
 };
 
 static const uint16_t provider_id = 42;
@@ -115,6 +116,7 @@ static void* doc_test_common_context_setup(const MunitParameter params[], void* 
     context->id       = id;
     context->dbh      = dbh;
     context->mode     = 0;
+    context->backend  = backend_type;
     if(no_rdma && to_bool(no_rdma))
         context->mode |= YOKAN_MODE_NO_RDMA;
     // create random docs with empty data every 8 values
