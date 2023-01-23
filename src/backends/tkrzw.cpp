@@ -61,9 +61,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
-        json cfg;
-
+    static Status processConfig(const std::string& config, json& cfg) {
 #define CHECK_TYPE_AND_COMPLETE(__cfg__, __field__, __type__, __default__, __required__) \
         do { \
             if(__cfg__.contains(__field__)) { \
@@ -135,12 +133,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(const std::exception& ex) {
             return Status::InvalidConf;
         }
-        auto path = cfg["path"].get<std::string>();
-        auto writable = cfg["writable"].get<bool>();
-
-        tkrzw::DBM* db = nullptr;
-
-        auto& type = cfg["type"].get_ref<const std::string&>();
+        return Status::OK;
+    }
 
 #define SET_TUNABLE(__tun__, __field__, __cfg__, __type__) \
             do { if(!__cfg__.contains(#__field__)) \
@@ -159,9 +153,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             } \
         } while(0)
 
-        tkrzw::Status status;
-        if(type == "hash") {
-            auto tmp = new tkrzw::HashDBM{};
+    static tkrzw::HashDBM::TuningParameters createHashDBMTunningParameter(const json& cfg) {
             tkrzw::HashDBM::TuningParameters params;
             CONVERT_ENUM(params, update_mode, cfg,
                 ({"default", "in_place", "appending"}),
@@ -199,10 +191,10 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             SET_TUNABLE(params, min_read_size, cfg, int32_t);
             params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
             params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
-            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
-            db = tmp;
-        } else if(type == "tree") {
-            auto tmp = new tkrzw::TreeDBM{};
+            return params;
+    }
+
+    static tkrzw::TreeDBM::TuningParameters createTreeDBMTuningParameters(const json& cfg) {
             tkrzw::TreeDBM::TuningParameters params;
             CONVERT_ENUM(params, update_mode, cfg,
                 ({"default", "in_place", "appending"}),
@@ -245,6 +237,85 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             // TODO add support for key_comparator argument
             params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
             params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
+            return params;
+    }
+
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+        json cfg;
+
+        if(processConfig(config, cfg) != Status::OK)
+            return Status::InvalidConf;
+
+        auto path = cfg["path"].get<std::string>();
+        auto writable = cfg["writable"].get<bool>();
+
+        tkrzw::DBM* db = nullptr;
+
+        auto& type = cfg["type"].get_ref<const std::string&>();
+
+        tkrzw::Status status;
+        if(type == "hash") {
+            auto params = createHashDBMTunningParameter(cfg);
+            auto tmp = new tkrzw::HashDBM{};
+            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
+            db = tmp;
+        } else if(type == "tree") {
+            auto params = createTreeDBMTuningParameters(cfg);
+            auto tmp = new tkrzw::TreeDBM{};
+            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
+            db = tmp;
+        } else if(type == "tiny") {
+            auto num_buckets = cfg["num_buckets"].get<int64_t>();
+            auto tmp = new tkrzw::TinyDBM{num_buckets};
+            status = tmp->Open(path, writable);
+            db = tmp;
+        } else if(type == "baby") {
+            auto key_comparator_name = cfg["key_comparator"].get<std::string>();
+            // TODO add support for key_comparator
+            auto tmp = new tkrzw::BabyDBM{};
+            status = tmp->Open(path, writable);
+            db = tmp;
+        }
+
+        if(!status.IsOK()) {
+            delete db;
+            return convertStatus(status);
+        }
+        *kvs = new TkrzwDatabase(name, std::move(cfg), db);
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+        (void)migrationConfig;
+        json cfg;
+
+        if(processConfig(config, cfg) != Status::OK)
+            return Status::InvalidConf;
+
+        if(files.empty()) return Status::IOError;
+        std::string path = files.front();
+        cfg["path"] = path;
+
+        auto writable = cfg["writable"].get<bool>();
+
+        tkrzw::DBM* db = nullptr;
+
+        auto& type = cfg["type"].get_ref<const std::string&>();
+
+        tkrzw::Status status;
+        if(type == "hash") {
+            auto params = createHashDBMTunningParameter(cfg);
+            auto tmp = new tkrzw::HashDBM{};
+            status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
+            db = tmp;
+        } else if(type == "tree") {
+            auto params = createTreeDBMTuningParameters(cfg);
+            auto tmp = new tkrzw::TreeDBM{};
             status = tmp->OpenAdvanced(path, writable, tkrzw::File::OPEN_DEFAULT, params);
             db = tmp;
         } else if(type == "tiny") {
@@ -321,6 +392,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         int64_t count = 0;
         auto status = m_db->Count(&count);
@@ -333,6 +406,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
@@ -371,6 +446,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
         (void)mode;
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t i = 0;
 
@@ -392,6 +469,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         auto mode_append = mode & YOKAN_MODE_APPEND;
@@ -487,6 +566,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
         (void)mode;
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -517,6 +598,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         size_t offset = 0;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -598,6 +681,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         if(!m_db->IsOrdered())
             return Status::NotSupported;
 
@@ -744,6 +829,8 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         if(!m_db->IsOrdered())
             return Status::NotSupported;
 
@@ -788,11 +875,59 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct TkrzwDBMigrationHandle : public MigrationHandle {
+
+        TkrzwDatabase&   m_db;
+        bool               m_cancel = false;
+        ScopedWriteLock    m_lock;
+        std::string        m_path;
+
+        TkrzwDBMigrationHandle(TkrzwDatabase& db)
+        : m_db(db)
+        , m_lock(db.m_migration_lock) {
+            m_path = m_db.m_config["path"];
+            m_db.m_db->Synchronize(true);
+        }
+
+        ~TkrzwDBMigrationHandle() {
+            if(m_cancel) return;
+            m_db.destroy();
+            m_db.m_migrated = true;
+        }
+
+        std::string getRoot() const override {
+            auto i = m_path.find_last_of('/');
+            return m_path.substr(0, i+1);
+        }
+
+        std::list<std::string> getFiles() const override {
+            auto i = m_path.find_last_of('/');
+            return {m_path.substr(i+1)};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        if(m_config["type"] == "tiny" || m_config["type"] == "baby")
+            return Status::NotSupported;
+        try {
+            mh.reset(new TkrzwDBMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~TkrzwDatabase() {
         if(m_db) {
             m_db->Close();
             delete m_db;
         }
+        ABT_rwlock_free(&m_migration_lock);
     }
 
     private:
@@ -801,6 +936,9 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     json        m_config;
     tkrzw::DBM* m_db = nullptr;
 
+    bool       m_migrated = false;
+    ABT_rwlock m_migration_lock = ABT_RWLOCK_NULL;
+
     TkrzwDatabase(const std::string& name, json config, tkrzw::DBM* db)
     : m_name(name)
     , m_config(std::move(config))
@@ -808,6 +946,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
+        ABT_rwlock_create(&m_migration_lock);
     }
 };
 
