@@ -20,7 +20,7 @@ spack:
   - mochi-bedrock
   - ycsb-cpp-interface
   - rocksdb+rtti
-  - mochi-remi
+  - mochi-remi@main
   concretizer:
     unify: true
     reuse: false
