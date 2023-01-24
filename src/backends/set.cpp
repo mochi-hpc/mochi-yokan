@@ -10,6 +10,7 @@
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
 #include "util/key-copy.hpp"
+#include <unistd.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <abt.h>

@@ -10,6 +10,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include <unistd.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <fstream>

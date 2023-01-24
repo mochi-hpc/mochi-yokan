@@ -7,6 +7,7 @@
 #include "yokan/util/locks.hpp"
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
+#include <unistd.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
 #include <unordered_set>

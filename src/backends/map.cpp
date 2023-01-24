@@ -12,6 +12,7 @@
 #include "../common/modes.hpp"
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
+#include <unistd.h>
 #include <abt.h>
 #include <atomic>
 #include <fstream>
