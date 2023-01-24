@@ -110,8 +110,8 @@ yk_return_t yk_provider_register(
         config["buffer_cache"]["type"] = "external";
     }
 
-    p = new yk_provider;
-    if(p == NULL) {
+    p = new(std::nothrow) yk_provider;
+    if(!p) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(mid, "Could not allocate memory for provider");
         return YOKAN_ERR_ALLOCATION;
