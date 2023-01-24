@@ -34,28 +34,16 @@ using json = nlohmann::json;
 
 class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
-    public:
-
-    static inline Status convertStatus(const leveldb::Status& s) {
-        if(s.ok()) return Status::OK;
-        if(s.IsNotFound()) return Status::NotFound;
-        if(s.IsCorruption()) return Status::Corruption;
-        if(s.IsIOError()) return Status::IOError;
-        if(s.IsNotSupportedError()) return Status::NotSupported;
-        if(s.IsInvalidArgument()) return Status::InvalidArg;
-        return Status::Other;
-    }
-
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
-        json cfg;
+    static Status processConfig(
+            const std::string& config,
+            json& cfg,
+            leveldb::Options& options) {
         try {
             cfg = json::parse(config);
         } catch(...) {
             return Status::InvalidConf;
         }
         // fill options and complete configuration
-        leveldb::Options options;
-
 #define SET_AND_COMPLETE(__json__, __field__, __value__)               \
         do { try {                                                     \
             options.__field__ = __json__.value(#__field__, __value__); \
@@ -95,24 +83,84 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         CHECK_AND_ADD_MISSING(cfg["write_options"], "sync", boolean, false);
         CHECK_AND_ADD_MISSING(cfg["write_options"], "use_write_batch", boolean, false);
         // TODO set logger, env, block_cache, and filter_policy
+        return Status::OK;
+    }
+
+    public:
+
+    static inline Status convertStatus(const leveldb::Status& s) {
+        if(s.ok()) return Status::OK;
+        if(s.IsNotFound()) return Status::NotFound;
+        if(s.IsCorruption()) return Status::Corruption;
+        if(s.IsIOError()) return Status::IOError;
+        if(s.IsNotSupportedError()) return Status::NotSupported;
+        if(s.IsInvalidArgument()) return Status::InvalidArg;
+        return Status::Other;
+    }
+
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+        leveldb::Options options;
+        json cfg;
+        leveldb::Status status;
+
+        if(processConfig(config, cfg, options) != Status::OK)
+            return Status::InvalidConf;
+
         std::string path = cfg.value("path", "");
         if(path.empty()) {
             return Status::InvalidConf;
         }
-        leveldb::Status status;
         leveldb::DB* db = nullptr;
         status = leveldb::DB::Open(options, path, &db);
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBDatabase(db, std::move(cfg));
+        *kvs = new LevelDBDatabase(db, std::move(cfg), name);
+
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+
+        (void)migrationConfig;
+        leveldb::Options options;
+        json cfg;
+        leveldb::Status status;
+
+        if(processConfig(config, cfg, options) != Status::OK)
+            return Status::InvalidConf;
+
+        if(files.empty()) return Status::IOError;
+        std::string path = files.front();
+        path = path.substr(0, path.find_last_of('/'));
+        cfg["path"] = path;
+        options.create_if_missing = false;
+        options.error_if_exists = false;
+
+        leveldb::DB* db = nullptr;
+        status = leveldb::DB::Open(options, path, &db);
+        if(!status.ok())
+            return convertStatus(status);
+
+        *kvs = new LevelDBDatabase(db, std::move(cfg), name);
 
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "leveldb";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -148,11 +196,14 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual void destroy() override {
+        if(m_migrated) return;
         auto path = m_config["path"].get<std::string>();
         fs::remove_all(path);
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         (void)c;
         return Status::NotSupported;
@@ -161,6 +212,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
@@ -177,6 +230,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
@@ -202,6 +257,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -248,6 +305,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -313,6 +372,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         size_t offset = 0;
         leveldb::WriteBatch wb;
@@ -329,6 +390,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
@@ -406,6 +469,8 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
 
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
@@ -507,21 +572,66 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct LevelDBMigrationHandle : public MigrationHandle {
+
+        LevelDBDatabase&   m_db;
+        bool               m_cancel = false;
+        ScopedWriteLock    m_lock;
+        std::string        m_path;
+
+        LevelDBMigrationHandle(LevelDBDatabase& db)
+        : m_db(db)
+        , m_lock(db.m_migration_lock) {
+            m_path = m_db.m_config["path"];
+        }
+
+        ~LevelDBMigrationHandle() {
+            if(m_cancel) return;
+            fs::remove_all(m_path);
+            m_db.m_migrated = true;
+        }
+
+        std::string getRoot() const override {
+            return m_path;
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {"/"};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new LevelDBMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~LevelDBDatabase() {
         delete m_db;
+        ABT_rwlock_free(&m_migration_lock);
     }
 
     private:
 
-    LevelDBDatabase(leveldb::DB* db, json&& cfg)
+    LevelDBDatabase(leveldb::DB* db, json&& cfg, const std::string& name)
     : m_db(db)
-    , m_config(std::move(cfg)) {
+    , m_config(std::move(cfg))
+    , m_name(name) {
         m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
         m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
         m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
         m_use_write_batch = m_config["write_options"]["use_write_batch"].get<bool>();
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
+        ABT_rwlock_create(&m_migration_lock);
     }
 
     leveldb::DB*          m_db;
@@ -529,6 +639,10 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     leveldb::ReadOptions  m_read_options;
     leveldb::WriteOptions m_write_options;
     bool                  m_use_write_batch;
+    std::string           m_name;
+
+    bool                  m_migrated = false;
+    ABT_rwlock            m_migration_lock = ABT_RWLOCK_NULL;
 };
 
 }

@@ -147,6 +147,31 @@ yk_return_t yk_list_databases(
         yk_database_id_t* ids,
         size_t* count);
 
+/**
+ * @brief Migrates a database from its origin provider
+ * to a target provider.
+ *
+ * @param[in] admin Yokan admin object.
+ * @param[in] origin_addr Address of the origin provider.
+ * @param[in] origin_provider_id Provider id of the origin provider.
+ * @param[in] origin_id id of the databse to migrate.
+ * @param[in] dest_addr Address of the destination provider.
+ * @param[in] dest_provider_id Provider id of the destination provider.
+ * @param[in] token Security token of the origin provider.
+ * @param[in] options Optional migration options.
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_migrate_database(
+        yk_admin_t admin,
+        hg_addr_t origin_addr,
+        uint16_t origin_provider_id,
+        yk_database_id_t origin_id,
+        hg_addr_t dest_addr,
+        uint16_t dest_provider_id,
+        const char* token,
+        struct yk_migration_options* options);
+
 #if defined(__cplusplus)
 }
 #endif

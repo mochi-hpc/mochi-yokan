@@ -67,8 +67,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::Other;
     }
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
-        json cfg;
+    static Status processConfig(const std::string& config, json& cfg) {
         try {
             cfg = json::parse(config);
         } catch(...) {
@@ -91,6 +90,14 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         CHECK_AND_ADD_MISSING(cfg, "path", string, "", true);
         CHECK_AND_ADD_MISSING(cfg, "create_if_missing", boolean, true, false);
         CHECK_AND_ADD_MISSING(cfg, "no_lock", boolean, false, false);
+
+        return Status::OK;
+    }
+
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+        json cfg;
+        if(processConfig(config, cfg) != Status::OK)
+            return Status::InvalidConf;
 
         auto path = cfg["path"].get<std::string>();
         std::error_code ec;
@@ -127,14 +134,75 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBDatabase(std::move(cfg), env, db);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db, name);
+
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+
+        (void)migrationConfig;
+        json cfg;
+        if(processConfig(config, cfg) != Status::OK)
+            return Status::InvalidConf;
+
+        if(files.empty()) return Status::IOError;
+        std::string path = files.front();
+        path = path.substr(0, path.find_last_of('/'));
+        cfg["path"] = path;
+
+        std::error_code ec;
+        fs::create_directories(path, ec);
+        int ret;
+        MDB_env* env = nullptr;
+        MDB_txn *txn = nullptr;
+        MDB_dbi db;
+
+        ret = mdb_env_create(&env);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+        int flags = MDB_WRITEMAP;
+        if(cfg["no_lock"].get<bool>()) flags |= MDB_NOLOCK;
+        ret = mdb_env_open(env, path.c_str(), flags, 0644);
+        if(ret != MDB_SUCCESS) {
+            mdb_env_close(env);
+            return convertStatus(ret);
+        }
+        ret = mdb_txn_begin(env, nullptr, 0, &txn);
+        if(ret != MDB_SUCCESS) {
+            mdb_env_close(env);
+            return convertStatus(ret);
+        }
+        ret = mdb_dbi_open(txn, nullptr, 0, &db);
+        if(ret != MDB_SUCCESS) {
+            mdb_txn_abort(txn);
+            mdb_env_close(env);
+            return convertStatus(ret);
+        }
+        ret = mdb_txn_commit(txn);
+        if(ret != MDB_SUCCESS) {
+            mdb_env_close(env);
+            return convertStatus(ret);
+        }
+
+        *kvs = new LMDBDatabase(std::move(cfg), env, db, name);
 
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "lmdb";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -180,6 +248,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         MDB_txn* txn = nullptr;
         int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
@@ -194,6 +264,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status exists(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         auto count = ksizes.size;
@@ -221,6 +293,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         auto count = ksizes.size;
@@ -251,6 +325,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -289,6 +365,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -363,6 +441,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         size_t key_offset = 0;
         size_t total_ksizes = std::accumulate(ksizes.data,
@@ -390,6 +470,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         MDB_txn* txn = nullptr;
@@ -526,6 +608,8 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  BasicUserMem<size_t>& keySizes,
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
 
         MDB_txn* txn = nullptr;
@@ -686,27 +770,76 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct LMDBMigrationHandle : public MigrationHandle {
+
+        LMDBDatabase&   m_db;
+        bool            m_cancel = false;
+        ScopedWriteLock m_lock;
+        std::string     m_path;
+
+        LMDBMigrationHandle(LMDBDatabase& db)
+        : m_db(db)
+        , m_lock(db.m_migration_lock) {
+            m_path = m_db.m_config["path"];
+        }
+
+        ~LMDBMigrationHandle() {
+            if(m_cancel) return;
+            m_db.destroy();
+            m_db.m_migrated = true;
+        }
+
+        std::string getRoot() const override {
+            return m_path;
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {"/"};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new LMDBMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~LMDBDatabase() {
         if(m_env) {
             mdb_dbi_close(m_env, m_db);
             mdb_env_close(m_env);
         }
         m_env = nullptr;
+        ABT_rwlock_free(&m_migration_lock);
     }
 
     private:
 
-    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
+    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db, const std::string& name)
     : m_config(std::move(cfg))
     , m_env(env)
-    , m_db(db) {
+    , m_db(db)
+    , m_name(name) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
+        ABT_rwlock_create(&m_migration_lock);
     }
 
-    json     m_config;
-    MDB_env* m_env = nullptr;
-    MDB_dbi  m_db;
+    json        m_config;
+    MDB_env*    m_env = nullptr;
+    MDB_dbi     m_db;
+    std::string m_name;
+
+    bool        m_migrated = false;
+    ABT_rwlock  m_migration_lock = ABT_RWLOCK_NULL;
 };
 
 }

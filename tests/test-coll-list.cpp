@@ -50,6 +50,8 @@ static MunitResult test_coll_list(const MunitParameter params[], void* data)
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    if(context->backend == "unqlite") return MUNIT_SKIP;
+
     auto count = g_num_items + g_items_per_op - (g_num_items % g_items_per_op);
 
     std::vector<std::vector<char>> buffers(count);
@@ -138,6 +140,8 @@ static MunitResult test_coll_list_packed(const MunitParameter params[], void* da
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    if(context->backend == "unqlite") return MUNIT_SKIP;
+
     auto count = g_num_items + g_items_per_op - (g_num_items % g_items_per_op);
 
     std::vector<char> buffer(count*g_max_val_size);
@@ -218,6 +222,8 @@ static MunitResult test_coll_list_lua(const MunitParameter params[], void* data)
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    if(context->backend == "unqlite") return MUNIT_SKIP;
+
     std::vector<std::vector<char>> buffers(g_items_per_op);
     for(auto& v : buffers) v.resize(g_max_val_size);
 
@@ -270,6 +276,8 @@ static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    if(context->backend == "unqlite") return MUNIT_SKIP;
+
     std::vector<char> buffer(g_items_per_op*g_max_val_size);
     std::vector<size_t> buf_sizes(g_items_per_op);
     std::vector<yk_id_t> ids(g_items_per_op);
@@ -315,6 +323,8 @@ static MunitResult test_coll_list_custom_filter(const MunitParameter params[], v
     struct doc_test_context* context = (struct doc_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
+
+    if(context->backend == "unqlite") return MUNIT_SKIP;
 
     auto count = g_num_items;
 

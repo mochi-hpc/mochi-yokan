@@ -32,7 +32,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         bool use_lock;
         std::string path;
@@ -52,13 +52,53 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;
 
         auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
-        *kvs = new GDBMDatabase(std::move(cfg), use_lock, db);
+        *kvs = new GDBMDatabase(std::move(cfg), name, path, use_lock, db);
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+        json cfg;
+        bool use_lock;
+        std::string path;
+
+        (void)migrationConfig;
+        if(files.empty()) return Status::IOError;
+
+        path = files.front();
+
+        try {
+            cfg = json::parse(config);
+            if(!cfg.is_object())
+                return Status::InvalidConf;
+            // check use_lock
+            use_lock = cfg.value("use_lock", true);
+            cfg["use_lock"] = use_lock;
+            cfg["path"] = path;
+        } catch(...) {
+            return Status::InvalidConf;
+        }
+        if(path.empty())
+            return Status::InvalidConf;
+
+        auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
+        *kvs = new GDBMDatabase(std::move(cfg), name, path, use_lock, db);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "gdbm";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -95,6 +135,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return;
         gdbm_close(m_db);
         m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
@@ -114,6 +155,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const datum key{ keys.data + offset, (int)ksizes[i] };
@@ -130,6 +172,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const datum key{ keys.data + offset, (int)ksizes[i] };
@@ -170,6 +213,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         auto mode_exist_only = mode & YOKAN_MODE_EXIST_ONLY;
 
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             const auto key = datum { keys.data + key_offset, (int)ksizes[i] };
             const auto val = datum { vals.data + val_offset, (int)vsizes[i] };
@@ -205,6 +249,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t key_offset = 0;
         size_t val_offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         if(!packed) {
 
@@ -264,11 +309,59 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             const auto key = datum{ keys.data + offset, (int)ksizes[i] };
             gdbm_delete(m_db, key);
             offset += ksizes[i];
+        }
+        return Status::OK;
+    }
+
+    struct GDBMMigrationHandle : public MigrationHandle {
+
+        GDBMDatabase&   m_db;
+        bool            m_cancel = false;
+        ScopedWriteLock m_lock;
+
+        GDBMMigrationHandle(GDBMDatabase& db)
+        : m_db(db)
+        , m_lock(db.m_lock) {
+            gdbm_close(m_db.m_db);
+        }
+
+        ~GDBMMigrationHandle() {
+            if(m_cancel) {
+                m_db.m_db = gdbm_open(m_db.m_path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
+            } else {
+                fs::remove(m_db.m_path);
+                m_db.m_migrated = true;
+                m_db.m_db = nullptr;
+            }
+        }
+
+        std::string getRoot() const override {
+            auto i = m_db.m_path.find_last_of('/');
+            return m_db.m_path.substr(0, i+1);
+        }
+
+        std::list<std::string> getFiles() const override {
+            auto i = m_db.m_path.find_last_of('/');
+            return {m_db.m_path.substr(i+1)};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new GDBMMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
         }
         return Status::OK;
     }
@@ -281,9 +374,11 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    GDBMDatabase(json cfg, bool use_lock, GDBM_FILE db)
+    GDBMDatabase(json cfg, const std::string& name, const std::string& path, bool use_lock, GDBM_FILE db)
     : m_config(std::move(cfg))
     , m_db(db)
+    , m_name(name)
+    , m_path(path)
     {
         if(use_lock)
             ABT_rwlock_create(&m_lock);
@@ -291,9 +386,12 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    json       m_config;
-    GDBM_FILE  m_db;
-    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
+    json        m_config;
+    GDBM_FILE   m_db;
+    std::string m_name;
+    std::string m_path;
+    ABT_rwlock  m_lock = ABT_RWLOCK_NULL;
+    bool        m_migrated = false;
 };
 
 }

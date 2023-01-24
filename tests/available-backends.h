@@ -68,14 +68,14 @@ static const char* backend_configs[] = {
     "{}",
 #endif
 #ifdef YOKAN_HAS_TKRZW
-    "{\"path\":\"/tmp/trkzw-test\","
+    "{\"path\":\"/tmp/tkrzw-test\","
     " \"disable_doc_mixin_lock\":true,"
     " \"type\":\"tree\"}",
 #endif
 #ifdef YOKAN_HAS_UNQLITE
-    "{\"path\":\":mem:\","
+    "{\"path\":\"/tmp/unqlite-test\","
     " \"disable_doc_mixin_lock\":true,"
-    "\"mode\":\"memory\"}",
+    "\"mode\":\"create\"}",
 #endif
     NULL
 };

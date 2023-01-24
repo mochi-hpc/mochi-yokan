@@ -51,11 +51,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::Other;
     }
 
-    public:
-
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
-        json cfg;
-
+    static Status processConfig(const std::string& config, json& cfg) {
 #define CHECK_AND_ADD_MISSING(__json__, __field__, __type__, __default__, __required__) \
         do {                                                                            \
             if(!__json__.contains(__field__)) {                                         \
@@ -85,6 +81,17 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(...) {
             return Status::InvalidConf;
         }
+        return Status::OK;
+    }
+
+    public:
+
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+        json cfg;
+
+        if(processConfig(config, cfg) != Status::OK)
+              return Status::InvalidConf;
+
         auto mode_str = cfg["mode"].get<std::string>();
         int mode;
         if(mode_str == "create")          mode = UNQLITE_OPEN_CREATE;
@@ -123,13 +130,69 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             if(ret != UNQLITE_OK) return convertStatus(ret);
         }
 
-        *kvs = new UnQLiteDatabase(std::move(cfg), use_lock, db);
+        *kvs = new UnQLiteDatabase(name, std::move(cfg), use_lock, db);
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+        json cfg;
+        (void)migrationConfig;
+        if(processConfig(config, cfg) != Status::OK)
+              return Status::InvalidConf;
+
+        if(cfg["mode"] == "create") cfg["mode"] = "read_write";
+
+        auto mode_str = cfg["mode"].get<std::string>();
+        int mode;
+        if(mode_str == "create")          mode = UNQLITE_OPEN_CREATE;
+        else if(mode_str == "read_write") mode = UNQLITE_OPEN_READWRITE;
+        else if(mode_str == "read_only")  mode = UNQLITE_OPEN_READONLY;
+        else if(mode_str == "mmap")       mode = UNQLITE_OPEN_MMAP;
+        else if(mode_str == "memory")     mode = UNQLITE_OPEN_IN_MEMORY;
+        else return Status::InvalidConf;
+
+        if(files.empty()) return Status::IOError;
+        auto path = files.front();
+        cfg["path"] = path;
+
+        auto use_lock = cfg["use_abt_lock"].get<bool>();
+
+        if(cfg["temporary"].get<bool>())        mode |= UNQLITE_OPEN_TEMP_DB;
+        if(cfg["no_journaling"].get<bool>())    mode |= UNQLITE_OPEN_OMIT_JOURNALING;
+        if(cfg["no_unqlite_mutex"].get<bool>()) mode |= UNQLITE_OPEN_NOMUTEX;
+
+        unqlite* db = nullptr;
+        int ret = unqlite_open(&db, path.c_str(), mode);
+        if(ret != UNQLITE_OK)
+            return convertStatus(ret);
+
+        if(cfg["max_page_cache"].get<int>() >= 0) {
+            ret = unqlite_config(db, UNQLITE_CONFIG_MAX_PAGE_CACHE, cfg["max_page_cache"].get<int>());
+            if(ret != UNQLITE_OK) return convertStatus(ret);
+        }
+        if(cfg["disable_auto_commit"].get<bool>()) {
+            ret = unqlite_config(db, UNQLITE_CONFIG_DISABLE_AUTO_COMMIT);
+            if(ret != UNQLITE_OK) return convertStatus(ret);
+        }
+
+        *kvs = new UnQLiteDatabase(name, std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "unqlite";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -165,7 +228,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual void destroy() override {
-        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return;
         unqlite_close(m_db);
         m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
@@ -176,6 +239,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         (void)c;
         return Status::NotSupported;
@@ -188,6 +253,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(ksizes.size > flags.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto key_umem = keys.data + offset;
@@ -213,6 +279,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto key_umem = keys.data + offset;
@@ -253,6 +320,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key_umem = keys.data + key_offset;
             auto val_umem = vals.data + val_offset;
@@ -281,6 +349,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t key_offset = 0;
         size_t val_offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         struct CallbackArgs {
             size_t  buf_size;
@@ -379,6 +448,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         (void)mode;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
             auto key_umem = keys.data + offset;
@@ -430,6 +500,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         unqlite_kv_cursor* cursor = nullptr;
 
@@ -554,6 +625,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  BasicUserMem<size_t>& valSizes) const override {
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         unqlite_kv_cursor* cursor = nullptr;
 
@@ -696,6 +768,53 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct UnQLiteMigrationHandle : public MigrationHandle {
+
+        UnQLiteDatabase& m_db;
+        bool             m_cancel = false;
+        ScopedWriteLock  m_lock;
+        std::string      m_path;
+
+        UnQLiteMigrationHandle(UnQLiteDatabase& db)
+        : m_db(db)
+        , m_lock(db.m_lock)
+        , m_path(db.m_config["path"]) {
+            unqlite_commit(m_db.m_db);
+        }
+
+        ~UnQLiteMigrationHandle() {
+            if(!m_cancel) {
+                m_db.destroy();
+                m_db.m_migrated = true;
+            }
+        }
+
+        std::string getRoot() const override {
+            auto i = m_path.find_last_of('/');
+            return m_path.substr(0, i+1);
+        }
+
+        std::list<std::string> getFiles() const override {
+            auto i = m_path.find_last_of('/');
+            return {m_path.substr(i+1)};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        if(m_config["mode"] == "memory") return Status::NotSupported;
+        try {
+            mh.reset(new UnQLiteMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~UnQLiteDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
@@ -705,8 +824,9 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    UnQLiteDatabase(json cfg, bool use_lock, unqlite* db)
-    : m_db(db)
+    UnQLiteDatabase(const std::string& name, json cfg, bool use_lock, unqlite* db)
+    : m_name(name)
+    , m_db(db)
     , m_config(std::move(cfg))
     {
         if(use_lock)
@@ -715,9 +835,11 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    unqlite*   m_db;
-    json       m_config;
-    ABT_rwlock m_lock = ABT_RWLOCK_NULL;
+    std::string m_name;
+    unqlite*    m_db;
+    json        m_config;
+    ABT_rwlock  m_lock = ABT_RWLOCK_NULL;
+    bool        m_migrated = false;
 };
 
 }

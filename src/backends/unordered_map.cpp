@@ -10,8 +10,10 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include <unistd.h>
 #include <nlohmann/json.hpp>
 #include <abt.h>
+#include <fstream>
 #include <unordered_map>
 #include <string>
 #include <cstring>
@@ -46,7 +48,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, val_alloc, node_alloc;
@@ -125,13 +127,67 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapDatabase(std::move(cfg), node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapDatabase(name, std::move(cfg), node_alloc, key_alloc, val_alloc);
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name, const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files, DatabaseInterface** kvs) {
+        (void)migrationConfig;
+        if(files.size() != 1) return Status::InvalidArg;
+        auto filename = files.front();
+        std::ifstream ifs(filename.c_str(), std::ios::binary);
+        if(!ifs.good()) {
+            return Status::IOError;
+        }
+        auto remove_file = [&ifs,&filename]() {
+            ifs.close();
+            remove(filename.c_str());
+        };
+        auto status = create(name, config, kvs);
+        if(status != Status::OK) {
+            remove_file();
+            return status;
+        }
+        auto db = dynamic_cast<UnorderedMapDatabase*>(*kvs);
+        ifs.seekg(0, std::ios::end);
+        size_t total_size = ifs.tellg();
+        ifs.clear();
+        ifs.seekg(0);
+        size_t size_read = 0;
+        std::vector<char> key, val;
+        while(size_read < total_size) {
+            size_t ksize, vsize;
+            ifs.read(reinterpret_cast<char*>(&ksize), sizeof(ksize));
+            key.resize(ksize);
+            ifs.read(key.data(), ksize);
+            ifs.read(reinterpret_cast<char*>(&vsize), sizeof(vsize));
+            val.resize(vsize);
+            ifs.read(val.data(), vsize);
+            if(ifs.fail()) {
+                remove_file();
+                return Status::IOError;
+            }
+            db->m_db->emplace(std::piecewise_construct,
+                    std::forward_as_tuple(key.data(), ksize, db->m_key_allocator),
+                    std::forward_as_tuple(val.data(), vsize, db->m_val_allocator));
+            size_read += 2*sizeof(ksize) + ksize + vsize;
+        }
+        remove_file();
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "unordered_map";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -177,6 +233,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status count(int32_t mode, uint64_t* c) const override {
         (void)mode;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         *c = m_db->size();
         return Status::OK;
     }
@@ -189,6 +246,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t offset = 0;
         const auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -222,6 +280,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         const auto mode_wait = mode & YOKAN_MODE_WAIT;
         size_t offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -278,6 +337,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
         ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
 
             if(mode_new_only) {
@@ -370,6 +430,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t key_offset = 0;
         size_t val_offset = 0;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
 
         if(!packed) {
 
@@ -459,6 +520,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t offset = 0;
         const auto mode_wait = mode & YOKAN_MODE_WAIT;
         ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
@@ -483,6 +545,71 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct UnorderedMapMigrationHandle : public MigrationHandle {
+
+        UnorderedMapDatabase&   m_db;
+        ScopedReadLock m_db_lock;
+        std::string    m_filename;
+        int            m_fd;
+        FILE*          m_file;
+        bool           m_cancel = false;
+
+        UnorderedMapMigrationHandle(UnorderedMapDatabase& db)
+        : m_db(db)
+        , m_db_lock(db.m_lock) {
+            // create temporary file name
+            char template_filename[] = "/tmp/yokan-unordered-map-snapshot-XXXXXX";
+            m_fd = mkstemp(template_filename);
+            m_filename = template_filename;
+            // create temporary file
+            std::ofstream ofs(m_filename.c_str(), std::ofstream::out | std::ofstream::binary);
+            // write the map to it
+            if(m_db.m_db) {
+                for(const auto& p : *m_db.m_db) {
+                    size_t ksize = p.first.size();
+                    size_t vsize = p.second.size();
+                    const char* kdata = p.first.data();
+                    const char* vdata = p.second.data();
+                    ofs.write(reinterpret_cast<const char*>(&ksize), sizeof(ksize));
+                    ofs.write(kdata, ksize);
+                    ofs.write(reinterpret_cast<const char*>(&vsize), sizeof(vsize));
+                    ofs.write(vdata, vsize);
+                }
+            }
+        }
+
+        ~UnorderedMapMigrationHandle() {
+            close(m_fd);
+            remove(m_filename.c_str());
+            if(!m_cancel) {
+                m_db.m_migrated = true;
+                m_db.m_db->clear();
+            }
+        }
+
+        std::string getRoot() const override {
+            return "/tmp";
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {m_filename.substr(5)}; // remove /tmp/ from the name
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new UnorderedMapMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~UnorderedMapDatabase() {
         if(m_lock != ABT_RWLOCK_NULL)
             ABT_rwlock_free(&m_lock);
@@ -503,11 +630,13 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     using hash_type = UnorderedMapDatabaseHash<key_type>;
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
-    UnorderedMapDatabase(json cfg,
-                     const yk_allocator_t& node_allocator,
-                     const yk_allocator_t& key_allocator,
-                     const yk_allocator_t& val_allocator)
-    : m_config(std::move(cfg))
+    UnorderedMapDatabase(const std::string& name,
+                         json cfg,
+                         const yk_allocator_t& node_allocator,
+                         const yk_allocator_t& key_allocator,
+                         const yk_allocator_t& val_allocator)
+    : m_name(name)
+    , m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
@@ -523,13 +652,15 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    unordered_map_type* m_db;
-    json                m_config;
-    ABT_rwlock          m_lock = ABT_RWLOCK_NULL;
-    mutable yk_allocator_t     m_node_allocator;
-    mutable yk_allocator_t     m_key_allocator;
-    mutable yk_allocator_t     m_val_allocator;
-    mutable KeyWatcher m_watcher;
+    std::string            m_name;
+    unordered_map_type*    m_db;
+    json                   m_config;
+    ABT_rwlock             m_lock = ABT_RWLOCK_NULL;
+    mutable yk_allocator_t m_node_allocator;
+    mutable yk_allocator_t m_key_allocator;
+    mutable yk_allocator_t m_val_allocator;
+    mutable KeyWatcher     m_watcher;
+    bool                   m_migrated = false;
 };
 
 }

@@ -111,6 +111,19 @@ static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *dat
     return ret;
 }
 
+MERCURY_GEN_PROC(migrate_database_in_t,
+        ((hg_string_t)(token))\
+        ((hg_string_t)(new_root))\
+        ((hg_string_t)(extra_config))\
+        ((hg_size_t)(xfer_size))\
+        ((yk_database_id_t)(origin_id))\
+        ((hg_string_t)(target_address))\
+        ((uint16_t)(target_provider_id)))
+
+MERCURY_GEN_PROC(migrate_database_out_t,
+        ((yk_database_id_t)(target_id))\
+        ((int32_t)(ret)))
+
 /* Client RPC types */
 
 /* find_by_name */

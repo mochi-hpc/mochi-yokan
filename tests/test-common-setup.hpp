@@ -42,6 +42,7 @@ struct kv_test_context {
     std::unordered_map<std::string,std::string> reference;
     bool                                        empty_values = false;
     int32_t                                     mode;
+    std::string                                 backend;
 };
 
 static const uint16_t provider_id = 42;
@@ -122,6 +123,7 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     context->id       = id;
     context->dbh      = dbh;
     context->mode     = 0;
+    context->backend  = backend_type;
     if(no_rdma && to_bool(no_rdma))
         context->mode |= YOKAN_MODE_NO_RDMA;
     if(g_max_val_size == 0 && g_min_val_size == 0) {

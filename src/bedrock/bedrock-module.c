@@ -23,8 +23,13 @@ static int yk_register_provider(
     yk_args.config = bedrock_args_get_config(args);
     yk_args.pool   = bedrock_args_get_pool(args);
 
+    // these are optional, but if they are not present,
+    // bedrock_args_get_dependency will return NULL.
+    yk_args.remi.provider = bedrock_args_get_dependency(args, "remi_provider", 0);
+    yk_args.remi.provider = bedrock_args_get_dependency(args, "remi_client", 0);
+
     return yk_provider_register(mid, provider_id, &yk_args,
-                                   (yk_provider_t*)provider);
+                                (yk_provider_t*)provider);
 }
 
 static int yk_deregister_provider(
@@ -84,6 +89,12 @@ static int yk_destroy_provider_handle(
     return BEDROCK_SUCCESS;
 }
 
+static struct bedrock_dependency yokan_provider_dependencies[] = {
+    { "remi_provider", "remi", BEDROCK_OPTIONAL },
+    { "remi_client", "remi", BEDROCK_OPTIONAL },
+    BEDROCK_NO_MORE_DEPENDENCIES
+};
+
 static struct bedrock_module yokan = {
     .register_provider       = yk_register_provider,
     .deregister_provider     = yk_deregister_provider,
@@ -93,7 +104,7 @@ static struct bedrock_module yokan = {
     .get_client_config       = yk_get_client_config,
     .create_provider_handle  = yk_create_provider_handle,
     .destroy_provider_handle = yk_destroy_provider_handle,
-    .provider_dependencies   = NULL,
+    .provider_dependencies   = yokan_provider_dependencies,
     .client_dependencies     = NULL
 };
 

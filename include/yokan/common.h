@@ -32,6 +32,7 @@ extern "C" {
     X(YOKAN_ERR_INVALID_FILTER, "Invalid filter")                \
     X(YOKAN_ERR_FROM_MERCURY, "Mercury error")                   \
     X(YOKAN_ERR_FROM_ARGOBOTS, "Argobots error")                 \
+    X(YOKAN_ERR_FROM_REMI, "REMI error")                         \
     X(YOKAN_ERR_OP_UNSUPPORTED, "Unsupported operation or mode") \
     X(YOKAN_ERR_OP_FORBIDDEN, "Forbidden operation")             \
     X(YOKAN_ERR_KEY_NOT_FOUND, "Key not found")                  \
@@ -51,6 +52,7 @@ extern "C" {
     X(YOKAN_ERR_MODE, "Invalid mode")                            \
     X(YOKAN_ERR_NONCONTIG, "Non-contiguous buffer")              \
     X(YOKAN_ERR_READONLY, "Read-only buffer")                    \
+    X(YOKAN_ERR_MIGRATED, "Database has migrated")               \
     X(YOKAN_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,
@@ -160,6 +162,12 @@ static inline void yk_database_id_from_string(
  * @brief Record when working with collections.
  */
 typedef uint64_t yk_id_t;
+
+struct yk_migration_options {
+    const char* new_root;     /* new path to database on target */
+    const char* extra_config; /* extra JSON config to use at target */
+    size_t      xfer_size;    /* transfer block size to use */
+};
 
 #ifdef __cplusplus
 }

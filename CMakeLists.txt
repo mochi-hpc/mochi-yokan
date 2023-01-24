@@ -13,7 +13,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wall -Wpedantic")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra -Wall -Wpedantic")
 
-add_library(coverage_config INTERFACE)
+add_library (coverage_config INTERFACE)
 
 option (ENABLE_COVERAGE   "Enable coverage reporting" OFF)
 option (ENABLE_TESTS      "Build tests" OFF)
@@ -29,6 +29,7 @@ option (ENABLE_UNQLITE    "Build with unqlite support" OFF)
 option (ENABLE_LUA        "Build with Lua support" OFF)
 option (ENABLE_PYTHON     "Build the Python module" OFF)
 option (ENABLE_YCSB       "Build the YCSB adaptor" OFF)
+option (ENABLE_REMI       "Build with REMI support" OFF)
 
 if (ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options (coverage_config INTERFACE
@@ -65,7 +66,14 @@ find_package (nlohmann_json REQUIRED)
 find_package (PkgConfig REQUIRED)
 
 if (${ENABLE_BEDROCK})
-    find_package(bedrock REQUIRED)
+    find_package (bedrock REQUIRED)
+endif ()
+
+if (${ENABLE_REMI})
+    find_package (remi REQUIRED)
+    set (YOKAN_HAS_REMI ON)
+else ()
+    set (YOKAN_HAS_REMI OFF)
 endif ()
 
 # search for margo
@@ -138,8 +146,8 @@ else ()
 endif ()
 
 if (ENABLE_PYTHON)
-    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-    find_package(pybind11 REQUIRED)
+    find_package (Python3 COMPONENTS Interpreter Development REQUIRED)
+    find_package (pybind11 REQUIRED)
     add_subdirectory (python)
 endif ()
 
@@ -156,21 +164,21 @@ else ()
         message (STATUS "Found std::experimental::string_view to be available")
     else ()
         message (FATAL_ERROR "Yokan needs either std::string_view or std::experimental::string_view")
-    endif()
-endif()
+    endif ()
+endif ()
 
 # Detect std::string_view or std::experimental::string_view
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.0")
         set (FS_LIB c++fs)
-    endif()
+    endif ()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         set (FS_LIB stdc++fs)
-endif()
+endif ()
 try_compile (HAS_FILESYSTEM ${CMAKE_CURRENT_BINARY_DIR}
              ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake-tests/has_filesystem.cpp
              LINK_LIBRARIES ${FS_LIB})
-     if (${HAS_FILESYSTEM})
+    if (${HAS_FILESYSTEM})
     message (STATUS "Found std::filesystem to be available")
     add_definitions (-DYOKAN_USE_STD_FILESYSTEM)
 else ()
@@ -181,19 +189,19 @@ else ()
         message (STATUS "Found std::experimental::filesystem to be available")
     else ()
         message (FATAL_ERROR "Yokan needs either std::filesystem or std::experimental::filesystem")
-    endif()
-endif()
+    endif ()
+endif ()
 
 add_subdirectory (bin)
 
 if (${ENABLE_BENCHMARK})
   add_subdirectory (benchmark)
-endif (${ENABLE_BENCHMARK})
+endif ()
 
 if (${ENABLE_YCSB})
   find_package (ycsb-cpp-interface CONFIG REQUIRED)
   add_subdirectory (ycsb)
-endif (${ENABLE_YCSB})
+endif ()
 
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)
@@ -203,9 +211,9 @@ set (YOKAN_VERSION
      "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
 add_subdirectory (src)
-if(${ENABLE_TESTS})
+if (${ENABLE_TESTS})
   add_subdirectory (tests)
-endif(${ENABLE_TESTS})
+endif ()
 
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindBerkeleyDB.cmake
                ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindGDBM.cmake

@@ -31,10 +31,12 @@ class Provider {
              const char* token="",
              const char* config="{}",
              ABT_pool pool=ABT_POOL_NULL,
-             yk_bulk_cache_t cache=nullptr) {
+             yk_bulk_cache_t cache=nullptr,
+             remi_client_t remi_client=nullptr,
+             remi_provider_t remi_provider=nullptr) {
         m_mid = mid;
         struct yk_provider_args args = {
-            token, config, pool, cache
+            token, config, pool, cache, { remi_client, remi_provider }
         };
         auto err = yk_provider_register(mid, provider_id, &args, &m_provider);
         YOKAN_CONVERT_AND_THROW(err);

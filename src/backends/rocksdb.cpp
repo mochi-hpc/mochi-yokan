@@ -117,15 +117,16 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
     }
 
-    static Status create(const std::string& config, DatabaseInterface** kvs) {
-        json cfg;
+    static Status processConfig(
+              const std::string& config,
+              json& cfg,
+              rocksdb::Options& options) {
         try {
             cfg = json::parse(config);
         } catch(...) {
             return Status::InvalidConf;
         }
         // fill options and complete configuration
-        rocksdb::Options options;
 
 #define SET_AND_COMPLETE(__json__, __field__, __value__)               \
         do { try {                                                     \
@@ -293,6 +294,15 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 "path field should be a string");
             return Status::InvalidConf;
         }
+        return Status::OK;
+    }
+
+    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+        json cfg;
+        rocksdb::Options options;
+        if(processConfig(config, cfg, options) != Status::OK)
+              return Status::InvalidConf;
+
         auto path = cfg["path"].get<std::string>();
 
         rocksdb::Status status;
@@ -305,14 +315,54 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(status);
         }
 
-        *kvs = new RocksDBDatabase(db, std::move(cfg));
+        *kvs = new RocksDBDatabase(name, db, std::move(cfg));
+
+        return Status::OK;
+    }
+
+    static Status recover(
+            const std::string& name,
+            const std::string& config,
+            const std::string& migrationConfig,
+            const std::list<std::string>& files,
+            DatabaseInterface** kvs) {
+        json cfg;
+        rocksdb::Status status;
+        (void)migrationConfig;
+        rocksdb::Options options;
+        if(processConfig(config, cfg, options) != Status::OK)
+              return Status::InvalidConf;
+
+        if(files.empty()) return Status::IOError;
+        std::string path = files.front();
+        path = path.substr(0, path.find_last_of('/'));
+        cfg["path"] = path;
+        options.create_if_missing = false;
+        options.error_if_exists = false;
+
+        rocksdb::DB* db = nullptr;
+        status = rocksdb::DB::Open(options, path, &db);
+        if(!status.ok()) {
+            YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                "Could not open RocksDB database: %s",
+                status.getState());
+            return convertStatus(status);
+        }
+
+        *kvs = new RocksDBDatabase(name, db, std::move(cfg));
 
         return Status::OK;
     }
 
     // LCOV_EXCL_START
-    virtual std::string name() const override {
+    virtual std::string type() const override {
         return "rocksdb";
+    }
+    // LCOV_EXCL_STOP
+
+    // LCOV_EXCL_START
+    virtual std::string name() const override {
+        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -347,6 +397,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual void destroy() override {
+        if(m_migrated) return;
         delete m_db;
         m_db = nullptr;
         auto path = m_config["path"].get<std::string>();
@@ -354,6 +405,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         (void)c;
         return Status::NotSupported;
@@ -363,6 +416,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                           const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BitField& flags) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > flags.size) return Status::InvalidArg;
         auto count = ksizes.size;
@@ -380,6 +435,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status length(int32_t mode, const UserMem& keys,
                           const BasicUserMem<size_t>& ksizes,
                           BasicUserMem<size_t>& vsizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size > vsizes.size) return Status::InvalidArg;
         size_t offset = 0;
@@ -404,6 +461,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        const UserMem& vals,
                        const BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -450,6 +509,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
@@ -515,6 +576,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         (void)mode;
         size_t offset = 0;
         rocksdb::WriteBatch wb;
@@ -531,6 +594,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
 
@@ -609,6 +674,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                  UserMem& vals,
                                  BasicUserMem<size_t>& valSizes) const override {
 
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
         auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
         auto fromKeySlice = rocksdb::Slice{ fromKey.data, fromKey.size };
 
@@ -709,15 +776,59 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct RocksDBMigrationHandle : public MigrationHandle {
+
+        RocksDBDatabase&   m_db;
+        bool               m_cancel = false;
+        ScopedWriteLock    m_lock;
+        std::string        m_path;
+
+        RocksDBMigrationHandle(RocksDBDatabase& db)
+            : m_db(db)
+              , m_lock(db.m_migration_lock) {
+                  m_path = m_db.m_config["path"];
+              }
+
+        ~RocksDBMigrationHandle() {
+            if(m_cancel) return;
+            fs::remove_all(m_path);
+            m_db.m_migrated = true;
+        }
+
+        std::string getRoot() const override {
+            return m_path;
+        }
+
+        std::list<std::string> getFiles() const override {
+            return {"/"};
+        }
+
+        void cancel() override {
+            m_cancel = true;
+        }
+    };
+
+    Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
+        if(m_migrated) return Status::Migrated;
+        try {
+            mh.reset(new RocksDBMigrationHandle(*this));
+        } catch(...) {
+            return Status::IOError;
+        }
+        return Status::OK;
+    }
+
     ~RocksDBDatabase() {
         if(m_db)
             delete m_db;
+        ABT_rwlock_free(&m_migration_lock);
     }
 
     private:
 
-    RocksDBDatabase(rocksdb::DB* db, json&& cfg)
-    : m_db(db)
+    RocksDBDatabase(const std::string& name, rocksdb::DB* db, json&& cfg)
+    : m_name(name)
+    , m_db(db)
     , m_config(std::move(cfg)) {
 
 #define GET_OPTION(__opt__, __cfg__, __field__) \
@@ -747,13 +858,19 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
+
+        ABT_rwlock_create(&m_migration_lock);
     }
 
+    std::string           m_name;
     rocksdb::DB*          m_db;
     json                  m_config;
     rocksdb::ReadOptions  m_read_options;
     rocksdb::WriteOptions m_write_options;
     bool                  m_use_write_batch;
+
+    bool                  m_migrated = false;
+    ABT_rwlock            m_migration_lock = ABT_RWLOCK_NULL;
 };
 
 }

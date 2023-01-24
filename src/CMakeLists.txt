@@ -136,14 +136,17 @@ add_library (yokan-headers INTERFACE)
 target_include_directories (yokan-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries (yokan-headers INTERFACE PkgConfig::uuid)
 
+if (ENABLE_REMI)
+  set (OPTIONAL_REMI remi)
+else ()
+  set (OPTIONAL_REMI)
+endif ()
+
 # server library
 add_library (yokan-server ${server-src-files} ${backend-src-files})
 target_link_libraries (yokan-server
-    PUBLIC PkgConfig::margo
-    PUBLIC PkgConfig::uuid
-    PRIVATE nlohmann_json
-    PRIVATE ${DB_DEPENDENCIES}
-    PRIVATE coverage_config)
+    PUBLIC PkgConfig::margo PkgConfig::uuid ${OPTIONAL_REMI}
+    PRIVATE nlohmann_json ${DB_DEPENDENCIES} coverage_config)
 target_compile_definitions (yokan-server PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-server BEFORE PUBLIC

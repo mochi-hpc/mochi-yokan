@@ -72,7 +72,9 @@ jobs:
                  -DENABLE_LMDB=ON \
                  -DENABLE_UNQLITE=ON \
                  -DENABLE_LUA=ON \
-                 -DENABLE_PYTHON=ON &&
+                 -DENABLE_REMI=ON \
+                 -DENABLE_PYTHON=ON \
+                 -DENABLE_YCSB=ON &&
         make
 
     - name: Perform CodeQL Analysis

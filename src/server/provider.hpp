@@ -6,7 +6,9 @@
 #ifndef __PROVIDER_H
 #define __PROVIDER_H
 
+#include "yokan/server.h"
 #include "yokan/backend.hpp"
+#include "yokan/bulk-cache.h"
 #include <nlohmann/json.hpp>
 #include <margo.h>
 #include <uuid.h>
@@ -56,6 +58,7 @@ typedef struct yk_provider {
     hg_id_t close_database_id;
     hg_id_t destroy_database_id;
     hg_id_t list_databases_id;
+    hg_id_t migrate_database_id;
     /* RPC identifiers for clients */
     hg_id_t find_by_name_id;
     hg_id_t count_id;
@@ -88,6 +91,13 @@ typedef struct yk_provider {
     hg_id_t doc_length_id;
     hg_id_t doc_list_id;
     hg_id_t doc_list_direct_id;
+
+    // REMI information
+    struct {
+        remi_provider_t provider;
+        remi_client_t   client;
+    } remi;
+
 } yk_provider;
 
 /* Admin RPCs */
@@ -101,6 +111,8 @@ DECLARE_MARGO_RPC_HANDLER(yk_destroy_database_ult)
 void yk_destroy_database_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_list_databases_ult)
 void yk_list_databases_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
+void yk_migrate_database_ult(hg_handle_t h);
 
 /* Client RPCs */
 DECLARE_MARGO_RPC_HANDLER(yk_find_by_name_ult)
