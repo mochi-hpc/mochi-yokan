@@ -382,6 +382,10 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return m_db && m_db->IsOrdered();
+    }
+
     virtual void destroy() override {
         auto path = m_config["path"].get<std::string>();
         auto type = m_config["type"].get<std::string>();
@@ -878,9 +882,9 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     struct TkrzwDBMigrationHandle : public MigrationHandle {
 
         TkrzwDatabase&   m_db;
-        bool               m_cancel = false;
-        ScopedWriteLock    m_lock;
-        std::string        m_path;
+        bool             m_cancel = false;
+        ScopedWriteLock  m_lock;
+        std::string      m_path;
 
         TkrzwDBMigrationHandle(TkrzwDatabase& db)
         : m_db(db)

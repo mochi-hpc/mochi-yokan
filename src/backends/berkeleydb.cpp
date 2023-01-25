@@ -175,6 +175,10 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return m_is_sorted;
+    }
+
     virtual void destroy() override {
         auto db_file = m_config["file"].get<std::string>();
         auto db_home = m_config["home"].get<std::string>();
@@ -691,6 +695,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     DbEnv*      m_db_env = nullptr;
     Db*         m_db = nullptr;
     std::string m_name;
+    bool        m_is_sorted;
 
     BerkeleyDBDatabase(json cfg, const std::string& name, int db_type, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
@@ -700,6 +705,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     , m_name(name) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
+        m_is_sorted = m_config["type"] == "btree";
     }
 };
 

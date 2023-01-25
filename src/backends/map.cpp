@@ -237,6 +237,10 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return true;
+    }
+
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
         m_db->clear();

@@ -237,6 +237,10 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return true;
+    }
+
     virtual void destroy() override {
         if(m_env) {
             mdb_dbi_close(m_env, m_db);

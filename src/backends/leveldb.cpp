@@ -152,6 +152,10 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    bool isSorted() const override {
+        return true;
+    }
+
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "leveldb";

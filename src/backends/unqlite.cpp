@@ -227,6 +227,10 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return false;
+    }
+
     virtual void destroy() override {
         if(m_migrated) return;
         unqlite_close(m_db);

@@ -147,6 +147,15 @@ class DatabaseInterface {
     }
 
     /**
+     * @brief Check if the backend is sorted (list functions
+     * will return keys in some defined order, either alphabetical
+     * or custom).
+     *
+     * @return true/false.
+     */
+    virtual bool isSorted() const = 0;
+
+    /**
      * @brief Get the number of key/value pairs stored.
      *
      * @param mode Mode.
