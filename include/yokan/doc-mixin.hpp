@@ -47,6 +47,7 @@ class DocumentStoreMixin : public DB {
     DocumentStoreMixin& operator=(const DocumentStoreMixin&) = default;
     DocumentStoreMixin& operator=(DocumentStoreMixin&&) = default;
 
+    using DB::isSorted;
     using DB::supportsMode;
     using DB::count;
     using DB::exists;
@@ -236,34 +237,85 @@ class DocumentStoreMixin : public DB {
                    BasicUserMem<yk_id_t>& ids,
                    UserMem& documents,
                    BasicUserMem<size_t>& docSizes) const override {
-        (void)filter;
-        (void)mode;
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
         if(!supportsMode(YOKAN_MODE_NO_PREFIX))
             return Status::NotSupported;
 
+
+        auto status = Status::OK;
+
         auto name_len = strlen(collection);
         auto count = ids.size;
         auto kv_filter = FilterFactory::docToKeyValueFilter(filter, collection);
-        auto first_key = _keyFromId(collection, name_len, from_id);
 
-        auto keys_umem = UserMem{ reinterpret_cast<char*>(ids.data), ids.size*sizeof(yk_id_t) };
-        std::vector<size_t> ksizes(count, sizeof(yk_id_t));
-        auto ksizes_umem = BasicUserMem<size_t> {ksizes};
-
-        auto new_mode = (mode & YOKAN_MODE_INCLUSIVE)|YOKAN_MODE_NO_PREFIX;
-
-        auto status = listKeyValues(new_mode, packed, first_key, kv_filter,
-                             keys_umem, ksizes_umem, documents, docSizes);
-        if(status == Status::OK) {
-            for(size_t i=0; i < count; i++) {
-                if(ksizes[i] == YOKAN_NO_MORE_KEYS)
-                    ids[i] = YOKAN_NO_MORE_DOCS;
-                else
-                    ids[i] = _ensureBigEndian(ids[i]);
+        CollectionMetadata metadata;
+        {
+            ScopedReadLock lock(m_lock);
+            status = _collGetMetadata(collection, name_len, &metadata);
+            if(status != Status::OK) {
+                return status;
             }
         }
+
+        if(isSorted()) { // use the underlying listKeyValues function
+
+            auto first_key = _keyFromId(collection, name_len, from_id);
+
+            auto keys_umem = UserMem{ reinterpret_cast<char*>(ids.data), ids.size*sizeof(yk_id_t) };
+            std::vector<size_t> ksizes(count, sizeof(yk_id_t));
+            auto ksizes_umem = BasicUserMem<size_t> {ksizes};
+
+            auto new_mode = (mode & YOKAN_MODE_INCLUSIVE)|YOKAN_MODE_NO_PREFIX;
+
+            status = listKeyValues(new_mode, packed, first_key, kv_filter,
+                             keys_umem, ksizes_umem, documents, docSizes);
+            if(status == Status::OK) {
+                for(size_t i=0; i < count; i++) {
+                    if(ksizes[i] == YOKAN_NO_MORE_KEYS)
+                        ids[i] = YOKAN_NO_MORE_DOCS;
+                    else
+                        ids[i] = _ensureBigEndian(ids[i]);
+                }
+            }
+        } else {
+
+            yk_id_t id = from_id;
+            size_t docs_offset = 0;
+            size_t i = 0;
+            while(i != count && id <= metadata.last_id && docs_offset < documents.size) {
+                auto key = _keyFromId(collection, name_len, id);
+                auto ksize = key.size();
+                auto doc_umem = UserMem{
+                    documents.data + docs_offset,
+                    packed ? (documents.size - docs_offset) : docSizes[i]
+                };
+                auto docsize_umem = BasicUserMem<size_t>{docSizes.data + i, 1};
+                auto original_vsize = docsize_umem[0];
+                status = const_cast<DocumentStoreMixin<DB>*>(this)->get(
+                        mode, true,  key, BasicUserMem<size_t>{&ksize, 1}, doc_umem, docsize_umem);
+                if(status != Status::OK) {
+                    return status;
+                }
+                if(docSizes[i] >= YOKAN_SIZE_TOO_SMALL) break;
+
+                if(!kv_filter->check(key.data(), ksize, doc_umem.data, docsize_umem[0])) {
+                    docsize_umem[0] = original_vsize;
+                    id += 1;
+                    continue;
+                }
+
+                ids[i] = id;
+                docs_offset += packed ? docsize_umem[0] : original_vsize;
+                i += 1;
+                id += 1;
+            }
+            for(; i < count; i++) {
+                ids[i] = YOKAN_NO_MORE_DOCS;
+                docSizes[i] = YOKAN_NO_MORE_DOCS;
+            }
+        }
+
         return status;
     }
 

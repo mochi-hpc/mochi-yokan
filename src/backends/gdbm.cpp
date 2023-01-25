@@ -133,6 +133,10 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return false;
+    }
+
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
         if(m_migrated) return;

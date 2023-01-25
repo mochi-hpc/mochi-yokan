@@ -222,6 +222,10 @@ class SetDatabase : public DatabaseInterface {
             );
     }
 
+    bool isSorted() const override {
+        return true;
+    }
+
     virtual void destroy() override {
         ScopedWriteLock lock(m_lock);
         if(m_migrated) return;

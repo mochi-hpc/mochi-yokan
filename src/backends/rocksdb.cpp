@@ -396,6 +396,10 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             );
     }
 
+    bool isSorted() const override {
+        return true;
+    }
+
     virtual void destroy() override {
         if(m_migrated) return;
         delete m_db;

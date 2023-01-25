@@ -52,6 +52,10 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return mode == YOKAN_MODE_DEFAULT;
     }
 
+    bool isSorted() const override {
+        return false;
+    }
+
     virtual void destroy() override {}
 
     virtual Status count(int32_t mode, uint64_t* c) const override {
