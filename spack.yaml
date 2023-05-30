@@ -20,10 +20,10 @@ spack:
   - mochi-bedrock
   - ycsb-cpp-interface
   - rocksdb+rtti
-  - mochi-remi@main
+  - mochi-remi@0.3.3:+bedrock
   concretizer:
     unify: true
-    reuse: false
+    reuse: true
   modules:
     prefix_inspections:
       lib: [LD_LIBRARY_PATH]

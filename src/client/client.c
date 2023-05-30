@@ -201,6 +201,22 @@ yk_return_t yk_database_handle_create(
     return YOKAN_SUCCESS;
 }
 
+yk_return_t yk_database_handle_get_info(
+        yk_database_handle_t handle,
+        yk_client_t* client,
+        hg_addr_t* addr,
+        uint16_t* provider_id,
+        yk_database_id_t* database_id)
+{
+    if(handle == YOKAN_DATABASE_HANDLE_NULL)
+        return YOKAN_ERR_INVALID_ARGS;
+    if(client) *client = handle->client;
+    if(addr) margo_addr_dup(handle->client->mid, handle->addr, addr);
+    if(provider_id) *provider_id = handle->provider_id;
+    if(database_id) *database_id = handle->database_id;
+    return YOKAN_SUCCESS;
+}
+
 yk_return_t yk_database_handle_ref_incr(
         yk_database_handle_t handle)
 {

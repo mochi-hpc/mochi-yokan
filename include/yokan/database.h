@@ -59,6 +59,26 @@ yk_return_t yk_database_handle_create(
         yk_database_handle_t* handle);
 
 /**
+ * @brief Retrieve the internal information from a database handle.
+ * Any NULL pointer will be ignored. The hg_addr_t addr field, if set,
+ * needs to be free by the caller using margo_addr_free.
+ *
+ * @param[in] handle YOKAN database handle
+ * @param[out] client Client used to create the handle
+ * @param[out] addr Address of the handle
+ * @param[out] provider_id Provider id of the handle
+ * @param[out] database_id Database id of the handle
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_database_handle_get_info(
+        yk_database_handle_t handle,
+        yk_client_t* client,
+        hg_addr_t* addr,
+        uint16_t* provider_id,
+        yk_database_id_t* database_id);
+
+/**
  * @brief Increments the reference counter of a database handle.
  *
  * @param handle database handle

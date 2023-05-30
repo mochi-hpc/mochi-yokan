@@ -89,6 +89,14 @@ class Database {
         }
     }
 
+    yk_database_id_t id() const {
+        yk_database_id_t db_id;
+        auto err = yk_database_handle_get_info(m_db,
+            NULL, NULL, NULL, &db_id);
+        YOKAN_CONVERT_AND_THROW(err);
+        return db_id;
+    }
+
     size_t count(int32_t mode = YOKAN_MODE_DEFAULT) const {
         size_t c;
         auto err = yk_count(m_db, mode, &c);

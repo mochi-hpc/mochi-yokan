@@ -143,6 +143,20 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     // test that we can increase the ref count
     ret = yk_database_handle_ref_incr(rh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    // test that we can retrieve the information
+    {
+        yk_client_t client2      = YOKAN_CLIENT_NULL;
+        hg_addr_t   addr2        = HG_ADDR_NULL;
+        uint16_t    provider_id2 = 0;
+        yk_database_id_t db_id2;
+        ret = yk_database_handle_get_info(rh,
+            &client2, &addr2, &provider_id2, &db_id2);
+        munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        munit_assert_ptr(client2, ==, client);
+        munit_assert(margo_addr_cmp(context->mid, addr2, context->addr));
+        munit_assert_int(provider_id2, ==, provider_id);
+        munit_assert_memory_equal(sizeof(db_id2), &db_id2, &context->id);
+    }
     // test that we can destroy the database handle
     ret = yk_database_handle_release(rh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
