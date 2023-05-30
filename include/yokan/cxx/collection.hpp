@@ -138,7 +138,7 @@ class Collection {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
-    void update(yk_id_t id, void* document, size_t docsize,
+    void update(yk_id_t id, const void* document, size_t docsize,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_doc_update(m_db.handle(), m_name.c_str(),
                                  mode, id, document, docsize);
