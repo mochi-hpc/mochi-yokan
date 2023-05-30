@@ -63,7 +63,7 @@ yk_return_t yk_provider_register(
     }
 
     json config;
-    if(a.config != NULL) {
+    if(a.config != NULL && a.config[0] != '\0') {
         try {
             config = json::parse(a.config);
         } catch(const std::exception& ex) {
