@@ -8,6 +8,7 @@
 
 #include <yokan/server.h>
 #include <yokan/cxx/exception.hpp>
+#include <string>
 
 namespace yokan {
 
@@ -58,6 +59,13 @@ class Provider {
         margo_provider_pop_finalize_callback(m_mid, &other);
         margo_provider_push_finalize_callback(
             m_mid, this, finalizeCallback, this);
+    }
+
+    std::string getConfig() const {
+        char* config = yk_provider_get_config(m_provider);
+        auto result = std::string{config ? config : ""};
+        free(config);
+        return result;
     }
 
     private:
