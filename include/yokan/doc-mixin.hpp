@@ -7,6 +7,7 @@
 #define __YOKAN_DOC_MIXIN_H
 
 #include <iostream>
+#include <limits>
 #include <yokan/backend.hpp>
 #include <yokan/util/locks.hpp>
 #include <memory>
@@ -25,7 +26,7 @@ class DocumentStoreMixin : public DB {
 
     struct CollectionMetadata {
         yk_id_t size    = 0;
-        yk_id_t last_id = 0;
+        yk_id_t next_id = 0;
     };
 
     ABT_rwlock m_lock = ABT_RWLOCK_NULL;
@@ -85,7 +86,7 @@ class DocumentStoreMixin : public DB {
         CollectionMetadata metadata;
         status = _collGetMetadata(collection, name_len, &metadata);
         if(status != Status::OK) return status;
-        std::vector<yk_id_t> ids(metadata.last_id);
+        std::vector<yk_id_t> ids(metadata.next_id);
         for(yk_id_t id = 0; id < ids.size(); id++) {
             ids[id] = id;
         }
@@ -110,7 +111,7 @@ class DocumentStoreMixin : public DB {
         ScopedReadLock lock(m_lock);
         auto status = _collGetMetadata(collection, strlen(collection), &metadata);
         if(status == Status::OK)
-            *id = metadata.last_id;
+            *id = metadata.next_id-1;
         return status;
     }
 
@@ -149,9 +150,9 @@ class DocumentStoreMixin : public DB {
             auto status = _collGetMetadata(collection, name_len, &metadata);
             if(status != Status::OK) return status;
             for(uint64_t i = 0; i < count; i++) {
-                ids[i] = metadata.last_id + i;
+                ids[i] = metadata.next_id + i;
             }
-            metadata.last_id += count;
+            metadata.next_id += count;
             status = _collPutMetadata(collection, name_len, &metadata, false);
             if(status != Status::OK) return status;
         }
@@ -180,7 +181,7 @@ class DocumentStoreMixin : public DB {
         auto status = _collGetMetadata(collection, name_len, &metadata);
         if(status != Status::OK) return status;
         for(unsigned i=0; i < ids.size; i++) {
-            if(ids[i] >= metadata.last_id)
+            if(ids[i] >= metadata.next_id)
                 return Status::InvalidID;
         }
         return put(mode, keys, ksizes, documents, sizes);
@@ -283,7 +284,7 @@ class DocumentStoreMixin : public DB {
             yk_id_t id = from_id;
             size_t docs_offset = 0;
             size_t i = 0;
-            while(i != count && id <= metadata.last_id && docs_offset < documents.size) {
+            while(i != count && id < metadata.next_id && docs_offset < documents.size) {
                 auto key = _keyFromId(collection, name_len, id);
                 auto ksize = key.size();
                 auto doc_umem = UserMem{

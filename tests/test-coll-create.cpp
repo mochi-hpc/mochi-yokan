@@ -70,7 +70,7 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
     ret = yk_collection_last_id(dbh, "abcd", 0, &last_id);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    munit_assert_long(last_id, ==, 0);
+    munit_assert_long(last_id, ==, -1);
 
     for(size_t i=0; i < context->reference.size(); i++) {
         yk_id_t id;
@@ -90,7 +90,7 @@ static MunitResult test_coll_create_store_size_last_id(const MunitParameter para
     ret = yk_collection_last_id(dbh, "abcd", 0, &last_id);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
-    munit_assert_long(last_id, ==, context->reference.size());
+    munit_assert_long(last_id, ==, context->reference.size()-1);
 
     ret = yk_collection_drop(dbh, "abcd", 0);
     SKIP_IF_NOT_IMPLEMENTED(ret);
