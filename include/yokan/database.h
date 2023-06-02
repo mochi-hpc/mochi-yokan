@@ -19,6 +19,20 @@ typedef struct yk_database_handle *yk_database_handle_t;
 #define YOKAN_DATABASE_HANDLE_NULL ((yk_database_handle_t)NULL)
 
 /**
+ * @brief Type of callback used by the fetch and iter functions.
+ *
+ * @param void* User-provided arguments.
+ * @param size_t Index of the key/value pair (if fetching multiple).
+ * @param const void* Key data.
+ * @param size_t Size of the key.
+ * @param const void* Value data.
+ * @param size_t Size of the data.
+ *
+ * @return YK_SUCCESS or other error code.
+ */
+typedef yk_return_t (*yk_keyvalue_callback_t)(void*, size_t, const void*, size_t, const void*, size_t);
+
+/**
  * @brief If a database has a "name":"something" entry in its
  * configuration, this function will find the corresponding
  * database id.
@@ -558,6 +572,124 @@ yk_return_t yk_get_bulk(yk_database_handle_t dbh,
                         bool packed);
 
 /**
+ * @brief This function performs a GET but instead of providing a buffer
+ * in which to receive the value, the caller provides a function to call
+ * on the fetched key/value pair. This function is useful when the size
+ * of the value is unknown, but yk_get should be preferred if the size is
+ * known.
+ *
+ * Important: the key/value data passed to the callback are guaranteed to
+ * be valid only until the callback returns. Hence if the callback
+ *
+ * Important: for this function to work, the calling process must have
+ * a margo instance running in server mode.
+ *
+ * @param dbh Database handle.
+ * @param mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param key Key data.
+ * @param ksize Size of the key.
+ * @param cb Callback to invoke on the key/value pair.
+ * @param uargs Argument for the callback.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_fetch(yk_database_handle_t dbh,
+                     int32_t mode,
+                     const void* key,
+                     size_t ksize,
+                     yk_keyvalue_callback_t cb,
+                     void* uargs);
+
+
+/**
+ * @brief Options for the yk_fetch_* functions.
+ */
+typedef struct yk_fetch_options {
+    ABT_pool pool;            /* pool in which to run the callback */
+    unsigned send_batch_size; /* keys are sent in batches of this size */
+    unsigned recv_batch_size; /* values are received by batches of this size */
+} yk_fetch_options_t;
+
+/**
+ * @brief Packed version of yk_fetch meant to fetch multiple values at once
+ * from a pack of keys.
+ *
+ * The options argument, if provided, will indicate how the processing is done.
+ *
+ * @param dbh Database handle.
+ * @param mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param count
+ * @param keys Packed keys data.
+ * @param ksizes Size of the keys.
+ * @param cb Callback to invoke on the key/value pair.
+ * @param uargs Argument for the callback.
+ * @param options Batching and parallelism options.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_fetch_packed(yk_database_handle_t dbh,
+                            int32_t mode,
+                            size_t count,
+                            const void* keys,
+                            const size_t* ksizes,
+                            yk_keyvalue_callback_t cb,
+                            void* uargs,
+                            const yk_fetch_options_t* options);
+
+/**
+ * @brief Multi version of yk_fetch meant to fetch multiple values at once
+ * from an array of keys.
+ *
+ * The options argument, if provided, will indicate how the processing is done.
+ *
+ * @param dbh Database handle.
+ * @param mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param count
+ * @param keys keys data.
+ * @param ksizes Size of the keys.
+ * @param cb Callback to invoke on the key/value pair.
+ * @param uargs Argument for the callback.
+ * @param options Batching and parallelism options.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_fetch_multi(yk_database_handle_t dbh,
+                           int32_t mode,
+                           size_t count,
+                           const void* const* keys,
+                           const size_t* ksizes,
+                           yk_keyvalue_callback_t cb,
+                           void* uargs,
+                           const yk_fetch_options_t* options);
+
+/**
+ * @brief Bulk version of yk_fetch meant to fetch multiple values at once
+ * from a bulk representing the data (array of size_t followed by the actual keys).
+ *
+ * The options argument, if provided, will indicate how the processing is done.
+ *
+ * @param dbh Database handle.
+ * @param mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param count
+ * @param keys keys data.
+ * @param ksizes Size of the keys.
+ * @param cb Callback to invoke on the key/value pair.
+ * @param uargs Argument for the callback.
+ * @param options Batching and parallelism options.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
+                          int32_t mode,
+                          size_t count,
+                          const char* origin,
+                          hg_bulk_t data,
+                          size_t offset,
+                          size_t size,
+                          yk_keyvalue_callback_t cb,
+                          void* uargs,
+                          const yk_fetch_options_t* options);
+/**
  * @brief Erase a key/value pair associated with the given key.
  * Note that this function will not return an error if the key
  * does not exist.
@@ -865,6 +997,74 @@ yk_return_t yk_list_keyvals_bulk(yk_database_handle_t dbh,
                                  bool packed,
                                  size_t count);
 
+typedef struct yk_iter_options {
+    unsigned recv_batch_size; /* how many items to receive at once */
+} yk_iter_options_t;
+
+/**
+ * @brief Iterate up to count keys from from_key (included if
+ * inclusive is set in the mode), filtering keys if a filter is provided.
+ *
+ * Unless a specific mode is used to change it, the filter is
+ * considered as a prefix that the keys must start with.
+ *
+ * If count is set to 0, this function will iterate until the end.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
+ * @param[in] count Max keys to read, 0 for all.
+ * @param[in] cb Callback to call in each key.
+ * @param[in] uargs Callback user-argument.
+ * @param[in] options Options.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_iter_keys(yk_database_handle_t dbh,
+                         int32_t mode,
+                         const void* from_key,
+                         size_t from_ksize,
+                         const void* filter,
+                         size_t filter_size,
+                         size_t count,
+                         yk_keyvalue_callback_t cb,
+                         void* uargs,
+                         const yk_iter_options_t* options);
+
+/**
+ * @brief Iterate up to count key/value pairs from from_key (included if
+ * inclusive is set in the mode), filtering keys if a filter is provided.
+ *
+ * Unless a specific mode is used to change it, the filter is
+ * considered as a prefix that the keys must start with.
+ *
+ * If count is set to 0, this function will iterate until the end.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param[in] from_key Starting key.
+ * @param[in] from_ksize Starting key size.
+ * @param[in] filter Key filter.
+ * @param[in] filter_size Filter size.
+ * @param[in] count Max keys to read, 0 for all.
+ * @param[in] cb Callback to call in each key.
+ * @param[in] uargs Callback user-argument.
+ * @param[in] options Options.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_iter_keyvals(yk_database_handle_t dbh,
+                            int32_t mode,
+                            const void* from_key,
+                            size_t from_ksize,
+                            const void* filter,
+                            size_t filter_size,
+                            size_t count,
+                            yk_keyvalue_callback_t cb,
+                            const yk_iter_options_t* options);
 #ifdef __cplusplus
 }
 #endif

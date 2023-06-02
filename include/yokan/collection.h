@@ -17,6 +17,18 @@ extern "C" {
 #endif
 
 /**
+ * @brief Type of callback used by the fetch and iter functions.
+ *
+ * @param void* User-provided arguments.
+ * @param yk_id_t Record id
+ * @param const void* Document data.
+ * @param size_t Size of the document.
+ *
+ * @return YK_SUCCESS or other error code.
+ */
+typedef yk_return_t (*yk_document_callback_t)(void*, yk_id_t, const void*, size_t);
+
+/**
  * @brief Create a collection in the specified database.
  *
  * @param[in] dbh Database handle
@@ -291,6 +303,58 @@ yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
                              bool packed);
 
 /**
+ * @brief Fetch a document from the collection, calling a function
+ * on the document when it is received.
+ * This function is a version of yk_doc_load that does not need to
+ * know the size of the document ahead of time.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[int] id Record id
+ * @param[out] data Buffer to load the document
+ * @param[inout] size Size of the buffer (in) / document (out)
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
+                         const char* collection,
+                         int32_t mode,
+                         yk_id_t id,
+                         yk_document_callback_t cb,
+                         void* uargs);
+
+/**
+ * @brief Options to provide to yk_doc_fetch_multi.
+ */
+typedef struct yk_doc_fetch_options {
+    unsigned recv_batch_size;
+} yk_doc_fetch_options_t;
+
+/**
+ * @brief Fetch documents from the collection, calling a function
+ * on the documents when they are received.
+ * This function is a version of yk_doc_load_multi that does not need to
+ * know the size of the document ahead of time.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[int] id Record id
+ * @param[out] data Buffer to load the document
+ * @param[inout] size Size of the buffer (in) / document (out)
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
+                               const char* collection,
+                               int32_t mode,
+                               size_t count,
+                               const yk_id_t* ids,
+                               yk_document_callback_t cb,
+                               void* uargs);
+
+/**
  * @brief Get the size of a document from the collection.
  *
  * @param[in] dbh Database handle
@@ -540,6 +604,43 @@ yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
                              size_t docs_buf_size,
                              bool packed,
                              size_t count);
+
+/**
+ * @brief Options to pass to yk_doc_iter.
+ */
+typedef struct yk_doc_iter_options {
+    unsigned recv_batch_size;
+} yk_doc_iter_options_t;
+
+/**
+ * @brief Iterate through up to max documents starting at start_id
+ * (excluded by default unless YOKAN_MODE_INCLUSIVE mode is used),
+ * calling the callback on each document.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] start_id Starting document id
+ * @param[in] filter Filter content
+ * @param[in] filter_size Filter size
+ * @param[in] max Maximum number of documents to return
+ * @param[in] cb Callback to call on each document
+ * @param[in] uargs Arguments for the callback
+ * @param[in] options Options
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_iter(yk_database_handle_t dbh,
+                        const char* collection,
+                        int32_t mode,
+                        yk_id_t start_id,
+                        const void* filter,
+                        size_t filter_size,
+                        size_t max,
+                        yk_document_callback_t cb,
+                        void* uargs,
+                        const yk_doc_iter_options_t* options);
+
 
 #ifdef __cplusplus
 }
