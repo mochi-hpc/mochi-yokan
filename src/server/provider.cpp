@@ -272,6 +272,18 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->get_direct_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_fetch",
+            fetch_in_t, fetch_out_t,
+            yk_fetch_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->fetch_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_fetch_direct",
+            fetch_direct_in_t, fetch_direct_out_t,
+            yk_fetch_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->fetch_direct_id = id;
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_length",
             length_in_t, length_out_t,
             yk_length_ult, provider_id, p->pool);
@@ -319,6 +331,32 @@ yk_return_t yk_provider_register(
             yk_list_keyvals_direct_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keyvals_direct_id = id;
+
+    /*
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keys",
+            iter_keys_in_t, iter_keys_out_t,
+            yk_iter_keys_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->iter_keys_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keys_direct",
+            iter_keys_direct_in_t, iter_keys_direct_out_t,
+            yk_iter_keys_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->iter_keys_direct_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keyvals",
+            iter_keyvals_in_t, iter_keyvals_out_t,
+            yk_iter_keyvals_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->iter_keyvals_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keyvals_direct",
+            iter_keyvals_direct_in_t, iter_keyvals_direct_out_t,
+            yk_iter_keyvals_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->iter_keyvals_direct_id = id;
+    */
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_create",
             coll_create_in_t, coll_create_out_t,
@@ -368,6 +406,20 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_load_direct_id = id;
 
+    /*
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_fetch",
+            doc_fetch_in_t, doc_fetch_out_t,
+            yk_doc_fetch_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_fetch_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_fetch_direct",
+            doc_fetch_direct_in_t, doc_fetch_direct_out_t,
+            yk_doc_fetch_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_fetch_direct_id = id;
+    */
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_store",
             doc_store_in_t, doc_store_out_t,
             yk_doc_store_ult, provider_id, p->pool);
@@ -409,6 +461,20 @@ yk_return_t yk_provider_register(
             yk_doc_list_direct_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_list_direct_id = id;
+
+    /*
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_iter",
+            doc_iter_in_t, doc_iter_out_t,
+            yk_doc_iter_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_iter_id = id;
+
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_iter_direct",
+            doc_iter_direct_in_t, doc_iter_direct_out_t,
+            yk_doc_iter_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_iter_direct_id = id;
+    */
 
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 

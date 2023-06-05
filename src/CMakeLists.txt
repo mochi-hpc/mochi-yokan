@@ -5,6 +5,7 @@ set (server-src-files
      server/put.cpp
      server/erase.cpp
      server/get.cpp
+     server/fetch.cpp
      server/length.cpp
      server/exists.cpp
      server/list_keys.cpp
@@ -99,6 +100,7 @@ set (client-src-files
      client/put.cpp
      client/erase.cpp
      client/get.cpp
+     client/fetch.cpp
      client/length.cpp
      client/exists.cpp
      client/list_keys.cpp

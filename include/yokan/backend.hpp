@@ -298,11 +298,10 @@ class DatabaseInterface {
      *
      * @return Status.
      */
-    virtual Status fetch(int32_t mode, bool packed, const UserMem& keys,
+    virtual Status fetch(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes,
                          const FetchCallback& func) {
         (void)mode;
-        (void)packed;
         (void)keys;
         (void)ksizes;
         (void)func;

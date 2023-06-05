@@ -18,41 +18,42 @@ extern "C" {
 /**
  * @brief Error codes that can be returned by YOKAN functions.
  */
-#define YOKAN_RETURN_VALUES                                      \
-    X(YOKAN_SUCCESS, "Success")                                  \
-    X(YOKAN_ERR_ALLOCATION, "Allocation error")                  \
-    X(YOKAN_ERR_INVALID_MID, "Invalid margo instance")           \
-    X(YOKAN_ERR_INVALID_ARGS, "Invalid argument")                \
-    X(YOKAN_ERR_INVALID_PROVIDER, "Invalid provider id")         \
-    X(YOKAN_ERR_INVALID_DATABASE, "Invalid database id")         \
-    X(YOKAN_ERR_INVALID_BACKEND, "Invalid backend type")         \
-    X(YOKAN_ERR_INVALID_CONFIG, "Invalid configuration")         \
-    X(YOKAN_ERR_INVALID_TOKEN, "Invalid token")                  \
-    X(YOKAN_ERR_INVALID_ID, "Invalid document id")               \
-    X(YOKAN_ERR_INVALID_FILTER, "Invalid filter")                \
-    X(YOKAN_ERR_FROM_MERCURY, "Mercury error")                   \
-    X(YOKAN_ERR_FROM_ARGOBOTS, "Argobots error")                 \
-    X(YOKAN_ERR_FROM_REMI, "REMI error")                         \
-    X(YOKAN_ERR_OP_UNSUPPORTED, "Unsupported operation or mode") \
-    X(YOKAN_ERR_OP_FORBIDDEN, "Forbidden operation")             \
-    X(YOKAN_ERR_KEY_NOT_FOUND, "Key not found")                  \
-    X(YOKAN_ERR_BUFFER_SIZE, "Buffer too small")                 \
-    X(YOKAN_ERR_KEY_EXISTS, "Key exists")                        \
-    X(YOKAN_ERR_CORRUPTION, "Data corruption")                   \
-    X(YOKAN_ERR_IO, "IO error")                                  \
-    X(YOKAN_ERR_INCOMPLETE, "Imcomplete operation")              \
-    X(YOKAN_ERR_TIMEOUT, "Timeout")                              \
-    X(YOKAN_ERR_ABORTED, "Operation aborted")                    \
-    X(YOKAN_ERR_BUSY, "Busy")                                    \
-    X(YOKAN_ERR_EXPIRED, "Operation expired")                    \
-    X(YOKAN_ERR_TRY_AGAIN, "Try again")                          \
-    X(YOKAN_ERR_SYSTEM, "System error")                          \
-    X(YOKAN_ERR_CANCELED, "Canceled")                            \
-    X(YOKAN_ERR_PERMISSION, "Permission error")                  \
-    X(YOKAN_ERR_MODE, "Invalid mode")                            \
-    X(YOKAN_ERR_NONCONTIG, "Non-contiguous buffer")              \
-    X(YOKAN_ERR_READONLY, "Read-only buffer")                    \
-    X(YOKAN_ERR_MIGRATED, "Database has migrated")               \
+#define YOKAN_RETURN_VALUES                                       \
+    X(YOKAN_SUCCESS, "Success")                                   \
+    X(YOKAN_ERR_ALLOCATION, "Allocation error")                   \
+    X(YOKAN_ERR_INVALID_MID, "Invalid margo instance")            \
+    X(YOKAN_ERR_INVALID_ARGS, "Invalid argument")                 \
+    X(YOKAN_ERR_INVALID_PROVIDER, "Invalid provider id")          \
+    X(YOKAN_ERR_INVALID_DATABASE, "Invalid database id")          \
+    X(YOKAN_ERR_INVALID_BACKEND, "Invalid backend type")          \
+    X(YOKAN_ERR_INVALID_CONFIG, "Invalid configuration")          \
+    X(YOKAN_ERR_INVALID_TOKEN, "Invalid token")                   \
+    X(YOKAN_ERR_INVALID_ID, "Invalid document id")                \
+    X(YOKAN_ERR_INVALID_FILTER, "Invalid filter")                 \
+    X(YOKAN_ERR_FROM_MERCURY, "Mercury error")                    \
+    X(YOKAN_ERR_FROM_ARGOBOTS, "Argobots error")                  \
+    X(YOKAN_ERR_FROM_REMI, "REMI error")                          \
+    X(YOKAN_ERR_OP_UNSUPPORTED, "Unsupported operation or mode")  \
+    X(YOKAN_ERR_OP_FORBIDDEN, "Forbidden operation")              \
+    X(YOKAN_ERR_KEY_NOT_FOUND, "Key not found")                   \
+    X(YOKAN_ERR_BUFFER_SIZE, "Buffer too small")                  \
+    X(YOKAN_ERR_KEY_EXISTS, "Key exists")                         \
+    X(YOKAN_ERR_CORRUPTION, "Data corruption")                    \
+    X(YOKAN_ERR_IO, "IO error")                                   \
+    X(YOKAN_ERR_INCOMPLETE, "Imcomplete operation")               \
+    X(YOKAN_ERR_TIMEOUT, "Timeout")                               \
+    X(YOKAN_ERR_ABORTED, "Operation aborted")                     \
+    X(YOKAN_ERR_BUSY, "Busy")                                     \
+    X(YOKAN_ERR_EXPIRED, "Operation expired")                     \
+    X(YOKAN_ERR_TRY_AGAIN, "Try again")                           \
+    X(YOKAN_ERR_SYSTEM, "System error")                           \
+    X(YOKAN_ERR_CANCELED, "Canceled")                             \
+    X(YOKAN_ERR_PERMISSION, "Permission error")                   \
+    X(YOKAN_ERR_MODE, "Invalid mode")                             \
+    X(YOKAN_ERR_NONCONTIG, "Non-contiguous buffer")               \
+    X(YOKAN_ERR_READONLY, "Read-only buffer")                     \
+    X(YOKAN_ERR_MIGRATED, "Database has migrated")                \
+    X(YOKAN_ERR_MID_NOT_LISTENING, "Margo instance not listening")\
     X(YOKAN_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,

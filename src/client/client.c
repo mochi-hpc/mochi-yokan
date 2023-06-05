@@ -31,12 +31,18 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_put_direct",          &c->put_direct_id,          &flag);
         margo_registered_name(mid, "yk_get",                 &c->get_id,                 &flag);
         margo_registered_name(mid, "yk_get_direct",          &c->get_direct_id,          &flag);
+        margo_registered_name(mid, "yk_fetch",               &c->fetch_id,               &flag);
+        margo_registered_name(mid, "yk_fetch_direct",        &c->fetch_direct_id,        &flag);
         margo_registered_name(mid, "yk_erase",               &c->erase_id,               &flag);
         margo_registered_name(mid, "yk_erase_direct",        &c->erase_direct_id,        &flag);
         margo_registered_name(mid, "yk_list_keys",           &c->list_keys_id,           &flag);
         margo_registered_name(mid, "yk_list_keys_direct",    &c->list_keys_direct_id,    &flag);
         margo_registered_name(mid, "yk_list_keyvals",        &c->list_keyvals_id,        &flag);
         margo_registered_name(mid, "yk_list_keyvals_direct", &c->list_keyvals_direct_id, &flag);
+        margo_registered_name(mid, "yk_iter_keys",           &c->iter_keys_id,           &flag);
+        margo_registered_name(mid, "yk_iter_keys_direct",    &c->iter_keys_direct_id,    &flag);
+        margo_registered_name(mid, "yk_iter_keyvals",        &c->iter_keyvals_id,        &flag);
+        margo_registered_name(mid, "yk_iter_keyvals_direct", &c->iter_keyvals_direct_id, &flag);
 
         margo_registered_name(mid, "yk_coll_create",      &c->coll_create_id,      &flag);
         margo_registered_name(mid, "yk_coll_drop",        &c->coll_drop_id,        &flag);
@@ -45,6 +51,8 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_coll_size",        &c->coll_size_id,        &flag);
         margo_registered_name(mid, "yk_doc_load",         &c->doc_load_id,         &flag);
         margo_registered_name(mid, "yk_doc_load_direct",  &c->doc_load_direct_id,  &flag);
+        margo_registered_name(mid, "yk_doc_fetch",        &c->doc_fetch_id,        &flag);
+        margo_registered_name(mid, "yk_doc_fetch_direct", &c->doc_fetch_direct_id, &flag);
         margo_registered_name(mid, "yk_doc_erase",        &c->doc_erase_id,        &flag);
         margo_registered_name(mid, "yk_doc_store",        &c->doc_store_id,        &flag);
         margo_registered_name(mid, "yk_doc_store_direct", &c->doc_store_direct_id, &flag);
@@ -53,6 +61,8 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_doc_length",       &c->doc_length_id,       &flag);
         margo_registered_name(mid, "yk_doc_list",         &c->doc_list_id,         &flag);
         margo_registered_name(mid, "yk_doc_list_direct",  &c->doc_list_direct_id,  &flag);
+        margo_registered_name(mid, "yk_doc_iter",         &c->doc_iter_id,         &flag);
+        margo_registered_name(mid, "yk_doc_iter_direct",  &c->doc_iter_direct_id,  &flag);
 
     } else {
 
@@ -86,6 +96,12 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->get_direct_id =
             MARGO_REGISTER(mid, "yk_get_direct",
                            get_direct_in_t, get_direct_out_t, NULL);
+        c->fetch_id =
+            MARGO_REGISTER(mid, "yk_fetch",
+                           fetch_in_t, fetch_out_t, NULL);
+        c->fetch_direct_id =
+            MARGO_REGISTER(mid, "yk_fetch_direct",
+                           fetch_direct_in_t, fetch_direct_out_t, NULL);
         c->erase_id =
             MARGO_REGISTER(mid, "yk_erase",
                            erase_in_t, erase_out_t, NULL);
@@ -104,6 +120,18 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->list_keyvals_direct_id =
             MARGO_REGISTER(mid, "yk_list_keyvals_direct",
                            list_keyvals_direct_in_t, list_keyvals_direct_out_t, NULL);
+//        c->iter_keys_id =
+//            MARGO_REGISTER(mid, "yk_iter_keys",
+//                           iter_keys_in_t, iter_keys_out_t, NULL);
+//        c->iter_keys_direct_id =
+//            MARGO_REGISTER(mid, "yk_iter_keys_direct",
+//                           iter_keys_direct_in_t, iter_keys_direct_out_t, NULL);
+//        c->iter_keyvals_id =
+//            MARGO_REGISTER(mid, "yk_iter_keyvals",
+//                           iter_keyvals_in_t, iter_keyvals_out_t, NULL);
+//        c->iter_keyvals_direct_id =
+//            MARGO_REGISTER(mid, "yk_iter_keyvals_direct",
+//                           iter_keyvals_direct_in_t, iter_keyvals_direct_out_t, NULL);
 
         c->coll_create_id =
             MARGO_REGISTER(mid, "yk_coll_create",
@@ -129,6 +157,12 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_load_direct_id =
             MARGO_REGISTER(mid, "yk_doc_load_direct",
                            doc_load_direct_in_t, doc_load_direct_out_t, NULL);
+//        c->doc_fetch_id =
+//            MARGO_REGISTER(mid, "yk_doc_fetch",
+//                           doc_fetch_in_t, doc_fetch_out_t, NULL);
+//        c->doc_fetch_direct_id =
+//            MARGO_REGISTER(mid, "yk_doc_fetch_direct",
+//                           doc_fetch_direct_in_t, doc_fetch_direct_out_t, NULL);
         c->doc_store_id =
             MARGO_REGISTER(mid, "yk_doc_store",
                            doc_store_in_t, doc_store_out_t, NULL);
@@ -150,6 +184,12 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_list_direct_id =
             MARGO_REGISTER(mid, "yk_doc_list_direct",
                            doc_list_direct_in_t, doc_list_direct_out_t, NULL);
+//        c->doc_iter_id =
+//            MARGO_REGISTER(mid, "yk_doc_iter",
+//                           doc_iter_in_t, doc_iter_out_t, NULL);
+//        c->doc_iter_direct_id =
+//            MARGO_REGISTER(mid, "yk_doc_iter_direct",
+//                           doc_iter_direct_in_t, doc_iter_direct_out_t, NULL);
     }
 
     *client = c;
