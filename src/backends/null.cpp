@@ -131,6 +131,22 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        (void)mode;
+        size_t key_offset = 0;
+        auto val_umem = UserMem{nullptr, 0};
+        for(unsigned i=0 ; i < ksizes.size; i++) {
+            auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+            key_offset += ksizes[i];
+        }
+        return Status::OK;
+    }
+
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
