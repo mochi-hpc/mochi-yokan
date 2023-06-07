@@ -14,22 +14,10 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-struct fetch_direct_context {
-    size_t                 count;
-    const void*            keys;
-    const size_t*          ksizes;
-    yk_keyvalue_callback_t cb;
-    void*                  uargs;
-};
-
-struct fetch_bulk_context {
-    size_t                 count;
-    const char*            origin;
-    hg_bulk_t              data;
-    size_t                 offset;
-    size_t                 size;
-    yk_keyvalue_callback_t cb;
-    void*                  uargs;
+struct fetch_context {
+    std::vector<std::pair<const void*, size_t>> keys;
+    yk_keyvalue_callback_t                      cb;
+    void*                                       uargs;
 };
 
 static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
@@ -59,12 +47,16 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
     fetch_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    fetch_direct_context context;
-    context.count  = count;
-    context.keys   = keys;
-    context.ksizes = ksizes;
+    fetch_context context;
     context.cb     = cb;
     context.uargs  = uargs;
+    size_t key_offset = 0;
+    for(unsigned i = 0; i < count; ++i) {
+        const void* key = ((const char*)keys)+key_offset;
+        size_t ksize    = ksizes[i];
+        context.keys.emplace_back(key, ksize);
+        key_offset += ksize;
+    }
 
     in.db_id        = dbh->database_id;
     in.mode         = mode;
@@ -124,14 +116,74 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
     fetch_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    fetch_bulk_context context;
-    context.count  = count;
-    context.origin = origin;
-    context.data   = data;
-    context.offset = offset;
-    context.size   = size;
+    fetch_context context;
     context.cb     = cb;
     context.uargs  = uargs;
+
+    std::vector<size_t> ksizes;
+    std::vector<char>   keys;
+
+    if(origin) {
+        // data bulk exposing keys is remote, we need to pull it here
+        // lookup the address
+        hg_addr_t origin_addr = HG_ADDR_NULL;
+        hret = margo_addr_lookup(mid, origin, &origin_addr);
+        CHECK_HRET(hret, margo_addr_lookup);
+        DEFER(margo_addr_free(mid, origin_addr));
+        // create and expose local buffers
+        ksizes.resize(count);
+        keys.resize(size - count*sizeof(size_t));
+        std::array<void*,2> buffer_ptrs = { ksizes.data(), keys.data() };
+        std::array<hg_size_t, 2> buffer_sizes = { ksizes.size()*sizeof(size_t), keys.size() };
+        hg_bulk_t buffer_bulk = HG_BULK_NULL;
+        hret = margo_bulk_create(mid, 2, buffer_ptrs.data(), buffer_sizes.data(), HG_BULK_WRITE_ONLY, &buffer_bulk);
+        CHECK_HRET(hret, margo_bulk_create);
+        DEFER(margo_bulk_free(buffer_bulk));
+        // transfer data
+        hret = margo_bulk_transfer(
+            mid, HG_BULK_PULL, origin_addr, data, offset, buffer_bulk, 0, size);
+        CHECK_HRET(hret, margo_bulk_transfer);
+        // start looping over keys to fill the context
+        size_t key_offset = 0;
+        for(unsigned i = 0; i < count; ++i) {
+            void*  key   = keys.data() + key_offset;
+            size_t ksize = ksizes[i];
+            context.keys.emplace_back(key, ksize);
+            key_offset += ksize;
+        }
+    } else {
+        // data bulk is local, we can access its memory directly
+        size_t ksize_offset = offset;
+        size_t key_offset   = offset + count*sizeof(size_t);
+
+        for(unsigned i = 0; i < count; ++i) {
+            // note: we try to access memory assuming a maximum of 2 segments,
+            // the second segment does not matter. If there is more than 1 for
+            // the piece of data we try to access, it's an error.
+            void*       seg_ptrs[2] = {nullptr, nullptr};
+            hg_size_t   seg_size[2] = {0, 0};
+            hg_uint32_t seg_count   = 0;
+            // access the size of the current key
+            hret = margo_bulk_access(
+                data, ksize_offset, sizeof(size_t),
+                HG_BULK_READ_ONLY, 1, seg_ptrs, seg_size, &seg_count);
+            CHECK_HRET(hret, margo_bulk_access);
+            if(seg_count != 1)
+                return YOKAN_ERR_NONCONTIG;
+            size_t ksize = *((size_t*)seg_ptrs[0]);
+            // access the current key
+            hret = margo_bulk_access(
+                data, key_offset, ksize,
+                HG_BULK_READ_ONLY, 1, seg_ptrs, seg_size, &seg_count);
+            CHECK_HRET(hret, margo_bulk_access);
+            if(seg_count != 1)
+                return YOKAN_ERR_NONCONTIG;
+            void* key = seg_ptrs[0];
+            context.keys.emplace_back(key, ksize);
+            ksize_offset += sizeof(size_t);
+            key_offset   += ksize;
+        }
+    }
 
     in.db_id  = dbh->database_id;
     in.mode   = mode;
@@ -281,19 +333,20 @@ void yk_fetch_back_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    fetch_bulk_context* context = reinterpret_cast<fetch_bulk_context*>(in.op_ref);
+    fetch_context* context = reinterpret_cast<fetch_context*>(in.op_ref);
 
-    if(context->count != in.count) {
+    if(context->keys.size() != in.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
 
     // create bulk for the values
-    std::vector<char> values(in.size);
-    void* values_ptr       = (void*)values.data();
-    hg_size_t values_sizes = values.size();
+    std::vector<size_t>     vsizes(in.count);
+    std::vector<char>       values(in.size - in.count*sizeof(size_t));
+    std::array<void*,2>     values_ptrs = { vsizes.data(), values.data() };
+    std::array<hg_size_t,2> values_sizes = { vsizes.size()*sizeof(size_t), values.size() };
     hg_bulk_t values_bulk  = HG_BULK_NULL;
-    hret = margo_bulk_create(mid, 1, &values_ptr, &values_sizes, HG_BULK_WRITE_ONLY, &values_bulk);
+    hret = margo_bulk_create(mid, 2, values_ptrs.data(), values_sizes.data(), HG_BULK_WRITE_ONLY, &values_bulk);
     CHECK_HRET_OUT(hret, margo_bulk_create);
     DEFER(margo_bulk_free(values_bulk));
 
@@ -301,86 +354,16 @@ void yk_fetch_back_ult(hg_handle_t h)
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, info->addr, in.bulk, 0, values_bulk, 0, in.size);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    size_t* vsizes   = reinterpret_cast<size_t*>(values.data());
-
-    if(context->origin) {
-        // context->data is remote, we need to pull it here
-        // lookup the address
-        hg_addr_t origin_addr = HG_ADDR_NULL;
-        hret = margo_addr_lookup(mid, context->origin, &origin_addr);
-        CHECK_HRET_OUT(hret, margo_addr_lookup);
-        DEFER(margo_addr_free(mid, origin_addr));
-        // create and expose local buffer
-        std::vector<size_t> buffer(1 + context->size/sizeof(size_t));
-        void* buffer_ptr      = (void*)buffer.data();
-        hg_size_t buffer_size = buffer.size()*sizeof(size_t);
-        hg_bulk_t buffer_bulk = HG_BULK_NULL;
-        hret = margo_bulk_create(mid, 1, &buffer_ptr, &buffer_size, HG_BULK_WRITE_ONLY, &buffer_bulk);
-        CHECK_HRET_OUT(hret, margo_bulk_create);
-        DEFER(margo_bulk_free(buffer_bulk));
-        // transfer data
-        hret = margo_bulk_transfer(
-            mid, HG_BULK_PULL, origin_addr, context->data, context->offset, buffer_bulk, 0, context->size);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
-        // initialize variables pointing to the right portions of the buffer
-        size_t* ksizes = buffer.data();
-        char*   keys   = ((char*)buffer.data()) + context->count;
-        // start looping over keys and values
-        size_t key_offset = 0;
-        size_t val_offset = 0;
-        for(unsigned i = 0; i < in.count; ++i) {
-            void*  key   = keys + key_offset;
-            size_t ksize = ksizes[i];
-            void*  val   = values.data() + val_offset;
-            size_t vsize = vsizes[i];
-            out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
-            if(out.ret != YOKAN_SUCCESS)
-                break;
-            key_offset   += ksize;
-            val_offset   += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
-        }
-    } else {
-        // context->data is loca, we can access its memory directly
-        size_t ksize_offset = context->offset;
-        size_t key_offset   = context->offset + in.count*sizeof(size_t);
-        size_t val_offset   = in.count*sizeof(size_t);
-
-        for(unsigned i = 0; i < in.count; ++i) {
-            // note: we try to access memory assuming a maximum of 2 segments,
-            // the second segment does not matter. If there is more than 1 for
-            // the piece of data we try to access, it's an error.
-            void*       seg_ptrs[2] = {nullptr, nullptr};
-            hg_size_t   seg_size[2] = {0, 0};
-            hg_uint32_t seg_count   = 0;
-            void*       val         = values.data() + val_offset;
-            size_t      vsize       = vsizes[i];
-            // access the size of the current key
-            hret = margo_bulk_access(
-                context->data, ksize_offset, sizeof(size_t),
-                HG_BULK_READ_ONLY, 1, seg_ptrs, seg_size, &seg_count);
-            CHECK_HRET_OUT(hret, margo_bulk_access);
-            if(seg_count != 1) {
-                out.ret = YOKAN_ERR_NONCONTIG;
-                break;
-            }
-            size_t ksize = *((size_t*)seg_ptrs[0]);
-            // access the current key
-            hret = margo_bulk_access(
-                context->data, key_offset, ksize,
-                HG_BULK_READ_ONLY, 1, seg_ptrs, seg_size, &seg_count);
-            CHECK_HRET_OUT(hret, margo_bulk_access);
-            if(seg_count != 1) {
-                out.ret = YOKAN_ERR_NONCONTIG;
-                break;
-            }
-            void* key = seg_ptrs[0];
-            out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
-            if(out.ret != YOKAN_SUCCESS)
-                break;
-            ksize_offset += sizeof(size_t);
-            key_offset   += ksize;
-            val_offset   += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
-        }
+    size_t val_offset = 0;
+    for(unsigned i = 0; i < in.count; ++i) {
+        const void* key = context->keys[i].first;
+        size_t ksize    = context->keys[i].second;
+        void*  val      = values.data() + val_offset;
+        size_t vsize    = vsizes[i];
+        out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
+        if(out.ret != YOKAN_SUCCESS)
+            break;
+        val_offset += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_back_ult)
@@ -406,22 +389,20 @@ void yk_fetch_direct_back_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    fetch_direct_context* context = reinterpret_cast<fetch_direct_context*>(in.op_ref);
+    fetch_context* context = reinterpret_cast<fetch_context*>(in.op_ref);
 
-    if(context->count != in.vsizes.count) {
+    if(context->keys.size() != in.vsizes.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
 
-    size_t key_offset = 0;
     size_t val_offset = 0;
-    for(unsigned i = 0; i < context->count; ++i) {
-        auto ksize = context->ksizes[i];
-        auto key   = ((const char*)context->keys) + key_offset;
+    for(unsigned i = 0; i < in.vsizes.count; ++i) {
+        auto key   = context->keys[i].first;
+        auto ksize = context->keys[i].second;
         auto vsize = in.vsizes.sizes[i];
         auto val   = ((const char*)in.vals.data) + val_offset;
         out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
-        key_offset += ksize;
         val_offset += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
         if(out.ret != YOKAN_SUCCESS)
             break;

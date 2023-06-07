@@ -591,7 +591,7 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
     size_t garbage_size = 42;
     std::string garbage('x', garbage_size);
 
-    std::array<void*, 5> seg_ptrs = {
+    std::array<void*, 3> seg_ptrs = {
         const_cast<char*>(garbage.data()),
         static_cast<void*>(ksizes.data()),
         const_cast<char*>(pkeys.data())
@@ -605,8 +605,8 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
             seg_sizes.begin()+1, seg_sizes.end(), 0);
 
     hret = margo_bulk_create(context->mid,
-            4, seg_ptrs.data(), seg_sizes.data(),
-            HG_BULK_READWRITE, &bulk);
+            3, seg_ptrs.data(), seg_sizes.data(),
+            HG_BULK_READ_ONLY, &bulk);
     munit_assert_int(hret, ==, HG_SUCCESS);
 
     char addr_str[256];
@@ -620,7 +620,7 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     ret = yk_fetch_bulk(dbh, context->mode, count, nullptr, bulk,
-                      garbage_size, useful_size, dummy, nullptr, nullptr);
+                        garbage_size, useful_size, dummy, nullptr, nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -631,7 +631,7 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
 
     /* third invalid size of 0 */
     ret = yk_fetch_bulk(dbh, context->mode, count, nullptr, bulk,
-                      garbage_size, 0, dummy, nullptr, nullptr);
+                        garbage_size, 0, dummy, nullptr, nullptr);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
