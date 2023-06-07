@@ -10,6 +10,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include <numeric>
+#include <iostream>
 
 void yk_fetch_ult(hg_handle_t h)
 {
@@ -97,12 +98,59 @@ void yk_fetch_ult(hg_handle_t h)
     // create UserMem wrapper for keys
     auto keys = yokan::UserMem{ ptr + keys_offset, total_ksize };
 
-    auto fetcher = [](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
-        // TODO
+    fetch_back_in_t back_in;
+    fetch_back_out_t back_out;
+
+    std::vector<char>   values;
+    std::vector<size_t> vsizes;
+    vsizes.reserve(in.count);
+
+    back_in.op_ref = in.op_ref;
+    back_in.start  = 0;
+
+    auto fetcher = [&values, &vsizes](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
+        (void)key;
+        vsizes.push_back(val.size);
+        if(val.size != YOKAN_KEY_NOT_FOUND) {
+            size_t current_size = values.size();
+            values.resize(current_size + val.size);
+            std::memcpy(values.data() + current_size, val.data, val.size);
+        }
         return yokan::Status::OK;
     };
+
     out.ret = static_cast<yk_return_t>(
             database->fetch(in.mode, keys, ksizes, fetcher));
+
+    if(out.ret != YOKAN_SUCCESS)
+        return;
+
+    std::array<void*, 2>     values_ptr   = {(void*)vsizes.data(), (void*)values.data()};
+    std::array<hg_size_t, 2> values_sizes = {in.count*sizeof(size_t), values.size()};
+    hg_bulk_t values_bulk  = HG_BULK_NULL;
+    hret = margo_bulk_create(mid, 2, values_ptr.data(), values_sizes.data(), HG_BULK_READ_ONLY, &values_bulk);
+    CHECK_HRET_OUT(hret, margo_bulk_create);
+    DEFER(margo_bulk_free(values_bulk));
+
+    back_in.count = in.count;
+    back_in.size  = std::accumulate(values_sizes.begin(), values_sizes.end(), (size_t)0);
+    back_in.bulk  = values_bulk;
+
+    // send a fetch_back RPC to the client
+
+    hg_handle_t back_handle = HG_HANDLE_NULL;
+    hret = margo_create(mid, info->addr, provider->fetch_back_id, &back_handle);
+    CHECK_HRET_OUT(hret, margo_create);
+    DEFER(margo_destroy(back_handle));
+
+    hret = margo_forward(back_handle, &back_in);
+    CHECK_HRET_OUT(hret, margo_forward);
+
+    hret = margo_get_output(back_handle, &back_out);
+    CHECK_HRET_OUT(hret, margo_get_output);
+    DEFER(margo_free_output(back_handle, &back_out));
+
+    out.ret = back_out.ret;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_ult)
 
@@ -152,11 +200,52 @@ void yk_fetch_direct_ult(hg_handle_t h)
         return;
     }
 
-    auto fetcher = [](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
-        // TODO
+    fetch_direct_back_in_t back_in;
+    fetch_direct_back_out_t back_out;
+
+    std::vector<char>   values;
+    std::vector<size_t> vsizes;
+    vsizes.reserve(count);
+
+    back_in.op_ref = in.op_ref;
+    back_in.start  = 0;
+
+    auto fetcher = [&values, &vsizes](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
+        (void)key;
+        vsizes.push_back(val.size);
+        if(val.size != YOKAN_KEY_NOT_FOUND) {
+            size_t current_size = values.size();
+            values.resize(current_size + val.size);
+            std::memcpy(values.data() + current_size, val.data, val.size);
+        }
         return yokan::Status::OK;
     };
+
     out.ret = static_cast<yk_return_t>(
         database->fetch(in.mode, keys_umem, ksizes_umem, fetcher));
+
+    if(out.ret != YOKAN_SUCCESS)
+        return;
+
+    back_in.vsizes.count = count;
+    back_in.vsizes.sizes = vsizes.data();
+    back_in.vals.size    = values.size();
+    back_in.vals.data    = values.data();
+
+    // send a fetch_direct_back RPC to the client
+
+    hg_handle_t back_handle = HG_HANDLE_NULL;
+    hret = margo_create(mid, info->addr, provider->fetch_direct_back_id, &back_handle);
+    CHECK_HRET_OUT(hret, margo_create);
+    DEFER(margo_destroy(back_handle));
+
+    hret = margo_forward(back_handle, &back_in);
+    CHECK_HRET_OUT(hret, margo_forward);
+
+    hret = margo_get_output(back_handle, &back_out);
+    CHECK_HRET_OUT(hret, margo_get_output);
+    DEFER(margo_free_output(back_handle, &back_out));
+
+    out.ret = back_out.ret;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_direct_ult)

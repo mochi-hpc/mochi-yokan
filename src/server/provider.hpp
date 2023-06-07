@@ -72,6 +72,8 @@ typedef struct yk_provider {
     hg_id_t get_direct_id;
     hg_id_t fetch_id;
     hg_id_t fetch_direct_id;
+    hg_id_t fetch_back_id;
+    hg_id_t fetch_direct_back_id;
     hg_id_t erase_id;
     hg_id_t erase_direct_id;
     hg_id_t list_keys_id;

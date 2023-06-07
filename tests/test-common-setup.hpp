@@ -71,8 +71,8 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     const char* backend_config = find_backend_config_for(backend_type);
     if(min_key_size) g_min_key_size = std::atol(min_key_size);
     if(max_key_size) g_max_key_size = std::atol(max_key_size);
-    if(min_val_size) g_min_val_size = std::atol(min_key_size);
-    if(max_val_size) g_max_val_size = std::atol(max_key_size);
+    if(min_val_size) g_min_val_size = std::atol(min_val_size);
+    if(max_val_size) g_max_val_size = std::atol(max_val_size);
     if(num_keyvals)  g_num_items  = std::atol(num_keyvals);
     if(strcmp(backend_type, "set") == 0
     || strcmp(backend_type, "unordered_set") == 0) {

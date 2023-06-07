@@ -94,7 +94,7 @@ if (ENABLE_LUA)
 endif ()
 
 set (client-src-files
-     client/client.c
+     client/client.cpp
      client/find_by_name.cpp
      client/count.cpp
      client/put.cpp

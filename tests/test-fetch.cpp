@@ -111,6 +111,10 @@ static MunitResult test_fetch_key_not_found(const MunitParameter params[], void*
     auto func = [](void* uargs, size_t i,
                    const void* kdata, size_t ksize,
                    const void* vdata, size_t vsize) {
+        (void)i;
+        (void)kdata;
+        (void)ksize;
+        (void)vdata;
         auto vsize_ptr = (size_t*)uargs;
         *vsize_ptr = vsize;
         return YOKAN_SUCCESS;
@@ -394,6 +398,7 @@ static MunitResult test_fetch_packed(const MunitParameter params[], void* data)
         (void)i;
         auto args = (func_args*)uargs;
         munit_assert_int(i, ==, args->recv_keys.size());
+        munit_assert_size(vsize, <=, YOKAN_LAST_VALID_SIZE);
         args->recv_keys.emplace_back((const char*)kdata, ksize);
         args->recv_values.emplace_back((const char*)vdata, vsize);
         return YOKAN_SUCCESS;
@@ -522,10 +527,11 @@ static MunitResult test_fetch_packed_key_not_found(const MunitParameter params[]
         munit_assert_int(i, ==, args->recv_keys.size());
         args->recv_keys.emplace_back((const char*)kdata, ksize);
         args->recv_valsizes.push_back(vsize);
-        if(vsize <= YOKAN_LAST_VALID_SIZE)
+        if(vsize <= YOKAN_LAST_VALID_SIZE) {
             args->recv_vals.emplace_back((const char*)vdata, vsize);
-        else
+        } else {
             args->recv_vals.emplace_back();
+        }
         return YOKAN_SUCCESS;
     };
 

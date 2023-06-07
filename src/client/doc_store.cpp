@@ -7,7 +7,7 @@
 #include <array>
 #include <cstring>
 #include <numeric>
-#include "client.h"
+#include "client.hpp"
 #include "../common/defer.hpp"
 #include "../common/types.h"
 #include "../common/logging.h"

@@ -284,6 +284,16 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->fetch_direct_id = id;
 
+    margo_registered_name(mid, "yk_fetch_back", &id, &flag);
+    if(flag) p->fetch_back_id = id;
+    else p->fetch_back_id = MARGO_REGISTER(
+        mid, "yk_fetch_back", fetch_back_in_t, fetch_back_out_t, NULL);
+
+    margo_registered_name(mid, "yk_fetch_direct_back", &id, &flag);
+    if(flag) p->fetch_direct_back_id = id;
+    else p->fetch_direct_back_id = MARGO_REGISTER(
+        mid, "yk_fetch_direct_back", fetch_direct_back_in_t, fetch_direct_back_out_t, NULL);
+
     id = MARGO_REGISTER_PROVIDER(mid, "yk_length",
             length_in_t, length_out_t,
             yk_length_ult, provider_id, p->pool);

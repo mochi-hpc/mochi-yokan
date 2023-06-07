@@ -10,7 +10,7 @@
 #include "yokan/client.h"
 #include "yokan/admin.h"
 #include "yokan/provider-handle.h"
-#include "../client/client.h"
+#include "../client/client.hpp"
 
 static int yk_register_provider(
         bedrock_args_t args,
