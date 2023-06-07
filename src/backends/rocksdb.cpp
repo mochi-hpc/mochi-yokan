@@ -578,6 +578,37 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+
+        size_t key_offset = 0;
+
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
+            rocksdb::PinnableSlice value;
+            auto status = m_db->Get(m_read_options, m_db->DefaultColumnFamily(), key, &value);
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = UserMem{(char*)value.data(), value.size()};
+            if(status.IsNotFound()) {
+                val_umem.size = KeyNotFound;
+            } else if(!status.ok()) {
+                return convertStatus(status);
+            }
+            auto func_status = func(key_umem, val_umem);
+            if(func_status != Status::OK)
+                return func_status;
+            key_offset += ksizes[i];
+        }
+
+        if(mode & YOKAN_MODE_CONSUME) {
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         ScopedReadLock mlock(m_migration_lock);
