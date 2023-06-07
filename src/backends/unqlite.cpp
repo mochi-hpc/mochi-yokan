@@ -447,6 +447,57 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+
+        size_t key_offset = 0;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        Status status = Status::OK;
+
+        struct CallbackArgs {
+            UserMem              key;
+            std::string          val;
+        };
+
+        auto Callback = [](const void *pData,unsigned int iDataLen,void *pUserData) -> int {
+            auto args = static_cast<CallbackArgs*>(pUserData);
+            args->val += std::string{(const char*)pData, iDataLen};
+            return UNQLITE_OK;
+        };
+
+
+        for(size_t i = 0; i < ksizes.size; i++) {
+
+            auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+
+            CallbackArgs args{ key_umem, std::string{} };
+
+            int ret = unqlite_kv_fetch_callback(
+                    m_db, key_umem.data, key_umem.size, Callback,
+                    static_cast<void*>(&args));
+
+            if(ret == UNQLITE_OK) {
+                status = func(key_umem, UserMem{args.val.data(), args.val.size()});
+            } else if(ret == UNQLITE_NOTFOUND) {
+                status = func(key_umem, UserMem{nullptr, KeyNotFound});
+            } else {
+                return convertStatus(ret);
+            }
+            if(status != Status::OK)
+                return status;
+
+            key_offset += ksizes[i];
+        }
+
+        if(mode & YOKAN_MODE_CONSUME)
+            return erase(mode, keys, ksizes);
+
+        return Status::OK;
+    }
+
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
