@@ -242,7 +242,9 @@ MERCURY_GEN_PROC(fetch_in_t,
         ((uint64_t)(size))\
         ((hg_string_t)(origin))\
         ((hg_bulk_t)(bulk))\
-        ((uint64_t)(op_ref)))
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(keys_batch_size))\
+        ((uint64_t)(vals_batch_size)))
 MERCURY_GEN_PROC(fetch_out_t,
         ((int32_t)(ret)))
 
@@ -252,7 +254,9 @@ MERCURY_GEN_PROC(fetch_direct_in_t,
         ((int32_t)(mode))\
         ((uint64_list)(ksizes))\
         ((raw_data)(keys))\
-        ((uint64_t)(op_ref)))
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(keys_batch_size))\
+        ((uint64_t)(vals_batch_size)))
 MERCURY_GEN_PROC(fetch_direct_out_t,
         ((int32_t)(ret)))
 

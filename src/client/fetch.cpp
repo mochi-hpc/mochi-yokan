@@ -18,6 +18,7 @@ struct fetch_context {
     std::vector<std::pair<const void*, size_t>> keys;
     yk_keyvalue_callback_t                      cb;
     void*                                       uargs;
+    const yk_fetch_options_t*                   options;
 };
 
 static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
@@ -48,8 +49,9 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     fetch_context context;
-    context.cb     = cb;
-    context.uargs  = uargs;
+    context.cb      = cb;
+    context.uargs   = uargs;
+    context.options = options;
     size_t key_offset = 0;
     for(unsigned i = 0; i < count; ++i) {
         const void* key = ((const char*)keys)+key_offset;
@@ -65,6 +67,8 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
     in.keys.data    = (char*)keys;
     in.keys.size    = std::accumulate(ksizes, ksizes+count, (size_t)0);
     in.op_ref       = reinterpret_cast<uint64_t>(&context);
+    in.keys_batch_size = options ? options->keys_batch_size : 0;
+    in.vals_batch_size = options ? options->vals_batch_size : 0;
 
     hret = margo_create(mid, dbh->addr, dbh->client->fetch_direct_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -119,6 +123,7 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
     fetch_context context;
     context.cb     = cb;
     context.uargs  = uargs;
+    context.options = options;
 
     std::vector<size_t> ksizes;
     std::vector<char>   keys;
@@ -193,6 +198,8 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
     in.size   = size;
     in.origin = const_cast<char*>(origin);
     in.op_ref = reinterpret_cast<uint64_t>(&context);
+    in.keys_batch_size = options ? options->keys_batch_size : 0;
+    in.vals_batch_size = options ? options->vals_batch_size : 0;
 
     hret = margo_create(mid, dbh->addr, dbh->client->fetch_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -312,6 +319,7 @@ extern "C" yk_return_t yk_fetch_packed(yk_database_handle_t dbh,
 
 void yk_fetch_back_ult(hg_handle_t h)
 {
+
     hg_return_t hret = HG_SUCCESS;
     fetch_back_in_t in;
     fetch_back_out_t out;
@@ -354,16 +362,59 @@ void yk_fetch_back_ult(hg_handle_t h)
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, info->addr, in.bulk, 0, values_bulk, 0, in.size);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
+    const auto opt = context->options;
+    ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
+                    opt->pool : ABT_POOL_NULL;
+
+    struct ult_args {
+        yk_keyvalue_callback_t cb;
+        void*                  uargs;
+        unsigned               index;
+        const void*            key;
+        size_t                 ksize;
+        const void*            val;
+        size_t                 vsize;
+        yk_return_t            ret;
+    };
+
+    std::vector<ABT_thread> ults;
+    std::vector<ult_args>   args(in.count);
+
+    if(pool != ABT_POOL_NULL)
+        ults.resize(in.count);
+
+    auto ult = [](void* a) -> void {
+        auto arg = (ult_args*)a;
+        arg->ret = (arg->cb)(
+            arg->uargs, arg->index,
+            arg->key, arg->ksize,
+            arg->val, arg->vsize);
+    };
+
     size_t val_offset = 0;
     for(unsigned i = 0; i < in.count; ++i) {
-        const void* key = context->keys[i].first;
-        size_t ksize    = context->keys[i].second;
-        void*  val      = values.data() + val_offset;
-        size_t vsize    = vsizes[i];
-        out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
-        if(out.ret != YOKAN_SUCCESS)
-            break;
-        val_offset += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
+        args[i].cb    = context->cb;
+        args[i].uargs = context->uargs;
+        args[i].index = in.start + i;
+        args[i].key   = context->keys[i].first;
+        args[i].ksize = context->keys[i].second;
+        args[i].val   = values.data() + val_offset;
+        args[i].vsize = vsizes[i];
+        if(pool == ABT_POOL_NULL) {
+            ult(&args[i]);
+            if(args[i].ret != YOKAN_SUCCESS) {
+                out.ret = args[i].ret;
+                break;
+            }
+        } else {
+            ABT_thread_create(pool, ult, &args[i], ABT_THREAD_ATTR_NULL, &ults[i]);
+        }
+        val_offset += args[i].vsize <= YOKAN_LAST_VALID_SIZE ? args[i].vsize : 0;
+    }
+
+    if(pool != ABT_POOL_NULL) {
+        ABT_thread_join_many(ults.size(), ults.data());
+        ABT_thread_free_many(ults.size(), ults.data());
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_back_ult)
@@ -396,16 +447,59 @@ void yk_fetch_direct_back_ult(hg_handle_t h)
         return;
     }
 
+    const auto opt = context->options;
+    ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
+                    opt->pool : ABT_POOL_NULL;
+
+    struct ult_args {
+        yk_keyvalue_callback_t cb;
+        void*                  uargs;
+        unsigned               index;
+        const void*            key;
+        size_t                 ksize;
+        const void*            val;
+        size_t                 vsize;
+        yk_return_t            ret;
+    };
+
+    std::vector<ABT_thread> ults;
+    std::vector<ult_args>   args(in.vsizes.count);
+
+    if(pool != ABT_POOL_NULL)
+        ults.resize(in.vsizes.count);
+
+    auto ult = [](void* a) -> void {
+        auto arg = (ult_args*)a;
+        arg->ret = (arg->cb)(
+            arg->uargs, arg->index,
+            arg->key, arg->ksize,
+            arg->val, arg->vsize);
+    };
+
     size_t val_offset = 0;
     for(unsigned i = 0; i < in.vsizes.count; ++i) {
-        auto key   = context->keys[i].first;
-        auto ksize = context->keys[i].second;
-        auto vsize = in.vsizes.sizes[i];
-        auto val   = ((const char*)in.vals.data) + val_offset;
-        out.ret = (context->cb)(context->uargs, in.start + i, key, ksize, val, vsize);
-        val_offset += vsize <= YOKAN_LAST_VALID_SIZE ? vsize : 0;
-        if(out.ret != YOKAN_SUCCESS)
-            break;
+        args[i].cb    = context->cb;
+        args[i].uargs = context->uargs;
+        args[i].index = in.start + i;
+        args[i].key   = context->keys[i].first;
+        args[i].ksize = context->keys[i].second;
+        args[i].val   = ((const char*)in.vals.data) + val_offset;
+        args[i].vsize = in.vsizes.sizes[i];
+        if(pool == ABT_POOL_NULL) {
+            ult(&args[i]);
+            if(args[i].ret != YOKAN_SUCCESS) {
+                out.ret = args[i].ret;
+                break;
+            }
+        } else {
+            ABT_thread_create(pool, ult, &args[i], ABT_THREAD_ATTR_NULL, &ults[i]);
+        }
+        val_offset += args[i].vsize <= YOKAN_LAST_VALID_SIZE ? args[i].vsize : 0;
+    }
+
+    if(pool != ABT_POOL_NULL) {
+        ABT_thread_join_many(ults.size(), ults.data());
+        ABT_thread_free_many(ults.size(), ults.data());
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_direct_back_ult)
