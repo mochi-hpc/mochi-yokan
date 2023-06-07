@@ -365,10 +365,10 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return convertStatus(ret);
     }
 
-    virtual Status get(int32_t mode, bool packed, const UserMem& keys,
-                       const BasicUserMem<size_t>& ksizes,
-                       UserMem& vals,
-                       BasicUserMem<size_t>& vsizes) override {
+    Status get(int32_t mode, bool packed, const UserMem& keys,
+               const BasicUserMem<size_t>& ksizes,
+               UserMem& vals,
+               BasicUserMem<size_t>& vsizes) override {
         ScopedReadLock mlock(m_migration_lock);
         if(m_migrated) return Status::Migrated;
         (void)mode;
@@ -437,6 +437,44 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             mdb_txn_abort(txn);
             vals.size = vals.size - val_remaining_size;
         }
+        if(mode & YOKAN_MODE_CONSUME) {
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+
+        size_t key_offset = 0;
+
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            MDB_val key{ ksizes[i], keys.data + key_offset };
+            MDB_val val{ 0, nullptr };
+            ret = mdb_get(txn, m_db, &key, &val);
+            auto key_umem = UserMem{(char*)key.mv_data, key.mv_size};
+            auto val_umem = UserMem{(char*)val.mv_data, val.mv_size};
+            if(ret == MDB_NOTFOUND) {
+                val_umem.size = KeyNotFound;
+            } else if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK) {
+                mdb_txn_abort(txn);
+                return status;
+            }
+            key_offset += ksizes[i];
+        }
+        mdb_txn_abort(txn);
+
         if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }

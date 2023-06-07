@@ -401,7 +401,6 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
 
         if(mode & YOKAN_MODE_CONSUME) {
-            mlock.unlock();
             return erase(mode, keys, ksizes);
         }
         return Status::OK;
