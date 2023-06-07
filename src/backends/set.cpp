@@ -364,7 +364,6 @@ class SetDatabase : public DatabaseInterface {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         (void)packed;
         size_t key_offset = 0;
@@ -394,6 +393,46 @@ class SetDatabase : public DatabaseInterface {
             key_offset += ksizes[i];
         }
         vals.size = 0;
+        if(mode & YOKAN_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        size_t key_offset = 0;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto mode_wait = mode & YOKAN_MODE_WAIT;
+
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const UserMem key{ keys.data + key_offset, ksizes[i] };
+            UserMem val{ nullptr, 0 };
+            retry:
+            auto it = m_db->find(key);
+            if(it == m_db->end()) {
+                if(mode_wait) {
+                    m_watcher.addKey(key);
+                    lock.unlock();
+                    auto ret = m_watcher.waitKey(key);
+                    lock.lock();
+                    if(ret == KeyWatcher::KeyPresent)
+                        goto retry;
+                    else
+                        return Status::TimedOut;
+                } else {
+                    val.size = KeyNotFound;
+                }
+            }
+            auto status = func(key, val);
+            if(status != Status::OK)
+                return status;
+            key_offset += ksizes[i];
+        }
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
