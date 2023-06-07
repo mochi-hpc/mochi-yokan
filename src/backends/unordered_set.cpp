@@ -307,7 +307,6 @@ class UnorderedSetDatabase : public DatabaseInterface {
                        BasicUserMem<size_t>& vsizes) override {
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
         (void)packed;
-        (void)mode;
         size_t key_offset = 0;
         ScopedReadLock lock(m_lock);
         if(m_migrated) return Status::Migrated;
@@ -324,6 +323,35 @@ class UnorderedSetDatabase : public DatabaseInterface {
             key_offset += ksizes[i];
         }
         vals.size = 0;
+        if(mode & YOKAN_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        size_t key_offset = 0;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto key = key_type(m_key_allocator);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            key.assign(keys.data + key_offset, ksizes[i]);
+            auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+            auto val_umem = UserMem{nullptr, 0};
+            auto it = m_db->find(key);
+            if(it == m_db->end()) {
+                val_umem.size = KeyNotFound;
+            }
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+            key_offset += ksizes[i];
+        }
+
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
