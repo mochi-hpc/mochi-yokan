@@ -605,9 +605,8 @@ yk_return_t yk_fetch(yk_database_handle_t dbh,
  * @brief Options for the yk_fetch_* functions.
  */
 typedef struct yk_fetch_options {
-    ABT_pool pool;            /* pool in which to run the callback */
-    unsigned keys_batch_size; /* keys are sent in batches of this size */
-    unsigned vals_batch_size; /* values are received back by batches of this size */
+    ABT_pool pool;       /* pool in which to run the callback */
+    unsigned batch_size; /* value are sent back in batches of this size */
 } yk_fetch_options_t;
 
 /**

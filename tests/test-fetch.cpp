@@ -61,12 +61,11 @@ static void* test_fetch_context_setup(const MunitParameter params[], void* user_
  */
 static MunitResult test_fetch(const MunitParameter params[], void* data)
 {
-    (void)params;
     (void)data;
+    (void)params;
     struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
-
 
     for(auto& p : context->reference) {
         auto key = p.first.data();
@@ -167,6 +166,16 @@ static MunitResult test_fetch_multi(const MunitParameter params[], void* data)
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
+
     auto count = context->reference.size();
 
     struct func_args {
@@ -203,7 +212,7 @@ static MunitResult test_fetch_multi(const MunitParameter params[], void* data)
     func_args args;
     ret = yk_fetch_multi(dbh, context->mode, count,
                          kptrs.data(), ksizes.data(),
-                         func, &args, nullptr);
+                         func, &args, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -236,6 +245,16 @@ static MunitResult test_fetch_multi_empty_key(const MunitParameter params[], voi
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
+
     auto count = context->reference.size();
     std::vector<std::vector<char>> values(count);
     for(auto& v : values) v.resize(g_max_val_size);
@@ -260,24 +279,24 @@ static MunitResult test_fetch_multi_empty_key(const MunitParameter params[], voi
 
     ret = yk_fetch_multi(dbh, context->mode, count,
                          kptrs.data(), ksizes.data(),
-                         dummy, nullptr, nullptr);
+                         dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     // other invalid args tests
     ret = yk_fetch_multi(dbh, context->mode, count,
                          nullptr, ksizes.data(),
-                         dummy, nullptr, nullptr);
+                         dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_fetch_multi(dbh, context->mode, count,
                          kptrs.data(), nullptr,
-                         dummy, nullptr, nullptr);
+                         dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_fetch_multi(dbh, context->mode, count,
                          kptrs.data(), ksizes.data(),
-                         nullptr, nullptr, nullptr);
+                         nullptr, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -296,6 +315,16 @@ static MunitResult test_fetch_multi_key_not_found(const MunitParameter params[],
     struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
+
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
 
     auto count = context->reference.size();
     std::vector<std::string> keys(count);
@@ -343,7 +372,7 @@ static MunitResult test_fetch_multi_key_not_found(const MunitParameter params[],
 
     ret = yk_fetch_multi(dbh, context->mode, count,
                          kptrs.data(), ksizes.data(),
-                         func, &args, nullptr);
+                         func, &args, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -377,6 +406,16 @@ static MunitResult test_fetch_packed(const MunitParameter params[], void* data)
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
+
     auto count = context->reference.size();
     std::string         packed_keys;
     std::vector<size_t> packed_ksizes(count);
@@ -407,7 +446,7 @@ static MunitResult test_fetch_packed(const MunitParameter params[], void* data)
     func_args args;
     ret = yk_fetch_packed(dbh, context->mode, count,
                           packed_keys.data(), packed_ksizes.data(),
-                          func, &args, nullptr);
+                          func, &args, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -440,6 +479,16 @@ static MunitResult test_fetch_packed_empty_key(const MunitParameter params[], vo
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
 
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
+
     auto count = context->reference.size();
     std::string         packed_keys;
     std::vector<size_t> packed_ksizes(count);
@@ -457,24 +506,24 @@ static MunitResult test_fetch_packed_empty_key(const MunitParameter params[], vo
 
     ret = yk_fetch_packed(dbh, context->mode, count,
                           packed_keys.data(), packed_ksizes.data(),
-                          dummy, nullptr, nullptr);
+                          dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
     // other invalid args tests
     ret = yk_fetch_packed(dbh, context->mode, count,
                           nullptr, packed_ksizes.data(),
-                          dummy, nullptr, nullptr);
+                          dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_fetch_packed(dbh, context->mode, count,
                           packed_keys.data(), nullptr,
-                          dummy, nullptr, nullptr);
+                          dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_fetch_packed(dbh, context->mode, count,
                           packed_keys.data(), packed_ksizes.data(),
-                          nullptr, nullptr, nullptr);
+                          nullptr, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -496,6 +545,16 @@ static MunitResult test_fetch_packed_key_not_found(const MunitParameter params[]
     struct kv_test_context* context = (struct kv_test_context*)data;
     yk_database_handle_t dbh = context->dbh;
     yk_return_t ret;
+
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
 
     auto count = context->reference.size();
     std::string         packed_keys;
@@ -539,7 +598,7 @@ static MunitResult test_fetch_packed_key_not_found(const MunitParameter params[]
 
     ret = yk_fetch_packed(dbh, context->mode, count,
                           packed_keys.data(), packed_ksizes.data(),
-                          func, &args, nullptr);
+                          func, &args, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
@@ -574,6 +633,16 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
     yk_return_t ret;
     hg_return_t hret;
     hg_bulk_t bulk;
+
+    const char* use_pool_str   = munit_parameters_get(params, "use-pool");
+    const char* batch_size_str = munit_parameters_get(params, "batch-size");
+
+    yk_fetch_options_t options;
+    if(strcmp(use_pool_str, "true") == 0)
+        margo_get_progress_pool(context->mid, &options.pool);
+    else
+        options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(batch_size_str);
 
     auto count = context->reference.size();
     std::string         pkeys;
@@ -615,23 +684,23 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
             addr_str, &addr_str_size, context->addr);
 
     ret = yk_fetch_bulk(dbh, context->mode, count, addr_str, bulk,
-                        garbage_size, useful_size, dummy, nullptr, nullptr);
+                        garbage_size, useful_size, dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     ret = yk_fetch_bulk(dbh, context->mode, count, nullptr, bulk,
-                        garbage_size, useful_size, dummy, nullptr, nullptr);
+                        garbage_size, useful_size, dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     ret = yk_fetch_bulk(dbh, context->mode, count, "invalid-address", bulk,
-                        garbage_size, useful_size, dummy, nullptr, nullptr);
+                        garbage_size, useful_size, dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_FROM_MERCURY);
 
     /* third invalid size of 0 */
     ret = yk_fetch_bulk(dbh, context->mode, count, nullptr, bulk,
-                        garbage_size, 0, dummy, nullptr, nullptr);
+                        garbage_size, 0, dummy, nullptr, &options);
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
 
@@ -641,12 +710,28 @@ static MunitResult test_fetch_bulk(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
-static char* no_rdma_params[] = {
+static char* true_false_params[] = {
     (char*)"true", (char*)"false", (char*)NULL };
 
-static MunitParameterEnum test_params[] = {
+static char* batch_size_params[] = {
+    (char*)"0", (char*)"5", (char*)NULL };
+
+static MunitParameterEnum test_multi_params[] = {
   { (char*)"backend", (char**)available_backends },
-  { (char*)"no-rdma", (char**)no_rdma_params },
+  { (char*)"no-rdma", (char**)true_false_params },
+  { (char*)"batch-size", (char**)batch_size_params },
+  { (char*)"use-pool", (char**)true_false_params },
+  { (char*)"min-key-size", NULL },
+  { (char*)"max-key-size", NULL },
+  { (char*)"min-val-size", NULL },
+  { (char*)"max-val-size", NULL },
+  { (char*)"num-items", NULL },
+  { NULL, NULL }
+};
+
+static MunitParameterEnum test_default_params[] = {
+  { (char*)"backend", (char**)available_backends },
+  { (char*)"no-rdma", (char**)true_false_params },
   { (char*)"min-key-size", NULL },
   { (char*)"max-key-size", NULL },
   { (char*)"min-val-size", NULL },
@@ -657,25 +742,25 @@ static MunitParameterEnum test_params[] = {
 
 static MunitTest test_suite_tests[] = {
     { (char*) "/fetch", test_fetch,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_default_params },
     { (char*) "/fetch/empty-keys", test_fetch_empty_keys,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_default_params },
     { (char*) "/fetch/key-not-found", test_fetch_key_not_found,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_default_params },
     { (char*) "/fetch_multi", test_fetch_multi,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_multi/empty-key", test_fetch_multi_empty_key,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_multi/key-not-found", test_fetch_multi_key_not_found,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_packed", test_fetch_packed,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_packed/empty-key", test_fetch_packed_empty_key,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_packed/key-not-found", test_fetch_packed_key_not_found,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { (char*) "/fetch_bulk", test_fetch_bulk,
-        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+        test_fetch_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_multi_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };
 

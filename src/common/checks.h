@@ -25,6 +25,15 @@
         } \
     } while(0)
 
+#define CHECK_HRET_OUT_GOTO(__hret__, __fun__, __label__) \
+    do { \
+        if(__hret__ != HG_SUCCESS) { \
+            YOKAN_LOG_ERROR(mid, #__fun__ " returned %d", __hret__); \
+            out.ret = YOKAN_ERR_FROM_MERCURY; \
+            goto __label__; \
+        } \
+    } while(0)
+
 #define CHECK_RRET_OUT(__rret__, __fun__) \
     do { \
         if(__rret__ != REMI_SUCCESS) { \

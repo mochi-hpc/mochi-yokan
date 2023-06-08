@@ -67,8 +67,7 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
     in.keys.data    = (char*)keys;
     in.keys.size    = std::accumulate(ksizes, ksizes+count, (size_t)0);
     in.op_ref       = reinterpret_cast<uint64_t>(&context);
-    in.keys_batch_size = options ? options->keys_batch_size : 0;
-    in.vals_batch_size = options ? options->vals_batch_size : 0;
+    in.batch_size   = options ? options->batch_size : 0;
 
     hret = margo_create(mid, dbh->addr, dbh->client->fetch_direct_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -121,8 +120,8 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     fetch_context context;
-    context.cb     = cb;
-    context.uargs  = uargs;
+    context.cb      = cb;
+    context.uargs   = uargs;
     context.options = options;
 
     std::vector<size_t> ksizes;
@@ -198,8 +197,7 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
     in.size   = size;
     in.origin = const_cast<char*>(origin);
     in.op_ref = reinterpret_cast<uint64_t>(&context);
-    in.keys_batch_size = options ? options->keys_batch_size : 0;
-    in.vals_batch_size = options ? options->vals_batch_size : 0;
+    in.batch_size = options ? options->batch_size : 0;
 
     hret = margo_create(mid, dbh->addr, dbh->client->fetch_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -343,7 +341,7 @@ void yk_fetch_back_ult(hg_handle_t h)
 
     fetch_context* context = reinterpret_cast<fetch_context*>(in.op_ref);
 
-    if(context->keys.size() != in.count) {
+    if(context->keys.size() < in.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
