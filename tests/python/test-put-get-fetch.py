@@ -4,6 +4,7 @@ import unittest
 import json
 import string
 import random
+from typing import Optional
 
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
@@ -14,7 +15,7 @@ from pyyokan_admin import Admin
 from pyyokan_client import Client
 from pyyokan_server import Provider
 
-class TestPutGet(unittest.TestCase):
+class TestPutGetFetch(unittest.TestCase):
 
     def setUp(self):
         self.engine = Engine('tcp')
@@ -78,6 +79,33 @@ class TestPutGet(unittest.TestCase):
 
         with self.assertRaises(yokan.Exception):
             self.db.get(key=bytearray(b'xxxxx'), value=out_val)
+
+    def test_put_fetch_strings(self):
+        """Test that we can fetch key/value pairs."""
+        for k, v in self.reference.items():
+            self.db.put(key=k, value=v)
+        for k_ref, v_ref in self.reference.items():
+            def compare(i: int, k: str, v: Optional[memoryview]):
+                self.assertEqual(k, k_ref)
+                self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
+            self.db.fetch(key=k_ref, callback=compare)
+
+        with self.assertRaises(yokan.Exception):
+            self.db.fetch(key='xxxxx', callback=compare)
+
+    def test_put_fetch_buffers(self):
+        """Test that we can fetch key/value pairs."""
+        for k, v in self.reference.items():
+            self.db.put(key=bytearray(k.encode('ascii')),
+                        value=bytearray(v.encode('ascii')))
+        for k_ref, v_ref in self.reference.items():
+            def compare(i: int, k: memoryview, v: Optional[memoryview]):
+                self.assertEqual(k, memoryview(bytearray(k_ref.encode('ascii'))))
+                self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
+            self.db.fetch(key=bytearray(k_ref.encode('ascii')), callback=compare)
+
+        with self.assertRaises(yokan.Exception):
+            self.db.fetch(key=bytearray(b'xxxxx'), callback=compare)
 
     def test_put_get_partial(self):
         """Test that we can put/get partial regions of bytearrays."""

@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/functional.h>
 #include <yokan/cxx/client.hpp>
 #include <yokan/cxx/database.hpp>
 #include <yokan/cxx/collection.hpp>
@@ -724,6 +725,55 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 }
                 return result;
              }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // FETCH
+        // --------------------------------------------------------------
+        .def("fetch",
+             [](const yokan::Database& db, const py::buffer& key,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb, int32_t mode) {
+                auto key_info = get_buffer_info(key);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                db.fetch(
+                    (const void*)key_info.ptr,
+                    key_info.itemsize*key_info.size,
+                    func, mode);
+             },
+             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        .def("fetch",
+             [](const yokan::Database& db, const std::string& key,
+                std::function<void(size_t, const std::string&, const py::object&)> cb, int32_t mode) {
+                auto key_info = get_buffer_info(key);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto func =
+                    [&cb, &key](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, key, py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, key, py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                db.fetch(
+                    (const void*)key_info.ptr,
+                    key_info.itemsize*key_info.size,
+                    func, mode);
+             },
+             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
