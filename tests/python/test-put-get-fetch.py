@@ -232,6 +232,42 @@ class TestPutGetFetch(unittest.TestCase):
                              self.reference[k])
             voffset += vsize
 
+    def test_put_fetch_packed(self):
+        """Test that we can use put_packed and fetch_packed."""
+        in_keys_buf = bytearray()
+        in_vals_buf = bytearray()
+        in_key_sizes = []
+        in_val_sizes = []
+        for k, v in self.reference.items():
+            in_keys_buf += bytearray(k.encode('ascii'))
+            in_key_sizes.append(len(k))
+            in_vals_buf += bytearray(v.encode('ascii'))
+            in_val_sizes.append(len(v))
+
+        self.db.put_packed(keys=in_keys_buf, key_sizes=in_key_sizes,
+                           values=in_vals_buf, value_sizes=in_val_sizes)
+
+        out_keys = list(self.reference.keys())
+        out_keys.append('xxxxxxxx')
+        random.shuffle(out_keys)
+        out_keys_buf = bytearray()
+        out_key_sizes = []
+        for k in out_keys:
+            out_keys_buf += k.encode('ascii')
+            out_key_sizes.append(len(k))
+
+        def compare(i: int, k: memoryview, v: Optional[memoryview]):
+            if k == b'xxxxxxxx':
+                self.assertIsNone(v)
+            else:
+                self.assertEqual(bytearray(k), bytearray(out_keys[i].encode('ascii')))
+                v_ref = self.reference[out_keys[i]]
+                self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
+
+        self.db.fetch_packed(
+            keys=out_keys_buf, key_sizes=out_key_sizes,
+            callback=compare)
+
 
 if __name__ == '__main__':
     unittest.main()

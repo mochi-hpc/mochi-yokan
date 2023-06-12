@@ -844,6 +844,40 @@ PYBIND11_MODULE(pyyokan_client, m) {
              },
              "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         // --------------------------------------------------------------
+        // FETCH_PACKED
+        // --------------------------------------------------------------
+        .def("fetch_packed",
+             [](const yokan::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& ksizes,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                auto key_info = get_buffer_info(keys);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto total_key_size = std::accumulate(ksizes.begin(), ksizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchPacked(ksizes.size(),
+                    key_info.ptr, ksizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "key_sizes"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
