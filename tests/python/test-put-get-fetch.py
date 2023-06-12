@@ -157,6 +157,44 @@ class TestPutGetFetch(unittest.TestCase):
                 self.assertEqual(v[0:vsizes[i]].decode('ascii'),
                                   self.reference[k.decode('ascii')])
 
+    def test_put_fetch_multi_strings(self):
+        """Test that we can use put_multi and fetch_multi with strings."""
+        pairs = list(self.reference.items())
+        self.db.put_multi(pairs=pairs)
+
+        keys = list(self.reference.keys())
+        keys.append('xxxxxxxx')
+        random.shuffle(keys)
+
+        def compare(i: int, k: str, v: Optional[memoryview]):
+            if k == 'xxxxxxxx':
+                self.assertIsNone(v)
+            else:
+                self.assertEqual(k, keys[i])
+                v_ref = self.reference[keys[i]]
+                self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
+
+        self.db.fetch_multi(keys=keys, callback=compare)
+
+    def test_put_fetch_multi_buffers(self):
+        """Test that we can use put_multi and fetch_multi with buffer."""
+        pairs = [ (bytearray(k.encode('ascii')), bytearray(v.encode('ascii'))) for k, v in self.reference.items() ]
+        self.db.put_multi(pairs=pairs)
+
+        keys = [ p[0] for p in pairs ]
+        keys.append(b'xxxxxxxx')
+        random.shuffle(keys)
+
+        def compare(i: int, k: memoryview, v: Optional[memoryview]):
+            if k == b'xxxxxxxx':
+                self.assertIsNone(v)
+            else:
+                self.assertEqual(bytearray(k), keys[i])
+                v_ref = self.reference[keys[i].decode()]
+                self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
+
+        self.db.fetch_multi(keys=keys, callback=compare)
+
     def test_put_get_packed(self):
         """Test that we can use put_packed and get_packed."""
         in_keys_buf = bytearray()

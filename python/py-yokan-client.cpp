@@ -775,6 +775,75 @@ PYBIND11_MODULE(pyyokan_client, m) {
              },
              "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // FETCH_MULTI
+        // --------------------------------------------------------------
+        .def("fetch_multi",
+             [](const yokan::Database& db, const std::vector<py::buffer>& keys,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                std::vector<const void*> key_ptrs;
+                std::vector<size_t>      key_sizes;
+                key_ptrs.reserve(keys.size());
+                key_sizes.reserve(keys.size());
+                for(auto& key : keys) {
+                    auto key_info = get_buffer_info(key);
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    key_ptrs.push_back(key_info.ptr);
+                    key_sizes.push_back(key_info.itemsize*key_info.size);
+                }
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchMulti(
+                    keys.size(), key_ptrs.data(), key_sizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        .def("fetch_multi",
+             [](const yokan::Database& db, const std::vector<std::string>& keys,
+                std::function<void(size_t, const std::string&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                std::vector<const void*> key_ptrs;
+                std::vector<size_t>      key_sizes;
+                key_ptrs.reserve(keys.size());
+                key_sizes.reserve(keys.size());
+                for(auto& key : keys) {
+                    key_ptrs.push_back(key.data());
+                    key_sizes.push_back(key.size());
+                }
+                auto func =
+                    [&cb, &keys](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, keys[index], py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, keys[index], py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchMulti(
+                    keys.size(), key_ptrs.data(), key_sizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
