@@ -247,7 +247,6 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -301,6 +300,33 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             }
             vals.size = vals.size - val_remaining_size;
         }
+        if(mode & YOKAN_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        size_t key_offset = 0;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const datum key{ keys.data + key_offset, (int)ksizes[i] };
+            datum val = gdbm_fetch(m_db, key);
+            auto key_umem = UserMem{key.dptr, (size_t)key.dsize};
+            auto val_umem = UserMem{val.dptr, (size_t)val.dsize};
+            if(val.dptr == nullptr)
+                val_umem.size = KeyNotFound;
+            auto status = func(key_umem, val_umem);
+            free(val.dptr);
+            if(status != Status::OK) return status;
+            key_offset += ksizes[i];
+        }
+
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);

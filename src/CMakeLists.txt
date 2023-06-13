@@ -5,6 +5,7 @@ set (server-src-files
      server/put.cpp
      server/erase.cpp
      server/get.cpp
+     server/fetch.cpp
      server/length.cpp
      server/exists.cpp
      server/list_keys.cpp
@@ -93,12 +94,13 @@ if (ENABLE_LUA)
 endif ()
 
 set (client-src-files
-     client/client.c
+     client/client.cpp
      client/find_by_name.cpp
      client/count.cpp
      client/put.cpp
      client/erase.cpp
      client/get.cpp
+     client/fetch.cpp
      client/length.cpp
      client/exists.cpp
      client/list_keys.cpp

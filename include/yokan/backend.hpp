@@ -281,6 +281,33 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+    using FetchCallback = std::function<Status(const UserMem& key, const UserMem& val)>;
+
+    /**
+     * @brief Get values associated of keys and pass them successively
+     * to the provided callback function.
+     *
+     * Note: this function is not const because it can potentially
+     * call erase() if a YOKAN_MODE_CONSUME is specified, for instance.
+     *
+     * @param mode Mode.
+     * @param packed whether data is packed.
+     * @param keys Keys to get.
+     * @param ksizes Size of the keys.
+     * @param func Function to call on the value.
+     *
+     * @return Status.
+     */
+    virtual Status fetch(int32_t mode, const UserMem& keys,
+                         const BasicUserMem<size_t>& ksizes,
+                         const FetchCallback& func) {
+        (void)mode;
+        (void)keys;
+        (void)ksizes;
+        (void)func;
+        return Status::NotSupported;
+    }
+
     /**
      * @brief Erase a set of key/value pairs. Keys are packed into
      * a single buffer. The number of keys is conveyed by ksizes.size.
@@ -348,6 +375,48 @@ class DatabaseInterface {
         (void)keySizes;
         (void)vals;
         (void)valSizes;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Iterate through the keys, calling the provided function on each
+     * key (corresponding value will is set to null).
+     *
+     * @param mode Mode
+     * @param fromKey Starting key.
+     * @param filter Key filter.
+     * @param func Function to call on each key.
+     *
+     * @return Status.
+     */
+    virtual Status iterKeys(int32_t mode, const UserMem& fromKey,
+                            const std::shared_ptr<KeyValueFilter>& filter,
+                            const FetchCallback& func) const {
+        (void)mode;
+        (void)fromKey;
+        (void)filter;
+        (void)func;
+        return Status::NotSupported;
+    }
+
+    /**
+     * @brief Iterate through the key/value pairs, calling the provided
+     * function on each key/value pair in sequence.
+     *
+     * @param mode Mode
+     * @param fromKey Starting key.
+     * @param filter Key filter.
+     * @param func Function to call on each key.
+     *
+     * @return Status.
+     */
+    virtual Status iterKeyValues(int32_t mode, const UserMem& fromKey,
+                            const std::shared_ptr<KeyValueFilter>& filter,
+                            const FetchCallback& func) const {
+        (void)mode;
+        (void)fromKey;
+        (void)filter;
+        (void)func;
         return Status::NotSupported;
     }
 

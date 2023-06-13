@@ -70,12 +70,20 @@ typedef struct yk_provider {
     hg_id_t put_direct_id;
     hg_id_t get_id;
     hg_id_t get_direct_id;
+    hg_id_t fetch_id;
+    hg_id_t fetch_direct_id;
+    hg_id_t fetch_back_id;
+    hg_id_t fetch_direct_back_id;
     hg_id_t erase_id;
     hg_id_t erase_direct_id;
     hg_id_t list_keys_id;
     hg_id_t list_keys_direct_id;
     hg_id_t list_keyvals_id;
     hg_id_t list_keyvals_direct_id;
+    hg_id_t iter_keys_id;
+    hg_id_t iter_keys_direct_id;
+    hg_id_t iter_keyvals_id;
+    hg_id_t iter_keyvals_direct_id;
     hg_id_t coll_create_id;
     hg_id_t coll_drop_id;
     hg_id_t coll_exists_id;
@@ -84,6 +92,8 @@ typedef struct yk_provider {
     hg_id_t doc_erase_id;
     hg_id_t doc_load_id;
     hg_id_t doc_load_direct_id;
+    hg_id_t doc_fetch_id;
+    hg_id_t doc_fetch_direct_id;
     hg_id_t doc_store_id;
     hg_id_t doc_store_direct_id;
     hg_id_t doc_update_id;
@@ -91,6 +101,8 @@ typedef struct yk_provider {
     hg_id_t doc_length_id;
     hg_id_t doc_list_id;
     hg_id_t doc_list_direct_id;
+    hg_id_t doc_iter_id;
+    hg_id_t doc_iter_direct_id;
 
     // REMI information
     struct {
@@ -131,6 +143,10 @@ DECLARE_MARGO_RPC_HANDLER(yk_get_ult)
 void yk_get_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_get_direct_ult)
 void yk_get_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_fetch_ult)
+void yk_fetch_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_fetch_direct_ult)
+void yk_fetch_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_length_ult)
 void yk_length_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_length_direct_ult)
@@ -147,6 +163,14 @@ DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)
 void yk_list_keyvals_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_direct_ult)
 void yk_list_keyvals_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_keys_ult)
+void yk_iter_keys_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_keys_direct_ult)
+void yk_iter_keys_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_keyvals_ult)
+void yk_iter_keyvals_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_keyvals_direct_ult)
+void yk_iter_keyvals_direct_ult(hg_handle_t h);
 
 DECLARE_MARGO_RPC_HANDLER(yk_coll_create_ult)
 void yk_coll_create_ult(hg_handle_t h);
@@ -164,6 +188,10 @@ DECLARE_MARGO_RPC_HANDLER(yk_doc_load_ult)
 void yk_doc_load_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_load_direct_ult)
 void yk_doc_load_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_ult)
+void yk_doc_fetch_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_direct_ult)
+void yk_doc_fetch_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_store_ult)
 void yk_doc_store_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_store_direct_ult)
@@ -178,6 +206,10 @@ DECLARE_MARGO_RPC_HANDLER(yk_doc_list_ult)
 void yk_doc_list_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_list_direct_ult)
 void yk_doc_list_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_iter_ult)
+void yk_doc_iter_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_iter_direct_ult)
+void yk_doc_iter_direct_ult(hg_handle_t h);
 
 static inline yk_database_t find_database(yk_provider_t provider,
                                           yk_database_id_t* db_id)

@@ -430,8 +430,6 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
-        if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         bool mode_wait = mode & YOKAN_MODE_WAIT;
@@ -515,6 +513,45 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
             return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                           const BasicUserMem<size_t>& ksizes,
+                           const FetchCallback& func) override {
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        bool mode_wait = mode & YOKAN_MODE_WAIT;
+        size_t key_offset = 0;
+        UserMem val{nullptr, 0};
+
+        for(size_t i = 0; i < ksizes.size; i++) {
+            const UserMem key{ keys.data + key_offset, ksizes[i] };
+retry:
+            auto it = m_db->find(key);
+            if(it == m_db->end()) {
+                if(mode_wait) {
+                    m_watcher.addKey(key);
+                    lock.unlock();
+                    auto ret = m_watcher.waitKey(key);
+                    lock.lock();
+                    if(ret == KeyWatcher::KeyPresent)
+                        goto retry;
+                    else
+                        return Status::TimedOut;
+                } else {
+                    val = UserMem{nullptr, KeyNotFound};
+                    val.size = KeyNotFound;
+                    val.data = nullptr;
+                }
+            } else {
+                auto& v = it->second;
+                val = UserMem{v.data(), v.size()};
+            }
+            key_offset += ksizes[i];
+            func(key, val);
         }
         return Status::OK;
     }

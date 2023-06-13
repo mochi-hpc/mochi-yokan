@@ -4,11 +4,11 @@
  * See COPYRIGHT in top-level directory.
  */
 #include "../common/types.h"
-#include "client.h"
+#include "client.hpp"
 #include "yokan/client.h"
 #include <stdio.h>
 
-yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
+extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
 {
     yk_client_t c = (yk_client_t)calloc(1, sizeof(*c));
     if(!c) return YOKAN_ERR_ALLOCATION;
@@ -31,12 +31,18 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_put_direct",          &c->put_direct_id,          &flag);
         margo_registered_name(mid, "yk_get",                 &c->get_id,                 &flag);
         margo_registered_name(mid, "yk_get_direct",          &c->get_direct_id,          &flag);
+        margo_registered_name(mid, "yk_fetch",               &c->fetch_id,               &flag);
+        margo_registered_name(mid, "yk_fetch_direct",        &c->fetch_direct_id,        &flag);
         margo_registered_name(mid, "yk_erase",               &c->erase_id,               &flag);
         margo_registered_name(mid, "yk_erase_direct",        &c->erase_direct_id,        &flag);
         margo_registered_name(mid, "yk_list_keys",           &c->list_keys_id,           &flag);
         margo_registered_name(mid, "yk_list_keys_direct",    &c->list_keys_direct_id,    &flag);
         margo_registered_name(mid, "yk_list_keyvals",        &c->list_keyvals_id,        &flag);
         margo_registered_name(mid, "yk_list_keyvals_direct", &c->list_keyvals_direct_id, &flag);
+        margo_registered_name(mid, "yk_iter_keys",           &c->iter_keys_id,           &flag);
+        margo_registered_name(mid, "yk_iter_keys_direct",    &c->iter_keys_direct_id,    &flag);
+        margo_registered_name(mid, "yk_iter_keyvals",        &c->iter_keyvals_id,        &flag);
+        margo_registered_name(mid, "yk_iter_keyvals_direct", &c->iter_keyvals_direct_id, &flag);
 
         margo_registered_name(mid, "yk_coll_create",      &c->coll_create_id,      &flag);
         margo_registered_name(mid, "yk_coll_drop",        &c->coll_drop_id,        &flag);
@@ -45,6 +51,8 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_coll_size",        &c->coll_size_id,        &flag);
         margo_registered_name(mid, "yk_doc_load",         &c->doc_load_id,         &flag);
         margo_registered_name(mid, "yk_doc_load_direct",  &c->doc_load_direct_id,  &flag);
+        margo_registered_name(mid, "yk_doc_fetch",        &c->doc_fetch_id,        &flag);
+        margo_registered_name(mid, "yk_doc_fetch_direct", &c->doc_fetch_direct_id, &flag);
         margo_registered_name(mid, "yk_doc_erase",        &c->doc_erase_id,        &flag);
         margo_registered_name(mid, "yk_doc_store",        &c->doc_store_id,        &flag);
         margo_registered_name(mid, "yk_doc_store_direct", &c->doc_store_direct_id, &flag);
@@ -53,6 +61,8 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         margo_registered_name(mid, "yk_doc_length",       &c->doc_length_id,       &flag);
         margo_registered_name(mid, "yk_doc_list",         &c->doc_list_id,         &flag);
         margo_registered_name(mid, "yk_doc_list_direct",  &c->doc_list_direct_id,  &flag);
+        margo_registered_name(mid, "yk_doc_iter",         &c->doc_iter_id,         &flag);
+        margo_registered_name(mid, "yk_doc_iter_direct",  &c->doc_iter_direct_id,  &flag);
 
     } else {
 
@@ -86,6 +96,12 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->get_direct_id =
             MARGO_REGISTER(mid, "yk_get_direct",
                            get_direct_in_t, get_direct_out_t, NULL);
+        c->fetch_id =
+            MARGO_REGISTER(mid, "yk_fetch",
+                           fetch_in_t, fetch_out_t, NULL);
+        c->fetch_direct_id =
+            MARGO_REGISTER(mid, "yk_fetch_direct",
+                           fetch_direct_in_t, fetch_direct_out_t, NULL);
         c->erase_id =
             MARGO_REGISTER(mid, "yk_erase",
                            erase_in_t, erase_out_t, NULL);
@@ -104,6 +120,18 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->list_keyvals_direct_id =
             MARGO_REGISTER(mid, "yk_list_keyvals_direct",
                            list_keyvals_direct_in_t, list_keyvals_direct_out_t, NULL);
+//        c->iter_keys_id =
+//            MARGO_REGISTER(mid, "yk_iter_keys",
+//                           iter_keys_in_t, iter_keys_out_t, NULL);
+//        c->iter_keys_direct_id =
+//            MARGO_REGISTER(mid, "yk_iter_keys_direct",
+//                           iter_keys_direct_in_t, iter_keys_direct_out_t, NULL);
+//        c->iter_keyvals_id =
+//            MARGO_REGISTER(mid, "yk_iter_keyvals",
+//                           iter_keyvals_in_t, iter_keyvals_out_t, NULL);
+//        c->iter_keyvals_direct_id =
+//            MARGO_REGISTER(mid, "yk_iter_keyvals_direct",
+//                           iter_keyvals_direct_in_t, iter_keyvals_direct_out_t, NULL);
 
         c->coll_create_id =
             MARGO_REGISTER(mid, "yk_coll_create",
@@ -129,6 +157,12 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_load_direct_id =
             MARGO_REGISTER(mid, "yk_doc_load_direct",
                            doc_load_direct_in_t, doc_load_direct_out_t, NULL);
+//        c->doc_fetch_id =
+//            MARGO_REGISTER(mid, "yk_doc_fetch",
+//                           doc_fetch_in_t, doc_fetch_out_t, NULL);
+//        c->doc_fetch_direct_id =
+//            MARGO_REGISTER(mid, "yk_doc_fetch_direct",
+//                           doc_fetch_direct_in_t, doc_fetch_direct_out_t, NULL);
         c->doc_store_id =
             MARGO_REGISTER(mid, "yk_doc_store",
                            doc_store_in_t, doc_store_out_t, NULL);
@@ -150,13 +184,28 @@ yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client)
         c->doc_list_direct_id =
             MARGO_REGISTER(mid, "yk_doc_list_direct",
                            doc_list_direct_in_t, doc_list_direct_out_t, NULL);
+//        c->doc_iter_id =
+//            MARGO_REGISTER(mid, "yk_doc_iter",
+//                           doc_iter_in_t, doc_iter_out_t, NULL);
+//        c->doc_iter_direct_id =
+//            MARGO_REGISTER(mid, "yk_doc_iter_direct",
+//                           doc_iter_direct_in_t, doc_iter_direct_out_t, NULL);
     }
+
+    // The RPCs bellow should be registered regardless of whether they already were registered
+
+    c->fetch_back_id =
+        MARGO_REGISTER(mid, "yk_fetch_back",
+                       fetch_back_in_t, fetch_back_out_t, yk_fetch_back_ult);
+    c->fetch_direct_back_id =
+        MARGO_REGISTER(mid, "yk_fetch_direct_back",
+                       fetch_direct_back_in_t, fetch_direct_back_out_t, yk_fetch_direct_back_ult);
 
     *client = c;
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_client_finalize(yk_client_t client)
+extern "C" yk_return_t yk_client_finalize(yk_client_t client)
 {
     if(client->num_database_handles != 0) {
         // LCOV_EXCL_START
@@ -169,7 +218,7 @@ yk_return_t yk_client_finalize(yk_client_t client)
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_database_handle_create(
+extern "C" yk_return_t yk_database_handle_create(
         yk_client_t client,
         hg_addr_t addr,
         uint16_t provider_id,
@@ -201,7 +250,7 @@ yk_return_t yk_database_handle_create(
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_database_handle_get_info(
+extern "C" yk_return_t yk_database_handle_get_info(
         yk_database_handle_t handle,
         yk_client_t* client,
         hg_addr_t* addr,
@@ -217,7 +266,7 @@ yk_return_t yk_database_handle_get_info(
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_database_handle_ref_incr(
+extern "C" yk_return_t yk_database_handle_ref_incr(
         yk_database_handle_t handle)
 {
     if(handle == YOKAN_DATABASE_HANDLE_NULL)
@@ -226,7 +275,7 @@ yk_return_t yk_database_handle_ref_incr(
     return YOKAN_SUCCESS;
 }
 
-yk_return_t yk_database_handle_release(yk_database_handle_t handle)
+extern "C" yk_return_t yk_database_handle_release(yk_database_handle_t handle)
 {
     if(handle == YOKAN_DATABASE_HANDLE_NULL)
         return YOKAN_ERR_INVALID_ARGS;

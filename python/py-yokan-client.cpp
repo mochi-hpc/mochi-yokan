@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/functional.h>
 #include <yokan/cxx/client.hpp>
 #include <yokan/cxx/database.hpp>
 #include <yokan/cxx/collection.hpp>
@@ -724,6 +725,158 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 }
                 return result;
              }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // FETCH
+        // --------------------------------------------------------------
+        .def("fetch",
+             [](const yokan::Database& db, const py::buffer& key,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb, int32_t mode) {
+                auto key_info = get_buffer_info(key);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                db.fetch(
+                    (const void*)key_info.ptr,
+                    key_info.itemsize*key_info.size,
+                    func, mode);
+             },
+             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        .def("fetch",
+             [](const yokan::Database& db, const std::string& key,
+                std::function<void(size_t, const std::string&, const py::object&)> cb, int32_t mode) {
+                auto key_info = get_buffer_info(key);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto func =
+                    [&cb, &key](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, key, py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, key, py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                db.fetch(
+                    (const void*)key_info.ptr,
+                    key_info.itemsize*key_info.size,
+                    func, mode);
+             },
+             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // FETCH_MULTI
+        // --------------------------------------------------------------
+        .def("fetch_multi",
+             [](const yokan::Database& db, const std::vector<py::buffer>& keys,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                std::vector<const void*> key_ptrs;
+                std::vector<size_t>      key_sizes;
+                key_ptrs.reserve(keys.size());
+                key_sizes.reserve(keys.size());
+                for(auto& key : keys) {
+                    auto key_info = get_buffer_info(key);
+                    CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                    key_ptrs.push_back(key_info.ptr);
+                    key_sizes.push_back(key_info.itemsize*key_info.size);
+                }
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchMulti(
+                    keys.size(), key_ptrs.data(), key_sizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        .def("fetch_multi",
+             [](const yokan::Database& db, const std::vector<std::string>& keys,
+                std::function<void(size_t, const std::string&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                std::vector<const void*> key_ptrs;
+                std::vector<size_t>      key_sizes;
+                key_ptrs.reserve(keys.size());
+                key_sizes.reserve(keys.size());
+                for(auto& key : keys) {
+                    key_ptrs.push_back(key.data());
+                    key_sizes.push_back(key.size());
+                }
+                auto func =
+                    [&cb, &keys](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, keys[index], py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, keys[index], py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchMulti(
+                    keys.size(), key_ptrs.data(), key_sizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        // --------------------------------------------------------------
+        // FETCH_PACKED
+        // --------------------------------------------------------------
+        .def("fetch_packed",
+             [](const yokan::Database& db, const py::buffer& keys,
+                const std::vector<size_t>& ksizes,
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                auto key_info = get_buffer_info(keys);
+                CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                auto total_key_size = std::accumulate(ksizes.begin(), ksizes.end(), (size_t)0);
+                if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
+                    throw std::length_error("keys buffer size smaller than accumulated key_sizes");
+                }
+                auto func =
+                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, py::memoryview::from_memory(key, ksize), py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                db.fetchPacked(ksizes.size(),
+                    key_info.ptr, ksizes.data(),
+                    func, &options, mode);
+             },
+             "keys"_a, "key_sizes"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------

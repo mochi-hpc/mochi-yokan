@@ -233,6 +233,50 @@ MERCURY_GEN_PROC(get_direct_out_t,
         ((raw_data)(vals))\
         ((int32_t)(ret)))
 
+/* fetch */
+MERCURY_GEN_PROC(fetch_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint32_t)(batch_size))\
+        ((uint64_t)(count))\
+        ((uint64_t)(offset))\
+        ((uint64_t)(size))\
+        ((hg_string_t)(origin))\
+        ((hg_bulk_t)(bulk))\
+        ((uint64_t)(op_ref)))
+MERCURY_GEN_PROC(fetch_out_t,
+        ((int32_t)(ret)))
+
+/* fetch (direct) */
+MERCURY_GEN_PROC(fetch_direct_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint32_t)(batch_size))\
+        ((uint64_list)(ksizes))\
+        ((raw_data)(keys))\
+        ((uint64_t)(op_ref)))
+MERCURY_GEN_PROC(fetch_direct_out_t,
+        ((int32_t)(ret)))
+
+/* fetch_back */
+MERCURY_GEN_PROC(fetch_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_t)(count))\
+        ((uint64_t)(size))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(fetch_back_out_t,
+        ((int32_t)(ret)))
+
+/* fetch_back (direct) */
+MERCURY_GEN_PROC(fetch_direct_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_list)(vsizes))\
+        ((raw_data)(vals)))
+MERCURY_GEN_PROC(fetch_direct_back_out_t,
+        ((int32_t)(ret)))
+
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
         ((yk_database_id_t)(db_id))\

@@ -363,6 +363,39 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        size_t key_offset = 0;
+        Dbt val{ nullptr, 0 };
+        val.set_flags(DB_DBT_REALLOC);
+        for(size_t i = 0; i < ksizes.size; i++) {
+                Dbt key{ keys.data + key_offset, (u_int32_t)ksizes[i] };
+                key.set_flags(DB_DBT_USERMEM);
+                key.set_ulen(ksizes[i]);
+                int ret = m_db->get(nullptr, &key, &val, 0);
+                UserMem val_umem{nullptr, 0};
+                UserMem key_umem{(char*)key.get_data(), key.get_size()};
+                Status status = Status::OK;
+                if(ret == 0) {
+                    val_umem = UserMem{(char*)val.get_data(), val.get_size()};
+                    status = func(key_umem, val_umem);
+                } else if(ret == DB_NOTFOUND) {
+                    val_umem = UserMem{nullptr, KeyNotFound};
+                    status = func(key_umem, val_umem);
+                } else {
+                    status = convertStatus(ret);
+                }
+                if(status != Status::OK) return status;
+                key_offset += ksizes[i];
+        }
+        free(val.get_data());
+        if(mode & YOKAN_MODE_CONSUME) {
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
     virtual Status erase(int32_t mode, const UserMem& keys,
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;

@@ -569,7 +569,6 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         ScopedReadLock mlock(m_migration_lock);
         if(m_migrated) return Status::Migrated;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
@@ -593,6 +592,59 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
 
         vals.size = get_value.m_offset;
+        if(mode & YOKAN_MODE_CONSUME) {
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    struct FetchValue : public tkrzw::DBM::RecordProcessor {
+        const FetchCallback& func;
+        Status&              status;
+
+        FetchValue(const FetchCallback& f, Status& s)
+        : func(f)
+        , status(s) {}
+
+        std::string_view ProcessFull(std::string_view key,
+                                     std::string_view val) override {
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = UserMem{(char*)val.data(), val.size()};
+            status = func(key_umem, val_umem);
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+
+        std::string_view ProcessEmpty(std::string_view key) override {
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = UserMem{nullptr, KeyNotFound};
+            status = func(key_umem, val_umem);
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+    };
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+
+        size_t key_offset = 0;
+        size_t i = 0;
+        Status func_status;
+
+        auto fetch_value = FetchValue{func, func_status};
+
+        for(; i < ksizes.size; i++) {
+            auto status = m_db->Process({ keys.data + key_offset, ksizes[i] },
+                                        &fetch_value, false);
+            if(!status.IsOK()) {
+                return convertStatus(status);
+            }
+            if(func_status != Status::OK)
+                return func_status;
+            key_offset += ksizes[i];
+        }
+
         if(mode & YOKAN_MODE_CONSUME) {
             return erase(mode, keys, ksizes);
         }

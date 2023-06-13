@@ -10,6 +10,7 @@
 #include <yokan/collection.h>
 #include <yokan/cxx/exception.hpp>
 #include <vector>
+#include <functional>
 
 namespace yokan {
 
@@ -275,6 +276,107 @@ class Database {
                  int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_get_bulk(m_db, mode, count, origin,
             data, offset, size, packed);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetch(const void* key,
+               size_t ksize,
+               yk_keyvalue_callback_t cb,
+               void* uargs,
+               int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch(m_db, mode, key, ksize, cb, uargs);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    using fetch_callback_type =
+        std::function<yk_return_t(size_t,const void*,size_t,const void*,size_t)>;
+
+    static yk_return_t _fetch_dispatch(void* uargs, size_t index,
+                                       const void* key, size_t ksize,
+                                       const void* val, size_t vsize) {
+            const fetch_callback_type* cb_ptr =
+                static_cast<const fetch_callback_type*>(uargs);
+            return (*cb_ptr)(index, key, ksize, val, vsize);
+    }
+
+    void fetch(const void* key,
+               size_t ksize,
+               const fetch_callback_type& cb,
+               int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch(m_db, mode, key, ksize, _fetch_dispatch, (void*)&cb);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchPacked(size_t count,
+                     const void* keys,
+                     const size_t* ksizes,
+                     yk_keyvalue_callback_t cb,
+                     void* uargs,
+                     const yk_fetch_options_t* options = nullptr,
+                     int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch_packed(
+            m_db, mode, count, keys, ksizes, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchPacked(size_t count,
+                     const void* keys,
+                     const size_t* ksizes,
+                     const fetch_callback_type& cb,
+                     const yk_fetch_options_t* options = nullptr,
+                     int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch_packed(
+            m_db, mode, count, keys, ksizes, _fetch_dispatch, (void*)&cb, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchMulti(size_t count,
+                    const void* const* keys,
+                    const size_t* ksizes,
+                    yk_keyvalue_callback_t cb,
+                    void* uargs,
+                    const yk_fetch_options_t* options = nullptr,
+                    int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err= yk_fetch_multi(
+            m_db, mode, count,keys, ksizes, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchMulti(size_t count,
+                    const void* const* keys,
+                    const size_t* ksizes,
+                    const fetch_callback_type& cb,
+                    const yk_fetch_options_t* options = nullptr,
+                    int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err= yk_fetch_multi(
+            m_db, mode, count,keys, ksizes, _fetch_dispatch, (void*)&cb, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchBulk(size_t count,
+                   const char* origin,
+                   hg_bulk_t data,
+                   size_t offset,
+                   size_t size,
+                   yk_keyvalue_callback_t cb,
+                   void* uargs,
+                   const yk_fetch_options_t* options = nullptr,
+                   int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch_bulk(
+            m_db, mode, count, origin, data, offset, size, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchBulk(size_t count,
+                   const char* origin,
+                   hg_bulk_t data,
+                   size_t offset,
+                   size_t size,
+                   const fetch_callback_type& cb,
+                   const yk_fetch_options_t* options = nullptr,
+                   int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_fetch_bulk(
+            m_db, mode, count, origin, data, offset, size, _fetch_dispatch, (void*)&cb, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 

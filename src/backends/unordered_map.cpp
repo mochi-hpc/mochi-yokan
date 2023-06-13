@@ -426,7 +426,6 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& ksizes,
                        UserMem& vals,
                        BasicUserMem<size_t>& vsizes) override {
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         const auto mode_wait = mode & YOKAN_MODE_WAIT;
@@ -509,6 +508,54 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 key_offset += ksizes[i];
             }
             vals.size = vals.size - val_remaining_size;
+        }
+
+        if(mode & YOKAN_MODE_CONSUME) {
+            lock.unlock();
+            return erase(mode, keys, ksizes);
+        }
+        return Status::OK;
+    }
+
+    Status fetch(int32_t mode, const UserMem& keys,
+                 const BasicUserMem<size_t>& ksizes,
+                 const FetchCallback& func) override {
+
+        const auto mode_wait = mode & YOKAN_MODE_WAIT;
+
+        size_t key_offset = 0;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto key = key_type(m_key_allocator);
+        for(size_t i = 0; i < ksizes.size; i++) {
+            key.assign(keys.data + key_offset, ksizes[i]);
+            retry:
+            auto it = m_db->find(key);
+            auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
+            auto val_umem = UserMem{nullptr, 0};
+            if(it == m_db->end()) {
+                if(mode_wait) {
+                    m_watcher.addKey(key_umem);
+                    lock.unlock();
+                    auto ret = m_watcher.waitKey(key_umem);
+                    lock.lock();
+                    if(ret == KeyWatcher::KeyPresent)
+                        goto retry;
+                    else
+                        return Status::TimedOut;
+                } else {
+                    val_umem.size = KeyNotFound;
+                }
+            } else {
+                auto& v = it->second;
+                val_umem.data = (char*)v.data();
+                val_umem.size = v.size();
+            }
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+            key_offset += ksizes[i];
         }
 
         if(mode & YOKAN_MODE_CONSUME) {
