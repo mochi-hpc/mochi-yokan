@@ -115,6 +115,7 @@ set (client-src-files
      client/doc_update.cpp
      client/doc_length.cpp
      client/doc_load.cpp
+     client/doc_fetch.cpp
      client/doc_list.cpp)
 
 set (admin-src-files

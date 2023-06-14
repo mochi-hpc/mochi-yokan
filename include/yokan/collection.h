@@ -26,7 +26,7 @@ extern "C" {
  *
  * @return YK_SUCCESS or other error code.
  */
-typedef yk_return_t (*yk_document_callback_t)(void*, yk_id_t, const void*, size_t);
+typedef yk_return_t (*yk_document_callback_t)(void*, size_t, yk_id_t, const void*, size_t);
 
 /**
  * @brief Create a collection in the specified database.
@@ -311,9 +311,9 @@ yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[int] id Record id
- * @param[out] data Buffer to load the document
- * @param[inout] size Size of the buffer (in) / document (out)
+ * @param[in] id Record id
+ * @param[in] cb Callback to call on the document
+ * @param[in] uargs Arguments for the callback
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
@@ -328,7 +328,8 @@ yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
  * @brief Options to provide to yk_doc_fetch_multi.
  */
 typedef struct yk_doc_fetch_options {
-    unsigned recv_batch_size;
+    ABT_pool pool;       /* pool in which to run the callback */
+    unsigned batch_size; /* documents are sent back in batches of this size */
 } yk_doc_fetch_options_t;
 
 /**
@@ -340,9 +341,11 @@ typedef struct yk_doc_fetch_options {
  * @param[in] dbh Database handle
  * @param[in] collection Collection
  * @param[in] mode Mode
- * @param[int] id Record id
- * @param[out] data Buffer to load the document
- * @param[inout] size Size of the buffer (in) / document (out)
+ * @param[in] count Number of ids
+ * @param[in] ids Record ids
+ * @param[in] cb Callback to call on the document
+ * @param[in] uargs Arguments for the callback
+ * @param[in] options Extra options
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
@@ -352,7 +355,8 @@ yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
                                size_t count,
                                const yk_id_t* ids,
                                yk_document_callback_t cb,
-                               void* uargs);
+                               void* uargs,
+                               const yk_doc_fetch_options_t* options);
 
 /**
  * @brief Get the size of a document from the collection.

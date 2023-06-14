@@ -52,7 +52,6 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         margo_registered_name(mid, "yk_doc_load",         &c->doc_load_id,         &flag);
         margo_registered_name(mid, "yk_doc_load_direct",  &c->doc_load_direct_id,  &flag);
         margo_registered_name(mid, "yk_doc_fetch",        &c->doc_fetch_id,        &flag);
-        margo_registered_name(mid, "yk_doc_fetch_direct", &c->doc_fetch_direct_id, &flag);
         margo_registered_name(mid, "yk_doc_erase",        &c->doc_erase_id,        &flag);
         margo_registered_name(mid, "yk_doc_store",        &c->doc_store_id,        &flag);
         margo_registered_name(mid, "yk_doc_store_direct", &c->doc_store_direct_id, &flag);
@@ -157,12 +156,9 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         c->doc_load_direct_id =
             MARGO_REGISTER(mid, "yk_doc_load_direct",
                            doc_load_direct_in_t, doc_load_direct_out_t, NULL);
-//        c->doc_fetch_id =
-//            MARGO_REGISTER(mid, "yk_doc_fetch",
-//                           doc_fetch_in_t, doc_fetch_out_t, NULL);
-//        c->doc_fetch_direct_id =
-//            MARGO_REGISTER(mid, "yk_doc_fetch_direct",
-//                           doc_fetch_direct_in_t, doc_fetch_direct_out_t, NULL);
+        c->doc_fetch_id =
+            MARGO_REGISTER(mid, "yk_doc_fetch",
+                           doc_fetch_in_t, doc_fetch_out_t, NULL);
         c->doc_store_id =
             MARGO_REGISTER(mid, "yk_doc_store",
                            doc_store_in_t, doc_store_out_t, NULL);
@@ -200,6 +196,13 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
     c->fetch_direct_back_id =
         MARGO_REGISTER(mid, "yk_fetch_direct_back",
                        fetch_direct_back_in_t, fetch_direct_back_out_t, yk_fetch_direct_back_ult);
+    c->doc_fetch_back_id =
+        MARGO_REGISTER(mid, "yk_doc_fetch_back",
+                       doc_fetch_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_back_ult);
+    c->doc_fetch_direct_back_id =
+        MARGO_REGISTER(mid, "yk_doc_fetch_direct_back",
+                       doc_fetch_direct_back_in_t, doc_fetch_direct_back_out_t, yk_doc_fetch_direct_back_ult);
+
 
     *client = c;
     return YOKAN_SUCCESS;
