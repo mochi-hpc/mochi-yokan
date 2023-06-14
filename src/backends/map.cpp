@@ -548,7 +548,7 @@ retry:
                 }
             } else {
                 auto& v = it->second;
-                val = UserMem{v.data(), v.size()};
+                val = UserMem{const_cast<char*>(v.data()), v.size()};
             }
             key_offset += ksizes[i];
             func(key, val);
