@@ -513,8 +513,6 @@ MERCURY_GEN_PROC(doc_fetch_direct_back_in_t,
         ((uint64_t)(start))\
         ((uint64_list)(doc_sizes))\
         ((raw_data)(docs)))
-MERCURY_GEN_PROC(doc_fetch_direct_back_out_t,
-        ((int32_t)(ret)))
 
 /* doc_length */
 MERCURY_GEN_PROC(doc_length_in_t,

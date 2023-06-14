@@ -57,12 +57,12 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
     context.options = options;
 
     in.db_id      = dbh->database_id;
-    in.coll_name  = (char*)collection;
     in.mode       = mode;
+    in.batch_size = options ? options->batch_size : 0;
+    in.coll_name  = (char*)collection;
     in.ids.ids    = (yk_id_t*)ids;
     in.ids.count  = count;
     in.op_ref     = reinterpret_cast<uint64_t>(&context);
-    in.batch_size = options ? options->batch_size : 0;
 
     hret = margo_create(mid, dbh->addr, dbh->client->doc_fetch_id, &handle);
     CHECK_HRET(hret, margo_create);
@@ -194,7 +194,7 @@ void yk_doc_fetch_direct_back_ult(hg_handle_t h)
 {
     hg_return_t hret = HG_SUCCESS;
     doc_fetch_direct_back_in_t in;
-    doc_fetch_direct_back_out_t out;
+    doc_fetch_back_out_t out;
 
     std::memset(&in, 0, sizeof(in));
     std::memset(&out, 0, sizeof(out));
@@ -213,7 +213,7 @@ void yk_doc_fetch_direct_back_ult(hg_handle_t h)
 
     doc_fetch_context* context = reinterpret_cast<doc_fetch_context*>(in.op_ref);
 
-    if(context->count != in.doc_sizes.count) {
+    if(context->count < in.doc_sizes.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }

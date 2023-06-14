@@ -18,6 +18,7 @@ void yk_doc_fetch_ult(hg_handle_t h)
     doc_fetch_in_t in;
     doc_fetch_out_t out;
 
+    std::memset(&in, 0, sizeof(in));
     out.ret = YOKAN_SUCCESS;
 
     DEFER(margo_destroy(h));
@@ -62,7 +63,7 @@ void yk_doc_fetch_ult(hg_handle_t h)
         if(previous.handle == HG_HANDLE_NULL) return YOKAN_SUCCESS;
         hret = margo_wait(previous.req);
         CHECK_HRET(hret, margo_wait);
-        fetch_back_out_t back_out;
+        doc_fetch_back_out_t back_out;
         hret = margo_get_output(previous.handle, &back_out);
         CHECK_HRET(hret, margo_get_output);
         DEFER(margo_free_output(previous.handle, &back_out));
@@ -113,10 +114,10 @@ void yk_doc_fetch_ult(hg_handle_t h)
             if(out.ret != YOKAN_SUCCESS)
                 break;
 
-            // send a fetch_direct_back RPC to the client
+            // send a doc_fetch_direct_back RPC to the client
 
             hg_handle_t back_handle = HG_HANDLE_NULL;
-            hret = margo_create(mid, info->addr, provider->fetch_direct_back_id, &back_handle);
+            hret = margo_create(mid, info->addr, provider->doc_fetch_direct_back_id, &back_handle);
             CHECK_HRET_OUT_GOTO(hret, margo_create, finish);
             DEFER(margo_destroy(back_handle));
 
@@ -131,29 +132,29 @@ void yk_doc_fetch_ult(hg_handle_t h)
 
         } else { // use RDMA
 
-            std::array<void*, 2>     docs_ptr   = {(void*)docs.data(), (void*)docs.data()};
-            std::array<hg_size_t, 2> docs_sizes = {docs.size()*sizeof(size_t), docs.size()};
-            hg_bulk_t                docs_bulk  = HG_BULK_NULL;
+            std::array<void*, 2>     ptrs   = {(void*)doc_sizes.data(), (void*)docs.data()};
+            std::array<hg_size_t, 2> sizes = {doc_sizes.size()*sizeof(size_t), docs.size()};
+            hg_bulk_t                bulk  = HG_BULK_NULL;
             hret = margo_bulk_create(
-                    mid, docs_sizes[1] ? 2 : 1, docs_ptr.data(), docs_sizes.data(), HG_BULK_READ_ONLY, &docs_bulk);
+                    mid, sizes[1] ? 2 : 1, ptrs.data(), sizes.data(), HG_BULK_READ_ONLY, &bulk);
             CHECK_HRET_OUT_GOTO(hret, margo_bulk_create, finish);
-            DEFER(margo_bulk_free(docs_bulk));
+            DEFER(margo_bulk_free(bulk));
 
             doc_fetch_back_in_t back_in;
             back_in.op_ref = in.op_ref;
             back_in.start  = batch_index*in.batch_size;
             back_in.count  = ids.size;
-            back_in.size   = std::accumulate(docs_sizes.begin(), docs_sizes.end(), (size_t)0);
-            back_in.bulk   = docs_bulk;
+            back_in.size   = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
+            back_in.bulk   = bulk;
 
             out.ret = wait_for_previous_rpc();
             if(out.ret != YOKAN_SUCCESS)
                 break;
 
-            // send a fetch_back RPC to the client
+            // send a doc_fetch_back RPC to the client
 
             hg_handle_t back_handle = HG_HANDLE_NULL;
-            hret = margo_create(mid, info->addr, provider->fetch_back_id, &back_handle);
+            hret = margo_create(mid, info->addr, provider->doc_fetch_back_id, &back_handle);
             CHECK_HRET_OUT_GOTO(hret, margo_create, finish);
             DEFER(margo_destroy(back_handle));
 
@@ -166,8 +167,8 @@ void yk_doc_fetch_ult(hg_handle_t h)
             previous.doc_sizes = std::move(doc_sizes);
             margo_ref_incr(back_handle);
             previous.handle = back_handle;
-            margo_bulk_ref_incr(docs_bulk);
-            previous.bulk   = docs_bulk;
+            margo_bulk_ref_incr(bulk);
+            previous.bulk   = bulk;
             previous.req    = req;
         }
     }

@@ -201,7 +201,7 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
                        doc_fetch_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_back_ult);
     c->doc_fetch_direct_back_id =
         MARGO_REGISTER(mid, "yk_doc_fetch_direct_back",
-                       doc_fetch_direct_back_in_t, doc_fetch_direct_back_out_t, yk_doc_fetch_direct_back_ult);
+                       doc_fetch_direct_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_direct_back_ult);
 
 
     *client = c;
