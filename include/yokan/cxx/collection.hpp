@@ -122,6 +122,55 @@ class Collection {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
+    void fetch(yk_id_t id,
+               yk_document_callback_t cb,
+               void* uargs,
+               int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_fetch(m_db.handle(), m_name.c_str(), mode, id, cb, uargs);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    using fetch_callback_type =
+        std::function<yk_return_t(size_t,yk_id_t,const void*,size_t)>;
+
+    static yk_return_t _fetch_dispatch(void* uargs, size_t index, yk_id_t id,
+                                       const void* val, size_t vsize) {
+        const fetch_callback_type* cb_ptr =
+            static_cast<const fetch_callback_type*>(uargs);
+        return (*cb_ptr)(index, id, val, vsize);
+    }
+
+    void fetch(yk_id_t id,
+               const fetch_callback_type& cb,
+               int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_fetch(m_db.handle(), m_name.c_str(), mode, id, _fetch_dispatch, (void*)&cb);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchMulti(size_t count,
+                    const yk_id_t* ids,
+                    yk_document_callback_t cb,
+                    void* uargs,
+                    const yk_doc_fetch_options_t* options = nullptr,
+                    int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err= yk_doc_fetch_multi(
+                m_db.handle(), m_name.c_str(),
+                mode, count, ids, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    void fetchMulti(size_t count,
+                    const yk_id_t* ids,
+                    const fetch_callback_type& cb,
+                    const yk_doc_fetch_options_t* options = nullptr,
+                    int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err= yk_doc_fetch_multi(
+                m_db.handle(), m_name.c_str(),
+                mode, count, ids, _fetch_dispatch,
+                (void*)&cb, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
     size_t length(yk_id_t id,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
         size_t size;
