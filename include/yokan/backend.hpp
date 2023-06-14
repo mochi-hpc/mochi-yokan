@@ -596,9 +596,37 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+    using DocFetchCallback = std::function<Status(yk_id_t, const UserMem& doc)>;
+
+    /**
+     * @brief Get the documents associated withe the ids and pass them successively
+     * to the provided callback function.
+     *
+     * Note: this function is not const because it can potentially
+     * call erase() if a YOKAN_MODE_CONSUME is specified, for instance.
+     *
+     * @param collection Collection name.
+     * @param mode Mode.
+     * @param ids Ids.
+     * @param func Function to call on the documents.
+     *
+     * @return Status.
+     */
+    virtual Status docFetch(const char* collection,
+                            int32_t mode, const BasicUserMem<yk_id_t>& ids,
+                            const DocFetchCallback& func) {
+        (void)collection;
+        (void)mode;
+        (void)ids;
+        (void)func;
+        return Status::NotSupported;
+    }
+
+
     /**
      * @brief Erase a set of documents.
      *
+     * @param [in] collection Collection name.
      * @param [in] mode Mode.
      * @param [in] ids Ids of the documents to erase.
      *
