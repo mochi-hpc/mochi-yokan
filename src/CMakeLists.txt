@@ -19,6 +19,7 @@ set (server-src-files
      server/doc_store.cpp
      server/doc_update.cpp
      server/doc_load.cpp
+     server/doc_fetch.cpp
      server/doc_length.cpp
      server/doc_list.cpp
      server/util/filters.cpp
@@ -115,6 +116,7 @@ set (client-src-files
      client/doc_update.cpp
      client/doc_length.cpp
      client/doc_load.cpp
+     client/doc_fetch.cpp
      client/doc_list.cpp)
 
 set (admin-src-files

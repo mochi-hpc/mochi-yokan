@@ -205,6 +205,26 @@ class DocumentStoreMixin : public DB {
         return get(mode, packed, keys, ksizes, documents, sizes);
     }
 
+    Status docFetch(const char* collection,
+                    int32_t mode,
+                    const BasicUserMem<yk_id_t>& ids,
+                    const DatabaseInterface::DocFetchCallback& func) override {
+        if(collection == nullptr || collection[0] == 0)
+              return Status::InvalidArg;
+        auto name_len = strlen(collection);
+        ScopedReadLock lock(m_lock);
+        bool e;
+        auto status = _collExists(collection, name_len, &e);
+        if(status != Status::OK) return status;
+        auto keys = _keysFromIds(collection, name_len, ids);
+        std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
+        return this->fetch(mode, keys, ksizes,
+            [&func, name_len](const UserMem& key, const UserMem& val) -> Status {
+                yk_id_t id = _idFromKey(name_len, key.data);
+                return func(id, val);
+            });
+    }
+
     Status docErase(const char* collection,
                     int32_t mode,
                     const BasicUserMem<yk_id_t>& ids) override {

@@ -416,19 +416,21 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_load_direct_id = id;
 
-    /*
     id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_fetch",
             doc_fetch_in_t, doc_fetch_out_t,
             yk_doc_fetch_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_fetch_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_fetch_direct",
-            doc_fetch_direct_in_t, doc_fetch_direct_out_t,
-            yk_doc_fetch_direct_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->doc_fetch_direct_id = id;
-    */
+    margo_registered_name(mid, "yk_doc_fetch_back", &id, &flag);
+    if(flag) p->doc_fetch_back_id = id;
+    else p->doc_fetch_back_id = MARGO_REGISTER(
+        mid, "yk_doc_fetch_back", doc_fetch_back_in_t, doc_fetch_back_out_t, NULL);
+
+    margo_registered_name(mid, "yk_doc_fetch_direct_back", &id, &flag);
+    if(flag) p->doc_fetch_direct_back_id = id;
+    else p->doc_fetch_direct_back_id = MARGO_REGISTER(
+        mid, "yk_doc_fetch_direct_back", doc_fetch_direct_back_in_t, doc_fetch_back_out_t, NULL);
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_store",
             doc_store_in_t, doc_store_out_t,
@@ -518,6 +520,8 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->put_direct_id);
     margo_deregister(mid, provider->get_id);
     margo_deregister(mid, provider->get_direct_id);
+    margo_deregister(mid, provider->fetch_id);
+    margo_deregister(mid, provider->fetch_direct_id);
     margo_deregister(mid, provider->erase_id);
     margo_deregister(mid, provider->erase_direct_id);
     margo_deregister(mid, provider->list_keys_id);
@@ -533,6 +537,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_store_direct_id);
     margo_deregister(mid, provider->doc_load_id);
     margo_deregister(mid, provider->doc_load_direct_id);
+    margo_deregister(mid, provider->doc_fetch_id);
     margo_deregister(mid, provider->doc_update_id);
     margo_deregister(mid, provider->doc_update_direct_id);
     margo_deregister(mid, provider->doc_length_id);

@@ -93,7 +93,8 @@ typedef struct yk_provider {
     hg_id_t doc_load_id;
     hg_id_t doc_load_direct_id;
     hg_id_t doc_fetch_id;
-    hg_id_t doc_fetch_direct_id;
+    hg_id_t doc_fetch_back_id;
+    hg_id_t doc_fetch_direct_back_id;
     hg_id_t doc_store_id;
     hg_id_t doc_store_direct_id;
     hg_id_t doc_update_id;
@@ -190,8 +191,6 @@ DECLARE_MARGO_RPC_HANDLER(yk_doc_load_direct_ult)
 void yk_doc_load_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_ult)
 void yk_doc_fetch_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_direct_ult)
-void yk_doc_fetch_direct_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_store_ult)
 void yk_doc_store_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_store_direct_ult)

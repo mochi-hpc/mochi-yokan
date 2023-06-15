@@ -47,7 +47,8 @@ typedef struct yk_client {
     hg_id_t           doc_load_id;
     hg_id_t           doc_load_direct_id;
     hg_id_t           doc_fetch_id;
-    hg_id_t           doc_fetch_direct_id;
+    hg_id_t           doc_fetch_back_id;
+    hg_id_t           doc_fetch_direct_back_id;
     hg_id_t           doc_store_id;
     hg_id_t           doc_store_direct_id;
     hg_id_t           doc_update_id;
@@ -63,9 +64,9 @@ typedef struct yk_client {
 
 typedef struct yk_database_handle {
     yk_client_t      client;
-    hg_addr_t         addr;
-    uint16_t          provider_id;
-    uint64_t          refcount;
+    hg_addr_t        addr;
+    uint16_t         provider_id;
+    uint64_t         refcount;
     yk_database_id_t database_id;
 } yk_database_handle;
 
@@ -73,5 +74,10 @@ DECLARE_MARGO_RPC_HANDLER(yk_fetch_back_ult)
 void yk_fetch_back_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_fetch_direct_back_ult)
 void yk_fetch_direct_back_ult(hg_handle_t h);
+
+DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_back_ult)
+void yk_doc_fetch_back_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_direct_back_ult)
+void yk_doc_fetch_direct_back_ult(hg_handle_t h);
 
 #endif

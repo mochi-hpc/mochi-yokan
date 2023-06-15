@@ -16,6 +16,7 @@ void yk_fetch_ult(hg_handle_t h)
 {
     hg_return_t hret;
     fetch_in_t in;
+    std::memset(&in, 0, sizeof(in));
     fetch_out_t out;
     hg_addr_t origin_addr = HG_ADDR_NULL;
 

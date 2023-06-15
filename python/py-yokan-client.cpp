@@ -1292,6 +1292,54 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 return result;
              }, "ids"_a, "buffer"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // FETCH
+        // --------------------------------------------------------------
+        .def("fetch",
+             [](const yokan::Collection& coll, yk_id_t id,
+                std::function<void(size_t, yk_id_t, const py::object&)> cb, int32_t mode) {
+                auto func =
+                    [&cb](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, id, py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, id, py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                coll.fetch(id, func, mode);
+             },
+             "id"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // FETCH_MULTI
+        // --------------------------------------------------------------
+        .def("fetch_multi",
+             [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
+                std::function<void(size_t, yk_id_t, const py::object&)> cb,
+                int32_t mode, unsigned batch_size) {
+                auto func =
+                    [&cb](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                        try {
+                            if(vsize <= YOKAN_LAST_VALID_SIZE)
+                                cb(index, id, py::memoryview::from_memory(val, vsize));
+                            else
+                                cb(index, id, py::none());
+                        } catch(py::error_already_set &e) {
+                            return YOKAN_ERR_OTHER;
+                        }
+                        return YOKAN_SUCCESS;
+                    };
+                yk_doc_fetch_options_t options;
+                options.pool       = ABT_POOL_NULL;
+                options.batch_size = batch_size;
+                coll.fetchMulti(
+                    ids.size(), ids.data(),
+                    func, &options, mode);
+             },
+             "ids"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        // --------------------------------------------------------------
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
