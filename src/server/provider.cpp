@@ -342,31 +342,27 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->list_keyvals_direct_id = id;
 
-    /*
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keys",
-            iter_keys_in_t, iter_keys_out_t,
-            yk_iter_keys_ult, provider_id, p->pool);
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter",
+            iter_in_t, iter_out_t,
+            yk_iter_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
-    p->iter_keys_id = id;
+    p->iter_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keys_direct",
-            iter_keys_direct_in_t, iter_keys_direct_out_t,
-            yk_iter_keys_direct_ult, provider_id, p->pool);
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_direct",
+            iter_in_t, iter_out_t,
+            yk_iter_direct_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
-    p->iter_keys_direct_id = id;
+    p->iter_direct_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keyvals",
-            iter_keyvals_in_t, iter_keyvals_out_t,
-            yk_iter_keyvals_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->iter_keyvals_id = id;
+    margo_registered_name(mid, "yk_iter_back", &id, &flag);
+    if(flag) p->iter_back_id = id;
+    else p->iter_back_id = MARGO_REGISTER(
+        mid, "yk_iter_back", iter_back_in_t, iter_back_out_t, NULL);
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_iter_keyvals_direct",
-            iter_keyvals_direct_in_t, iter_keyvals_direct_out_t,
-            yk_iter_keyvals_direct_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->iter_keyvals_direct_id = id;
-    */
+    margo_registered_name(mid, "yk_iter_direct_back", &id, &flag);
+    if(flag) p->iter_direct_back_id = id;
+    else p->iter_direct_back_id = MARGO_REGISTER(
+        mid, "yk_iter_direct_back", iter_direct_back_in_t, iter_direct_back_out_t, NULL);
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_coll_create",
             coll_create_in_t, coll_create_out_t,
@@ -527,6 +523,8 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->list_keys_id);
     margo_deregister(mid, provider->list_keys_direct_id);
     margo_deregister(mid, provider->list_keyvals_id);
+    margo_deregister(mid, provider->iter_id);
+    margo_deregister(mid, provider->iter_direct_id);
     margo_deregister(mid, provider->coll_create_id);
     margo_deregister(mid, provider->coll_drop_id);
     margo_deregister(mid, provider->coll_exists_id);

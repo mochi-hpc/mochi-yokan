@@ -746,6 +746,46 @@ retry:
         return Status::OK;
     }
 
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
+
+        using iterator = decltype(m_db->begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db->begin();
+        } else {
+            fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
+        }
+
+        const auto end = m_db->end();
+        size_t i = 0;
+        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); it++) {
+            auto& key = it->first;
+            auto& val = it->second;
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
+                continue;
+            }
+
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = ignore_values ? UserMem{nullptr, 0} : UserMem{(char*)val.data(), val.size()};
+
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+        }
+
+        return Status::OK;
+    }
+
+
     struct MapMigrationHandle : public MigrationHandle {
 
         MapDatabase&   m_db;

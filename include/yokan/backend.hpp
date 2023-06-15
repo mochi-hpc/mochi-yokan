@@ -378,44 +378,29 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
-    /**
-     * @brief Iterate through the keys, calling the provided function on each
-     * key (corresponding value will is set to null).
-     *
-     * @param mode Mode
-     * @param fromKey Starting key.
-     * @param filter Key filter.
-     * @param func Function to call on each key.
-     *
-     * @return Status.
-     */
-    virtual Status iterKeys(int32_t mode, const UserMem& fromKey,
-                            const std::shared_ptr<KeyValueFilter>& filter,
-                            const FetchCallback& func) const {
-        (void)mode;
-        (void)fromKey;
-        (void)filter;
-        (void)func;
-        return Status::NotSupported;
-    }
+    using IterCallback = std::function<Status(const UserMem& key, const UserMem& val)>;
 
     /**
      * @brief Iterate through the key/value pairs, calling the provided
-     * function on each key/value pair in sequence.
+     * function on each key/value pair.
      *
-     * @param mode Mode
+     * @param mode Mode.
+     * @param max Max number of key/values pairs to list (0 to list everything).
      * @param fromKey Starting key.
      * @param filter Key filter.
      * @param func Function to call on each key.
      *
      * @return Status.
      */
-    virtual Status iterKeyValues(int32_t mode, const UserMem& fromKey,
-                            const std::shared_ptr<KeyValueFilter>& filter,
-                            const FetchCallback& func) const {
+    virtual Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                        const std::shared_ptr<KeyValueFilter>& filter,
+                        bool ignore_values,
+                        const IterCallback& func) const {
+        (void)max;
         (void)mode;
         (void)fromKey;
         (void)filter;
+        (void)ignore_values;
         (void)func;
         return Status::NotSupported;
     }
