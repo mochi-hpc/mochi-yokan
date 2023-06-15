@@ -33,10 +33,10 @@ typedef struct yk_client {
     hg_id_t           list_keys_direct_id;
     hg_id_t           list_keyvals_id;
     hg_id_t           list_keyvals_direct_id;
-    hg_id_t           iter_keys_id;
-    hg_id_t           iter_keys_direct_id;
-    hg_id_t           iter_keyvals_id;
-    hg_id_t           iter_keyvals_direct_id;
+    hg_id_t           iter_id;
+    hg_id_t           iter_direct_id;
+    hg_id_t           iter_back_id;
+    hg_id_t           iter_direct_back_id;
 
     hg_id_t           coll_create_id;
     hg_id_t           coll_drop_id;
@@ -74,6 +74,11 @@ DECLARE_MARGO_RPC_HANDLER(yk_fetch_back_ult)
 void yk_fetch_back_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_fetch_direct_back_ult)
 void yk_fetch_direct_back_ult(hg_handle_t h);
+
+DECLARE_MARGO_RPC_HANDLER(yk_iter_back_ult)
+void yk_iter_back_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_direct_back_ult)
+void yk_iter_direct_back_ult(hg_handle_t h);
 
 DECLARE_MARGO_RPC_HANDLER(yk_doc_fetch_back_ult)
 void yk_doc_fetch_back_ult(hg_handle_t h);

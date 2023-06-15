@@ -997,17 +997,21 @@ yk_return_t yk_list_keyvals_bulk(yk_database_handle_t dbh,
                                  size_t count);
 
 typedef struct yk_iter_options {
-    unsigned recv_batch_size; /* how many items to receive at once */
+    unsigned batch_size;    /* how many items to receive at once */
+    ABT_pool pool;          /* pool in which to execute the callback */
+    bool     ignore_values; /* ignore the values if set to true */
 } yk_iter_options_t;
 
 /**
- * @brief Iterate up to count keys from from_key (included if
+ * @brief Iterate up to max key/value pairs from from_key (included if
  * inclusive is set in the mode), filtering keys if a filter is provided.
  *
  * Unless a specific mode is used to change it, the filter is
  * considered as a prefix that the keys must start with.
  *
  * If count is set to 0, this function will iterate until the end.
+ * If ignore_values is set to true in the options, the callback
+ * will be invoked with NULL values and value size of 0.
  *
  * @param[in] dbh Database handle.
  * @param[in] mode 0 or bitwise "or" of YOKAN_MODE_* flags.
@@ -1022,48 +1026,17 @@ typedef struct yk_iter_options {
  *
  * @return YOKAN_SUCCESS or corresponding error code.
  */
-yk_return_t yk_iter_keys(yk_database_handle_t dbh,
-                         int32_t mode,
-                         const void* from_key,
-                         size_t from_ksize,
-                         const void* filter,
-                         size_t filter_size,
-                         size_t count,
-                         yk_keyvalue_callback_t cb,
-                         void* uargs,
-                         const yk_iter_options_t* options);
+yk_return_t yk_iter(yk_database_handle_t dbh,
+                    int32_t mode,
+                    const void* from_key,
+                    size_t from_ksize,
+                    const void* filter,
+                    size_t filter_size,
+                    size_t count,
+                    yk_keyvalue_callback_t cb,
+                    void* uargs,
+                    const yk_iter_options_t* options);
 
-/**
- * @brief Iterate up to count key/value pairs from from_key (included if
- * inclusive is set in the mode), filtering keys if a filter is provided.
- *
- * Unless a specific mode is used to change it, the filter is
- * considered as a prefix that the keys must start with.
- *
- * If count is set to 0, this function will iterate until the end.
- *
- * @param[in] dbh Database handle.
- * @param[in] mode 0 or bitwise "or" of YOKAN_MODE_* flags.
- * @param[in] from_key Starting key.
- * @param[in] from_ksize Starting key size.
- * @param[in] filter Key filter.
- * @param[in] filter_size Filter size.
- * @param[in] count Max keys to read, 0 for all.
- * @param[in] cb Callback to call in each key.
- * @param[in] uargs Callback user-argument.
- * @param[in] options Options.
- *
- * @return YOKAN_SUCCESS or corresponding error code.
- */
-yk_return_t yk_iter_keyvals(yk_database_handle_t dbh,
-                            int32_t mode,
-                            const void* from_key,
-                            size_t from_ksize,
-                            const void* filter,
-                            size_t filter_size,
-                            size_t count,
-                            yk_keyvalue_callback_t cb,
-                            const yk_iter_options_t* options);
 #ifdef __cplusplus
 }
 #endif

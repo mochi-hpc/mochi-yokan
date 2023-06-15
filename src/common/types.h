@@ -358,6 +358,39 @@ MERCURY_GEN_PROC(list_keyvals_direct_out_t,
         ((raw_data)(keys))\
         ((raw_data)(vals)))
 
+/* iter */
+MERCURY_GEN_PROC(iter_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((hg_bool_t)(no_values))\
+        ((uint32_t)(batch_size))\
+        ((uint64_t)(count))\
+        ((raw_data)(from_key))\
+        ((raw_data)(filter))\
+        ((uint64_t)(op_ref)))
+MERCURY_GEN_PROC(iter_out_t,
+        ((int32_t)(ret)))
+
+/* iter_back */
+MERCURY_GEN_PROC(iter_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_t)(count))\
+        ((uint64_t)(size))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(iter_back_out_t,
+        ((int32_t)(ret)))
+
+/* iter_back (direct) */
+MERCURY_GEN_PROC(iter_direct_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_list)(ksizes))\
+        ((uint64_list)(vsizes))\
+        ((raw_data)(keyvals)))
+MERCURY_GEN_PROC(iter_direct_back_out_t,
+        ((int32_t)(ret)))
+
 
 /* coll_create */
 MERCURY_GEN_PROC(coll_create_in_t,

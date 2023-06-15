@@ -106,6 +106,7 @@ set (client-src-files
      client/exists.cpp
      client/list_keys.cpp
      client/list_keyvals.cpp
+     client/iter.cpp
      client/coll_create.cpp
      client/coll_drop.cpp
      client/coll_exists.cpp
