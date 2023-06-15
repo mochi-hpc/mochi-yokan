@@ -120,22 +120,35 @@ void yk_iter_ult(hg_handle_t h)
         return YOKAN_SUCCESS;
     };
 
+    auto filter_umem = yokan::UserMem{in.filter.data, in.filter.size };
+    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
+
     auto iter_func = [&](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
-        auto v = in.no_values ? yokan::UserMem{nullptr, 0} : val;
-        ksizes.push_back(key.size);
-        vsizes.push_back(v.size);
+        // filtered_ksize and filtered_vsize are upper-bounds here
+        auto filtered_ksize = filter->keySizeFrom(key.data, key.size);
+        auto filtered_vsize = in.no_values ? 0 : filter->valSizeFrom(val.data, val.size);
         auto current_size = keyvals.size();
-        keyvals.resize(current_size + key.size + v.size);
-        std::memcpy(keyvals.data() + current_size, key.data, key.size);
-        std::memcpy(keyvals.data() + current_size + key.size, v.data, v.size);
+        keyvals.resize(current_size + filtered_ksize + filtered_vsize);
+        filtered_ksize = filter->keyCopy(keyvals.data() + current_size, filtered_ksize, key.data, key.size);
+        if(!in.no_values)
+            filtered_vsize = filter->valCopy(
+                keyvals.data() + current_size + filtered_ksize,
+                filtered_vsize, val.data, val.size);
+        ksizes.push_back(filtered_ksize);
+        vsizes.push_back(filtered_vsize);
+        // filtered_ksize and filtered_vsize may have changed
+        keyvals.resize(current_size + filtered_ksize + filtered_vsize);
         if(ksizes.size() == in.batch_size)
             return (yokan::Status)send_batch();
         return yokan::Status::OK;
     };
 
     auto from_key = yokan::UserMem{in.from_key.data, in.from_key.size};
-    auto filter_umem = yokan::UserMem{in.filter.data, in.filter.size };
-    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
 
     out.ret = static_cast<yk_return_t>(
             database->iter(in.mode, in.count, from_key, filter, in.no_values, iter_func));
@@ -223,7 +236,7 @@ void yk_iter_direct_ult(hg_handle_t h)
 
         // send a iter_back RPC to the client
         hg_handle_t back_handle = HG_HANDLE_NULL;
-        hret = margo_create(mid, info->addr, provider->iter_back_id, &back_handle);
+        hret = margo_create(mid, info->addr, provider->iter_direct_back_id, &back_handle);
         CHECK_HRET(hret, margo_create);
         DEFER(margo_destroy(back_handle));
 
@@ -245,22 +258,35 @@ void yk_iter_direct_ult(hg_handle_t h)
         return YOKAN_SUCCESS;
     };
 
+    auto filter_umem = yokan::UserMem{in.filter.data, in.filter.size };
+    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
+
+    if(!filter) {
+        out.ret = YOKAN_ERR_INVALID_FILTER;
+        return;
+    }
+
     auto iter_func = [&](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
-        auto v = in.no_values ? yokan::UserMem{nullptr, 0} : val;
-        ksizes.push_back(key.size);
-        vsizes.push_back(v.size);
+        // filtered_ksize and filtered_vsize are upper-bounds here
+        auto filtered_ksize = filter->keySizeFrom(key.data, key.size);
+        auto filtered_vsize = in.no_values ? 0 : filter->valSizeFrom(val.data, val.size);
         auto current_size = keyvals.size();
-        keyvals.resize(current_size + key.size + v.size);
-        std::memcpy(keyvals.data() + current_size, key.data, key.size);
-        std::memcpy(keyvals.data() + current_size + key.size, v.data, v.size);
+        keyvals.resize(current_size + filtered_ksize + filtered_vsize);
+        filtered_ksize = filter->keyCopy(keyvals.data() + current_size, filtered_ksize, key.data, key.size);
+        if(!in.no_values)
+            filtered_vsize = filter->valCopy(
+                keyvals.data() + current_size + filtered_ksize,
+                filtered_vsize, val.data, val.size);
+        ksizes.push_back(filtered_ksize);
+        vsizes.push_back(filtered_vsize);
+        // filtered_ksize and filtered_vsize may have changed
+        keyvals.resize(current_size + filtered_ksize + filtered_vsize);
         if(ksizes.size() == in.batch_size)
             return (yokan::Status)send_batch();
         return yokan::Status::OK;
     };
 
-    auto from_key    = yokan::UserMem{in.from_key.data, in.from_key.size};
-    auto filter_umem = yokan::UserMem{in.filter.data, in.filter.size };
-    auto filter      = yokan::FilterFactory::makeKeyValueFilter(mid, in.mode, filter_umem);
+    auto from_key = yokan::UserMem{in.from_key.data, in.from_key.size};
 
     out.ret = static_cast<yk_return_t>(
             database->iter(in.mode, in.count, from_key, filter, in.no_values, iter_func));

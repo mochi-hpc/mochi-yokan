@@ -42,6 +42,19 @@ struct KeyPrefixFilter : public KeyValueFilter {
         return std::memcmp(key, m_prefix.data, m_prefix.size) == 0;
     }
 
+    size_t keySizeFrom(const void* key, size_t ksize) const override {
+        (void)key;
+        if(m_mode & YOKAN_MODE_NO_PREFIX)
+            return ksize - m_prefix.size;
+        else
+            return ksize;
+    }
+
+    size_t valSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize;
+    }
+
     size_t keyCopy(void* dst, size_t max_dst_size,
                    const void* key, size_t ksize) const override {
         if(!(m_mode & YOKAN_MODE_NO_PREFIX)) { // don't eliminate prefix/suffix
@@ -94,6 +107,19 @@ struct KeySuffixFilter : public KeyValueFilter {
         return std::memcmp(((const char*)key)+ksize-m_suffix.size, m_suffix.data, m_suffix.size) == 0;
     }
 
+    size_t keySizeFrom(const void* key, size_t ksize) const override {
+        (void)key;
+        if(m_mode & YOKAN_MODE_NO_PREFIX)
+            return ksize - m_suffix.size;
+        else
+            return ksize;
+    }
+
+    size_t valSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize;
+    }
+
     size_t keyCopy(void* dst, size_t max_dst_size,
                    const void* key, size_t ksize) const override {
         if(!(m_mode & YOKAN_MODE_NO_PREFIX)) { // don't eliminate suffix
@@ -142,6 +168,16 @@ struct LuaKeyValueFilter : public KeyValueFilter {
         auto result = m_lua.do_string(std::string_view{ m_code.data, m_code.size });
         if(!result.valid()) return false;
         return static_cast<bool>(result);
+    }
+
+    size_t keySizeFrom(const void* key, size_t ksize) const override {
+        (void)key;
+        return ksize;
+    }
+
+    size_t valSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize;
     }
 
     size_t keyCopy(void* dst, size_t max_dst_size,

@@ -44,6 +44,26 @@ class KeyValueFilter {
     virtual bool check(const void* key, size_t ksize,
                        const void* val, size_t vsize) const = 0;
 
+
+    /**
+     * @brief Compute the new key size from the provided key
+     * after the filter is applied, or an upper bound of the key size.
+     * This function will only be applied to keys that pass the check
+     * function (i.e. you can assume that check has already been called
+     * and returned true).
+     */
+    virtual size_t keySizeFrom(
+        const void* key, size_t ksize) const = 0;
+
+    /**
+     * @brief Compute the new value size from the provided value
+     * after the filter is applied, or an upper bound of the value size.
+     * This function will only be applied to keys that pass the check function
+     * (i.e. you can assume that check has already been called and returned true).
+     */
+    virtual size_t valSizeFrom(
+        const void* val, size_t vsize) const = 0;
+
     /**
      * @brief Copy the key to the target destination. This copy may
      * be implemented differently depending on the mode, and may alter
