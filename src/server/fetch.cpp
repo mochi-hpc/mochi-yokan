@@ -231,18 +231,19 @@ void yk_fetch_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
+    if(in.batch_size == 0)
+        in.batch_size = in.ksizes.count;
+
+    size_t num_batches = (size_t)std::ceil((double)in.ksizes.count/(double)in.batch_size);
+
     yk_database* database = find_database(provider, &in.db_id);
     CHECK_DATABASE(database, in.db_id);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto count = in.ksizes.count;
-    auto ksizes_umem = yokan::BasicUserMem<size_t>{
-        in.ksizes.sizes, count };
-    auto keys_umem = yokan::UserMem{
-        in.keys.data, in.keys.size };
 
     // check that there is no key of size 0
-    auto min_key_size = std::accumulate(in.ksizes.sizes, in.ksizes.sizes + in.ksizes.count,
+    auto min_key_size = std::accumulate(in.ksizes.sizes, in.ksizes.sizes + count,
                                         std::numeric_limits<size_t>::max(),
                                         [](const size_t& lhs, const size_t& rhs) {
                                             return std::min(lhs, rhs);
@@ -252,54 +253,98 @@ void yk_fetch_direct_ult(hg_handle_t h)
         return;
     }
 
-    fetch_direct_back_in_t back_in;
-    fetch_direct_back_out_t back_out;
-
-    std::vector<char>   values;
-    std::vector<size_t> vsizes;
-    vsizes.reserve(count);
-
-    back_in.op_ref = in.op_ref;
-    back_in.start  = 0;
-
-    auto fetcher = [&values, &vsizes](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
-        (void)key;
-        vsizes.push_back(val.size);
-        if(val.size != YOKAN_KEY_NOT_FOUND) {
-            size_t current_size = values.size();
-            if(values.capacity() < current_size + val.size)
-                values.reserve(values.capacity()*2);
-            values.resize(current_size + val.size);
-            std::memcpy(values.data() + current_size, val.data, val.size);
-        }
-        return yokan::Status::OK;
+    struct previous_op {
+        hg_handle_t   handle = HG_HANDLE_NULL;
+        margo_request req    = MARGO_REQUEST_NULL;
     };
 
-    out.ret = static_cast<yk_return_t>(
-        database->fetch(in.mode, keys_umem, ksizes_umem, fetcher));
+    previous_op previous;
 
-    if(out.ret != YOKAN_SUCCESS)
-        return;
+    auto wait_for_previous_rpc = [&previous, &mid]() -> yk_return_t {
+        hg_return_t hret = HG_SUCCESS;
+        DEFER(margo_destroy(previous.handle); previous.handle = HG_HANDLE_NULL;);
+        if(previous.handle == HG_HANDLE_NULL) return YOKAN_SUCCESS;
+        hret = margo_wait(previous.req);
+        CHECK_HRET(hret, margo_wait);
+        fetch_direct_back_out_t back_out;
+        hret = margo_get_output(previous.handle, &back_out);
+        CHECK_HRET(hret, margo_get_output);
+        DEFER(margo_free_output(previous.handle, &back_out));
+        return (yk_return_t)back_out.ret;
+    };
 
-    back_in.vsizes.count = count;
-    back_in.vsizes.sizes = vsizes.data();
-    back_in.vals.size    = values.size();
-    back_in.vals.data    = values.data();
+    size_t keys_offset = 0;
 
-    // send a fetch_direct_back RPC to the client
+    for(unsigned batch_index = 0; batch_index < num_batches; ++batch_index) {
 
-    hg_handle_t back_handle = HG_HANDLE_NULL;
-    hret = margo_create(mid, info->addr, provider->fetch_direct_back_id, &back_handle);
-    CHECK_HRET_OUT(hret, margo_create);
-    DEFER(margo_destroy(back_handle));
+        // create UserMem wrapper for ksizes for this batch
+        auto ksizes = yokan::BasicUserMem<size_t>{
+            in.ksizes.sizes + in.batch_size*batch_index,
+            std::min<size_t>(in.batch_size, count - batch_index*in.batch_size)};
 
-    hret = margo_forward(back_handle, &back_in);
-    CHECK_HRET_OUT(hret, margo_forward);
+        auto total_batch_ksize = std::accumulate(
+            ksizes.data, ksizes.data+ksizes.size, (size_t)0);
 
-    hret = margo_get_output(back_handle, &back_out);
-    CHECK_HRET_OUT(hret, margo_get_output);
-    DEFER(margo_free_output(back_handle, &back_out));
+        // create UserMem wrapper for keys for this batch
+        auto keys = yokan::UserMem{ ((char*)in.keys.data) + keys_offset, total_batch_ksize };
 
-    out.ret = back_out.ret;
+        // create buffers to hold the values and value sizes
+        std::vector<char>   values;
+        std::vector<size_t> vsizes;
+        vsizes.reserve(in.batch_size);
+
+        auto fetcher = [&values, &vsizes](const yokan::UserMem& key, const yokan::UserMem& val) -> yokan::Status {
+            (void)key;
+            vsizes.push_back(val.size);
+            if(val.size != YOKAN_KEY_NOT_FOUND) {
+                size_t current_size = values.size();
+                if(values.capacity() < current_size + val.size)
+                    values.reserve(values.capacity()*2);
+                values.resize(current_size + val.size);
+                std::memcpy(values.data() + current_size, val.data, val.size);
+            }
+            return yokan::Status::OK;
+        };
+
+        out.ret = static_cast<yk_return_t>(
+                database->fetch(in.mode, keys, ksizes, fetcher));
+        if(out.ret != YOKAN_SUCCESS)
+            break;
+
+        fetch_direct_back_in_t back_in;
+        back_in.op_ref       = in.op_ref;
+        back_in.start        = batch_index*in.batch_size;
+        back_in.vsizes.count = vsizes.size();
+        back_in.vsizes.sizes = vsizes.data();
+        back_in.vals.size    = values.size();
+        back_in.vals.data    = values.data();
+
+        out.ret = wait_for_previous_rpc();
+        if(out.ret != YOKAN_SUCCESS)
+            break;
+
+        // send a fetch_direct_back RPC to the client
+
+        hg_handle_t back_handle = HG_HANDLE_NULL;
+        hret = margo_create(mid, info->addr, provider->fetch_direct_back_id, &back_handle);
+        CHECK_HRET_OUT_GOTO(hret, margo_create, finish);
+        DEFER(margo_destroy(back_handle));
+
+        margo_request req = MARGO_REQUEST_NULL;
+
+        hret = margo_iforward(back_handle, &back_in, &req);
+        CHECK_HRET_OUT_GOTO(hret, margo_iforward, finish);
+
+        margo_ref_incr(back_handle);
+        previous.handle = back_handle;
+        previous.req    = req;
+
+        keys_offset += total_batch_ksize;
+    }
+
+finish:
+    auto ret = wait_for_previous_rpc();
+    if(out.ret == YOKAN_SUCCESS) out.ret = ret;
+    return;
 }
 DEFINE_MARGO_RPC_HANDLER(yk_fetch_direct_ult)

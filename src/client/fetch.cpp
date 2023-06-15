@@ -440,7 +440,7 @@ void yk_fetch_direct_back_ult(hg_handle_t h)
 
     fetch_context* context = reinterpret_cast<fetch_context*>(in.op_ref);
 
-    if(context->keys.size() != in.vsizes.count) {
+    if(context->keys.size() < in.vsizes.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
