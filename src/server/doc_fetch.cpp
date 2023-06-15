@@ -73,9 +73,10 @@ void yk_doc_fetch_ult(hg_handle_t h)
     for(unsigned batch_index = 0; batch_index < num_batches; ++batch_index) {
 
         // create UserMem wrapper for ids for this batch
+        auto ids_start = (uint64_t)in.batch_size * (uint64_t)batch_index;
         auto ids = yokan::BasicUserMem<yk_id_t>{
-            in.ids.ids + in.batch_size*batch_index,
-            std::min<size_t>(in.batch_size, in.ids.count - batch_index*in.batch_size)};
+            in.ids.ids + ids_start,
+            std::min<size_t>(in.batch_size, in.ids.count - ids_start)};
 
         // create buffers to hold the documents and document sizes
         std::vector<char>   docs;
@@ -104,7 +105,7 @@ void yk_doc_fetch_ult(hg_handle_t h)
 
             doc_fetch_direct_back_in_t back_in;
             back_in.op_ref = in.op_ref;
-            back_in.start  = batch_index*in.batch_size;
+            back_in.start  = ids_start;
             back_in.doc_sizes.count = doc_sizes.size();
             back_in.doc_sizes.sizes = doc_sizes.data();
             back_in.docs.size = docs.size();
@@ -142,7 +143,7 @@ void yk_doc_fetch_ult(hg_handle_t h)
 
             doc_fetch_back_in_t back_in;
             back_in.op_ref = in.op_ref;
-            back_in.start  = batch_index*in.batch_size;
+            back_in.start  = ids_start;
             back_in.count  = ids.size;
             back_in.size   = std::accumulate(sizes.begin(), sizes.end(), (size_t)0);
             back_in.bulk   = bulk;

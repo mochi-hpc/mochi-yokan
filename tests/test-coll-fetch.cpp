@@ -145,7 +145,6 @@ static MunitResult test_doc_fetch_multi(const MunitParameter params[], void* dat
 
     std::vector<yk_id_t> ids;
 
-    unsigned i = 0;
     for(yk_id_t i = 0; i < context->reference.size(); i++)
         ids.push_back(i);
 
@@ -165,7 +164,7 @@ static MunitResult test_doc_fetch_multi(const MunitParameter params[], void* dat
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
     munit_assert_size(args.recv_values.size(), ==, context->reference.size());
-    i = 0;
+    unsigned i = 0;
     for(auto& p : context->reference) {
         auto& val   = args.recv_values[i];
         munit_assert_long(val.size(), ==, p.size());
