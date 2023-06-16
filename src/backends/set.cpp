@@ -632,6 +632,45 @@ class SetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        (void)ignore_values;
+        ScopedReadLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
+
+        using iterator = decltype(m_db->begin());
+        iterator fromKeyIt;
+        if(fromKey.size == 0) {
+            fromKeyIt = m_db->begin();
+        } else {
+            fromKeyIt = inclusive ? m_db->lower_bound(fromKey) : m_db->upper_bound(fromKey);
+        }
+        const auto end = m_db->end();
+        size_t i = 0;
+
+        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); it++) {
+            auto& key = *it;
+            if(!filter->check(key.data(), key.size(), nullptr, 0)) {
+                if(filter->shouldStop(key.data(), key.size(), nullptr, 0))
+                    break;
+                continue;
+            }
+
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = UserMem{nullptr, 0};
+
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+            ++i;
+        }
+        return Status::OK;
+    }
+
     struct SetMigrationHandle : public MigrationHandle {
 
         SetDatabase&   m_db;
