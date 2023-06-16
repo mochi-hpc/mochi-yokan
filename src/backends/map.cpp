@@ -775,7 +775,8 @@ retry:
             }
 
             auto key_umem = UserMem{(char*)key.data(), key.size()};
-            auto val_umem = ignore_values ? UserMem{nullptr, 0} : UserMem{(char*)val.data(), val.size()};
+            auto val_umem = (ignore_values && !filter->requiresValue()) ?
+                UserMem{nullptr, 0} : UserMem{(char*)val.data(), val.size()};
 
             auto status = func(key_umem, val_umem);
             if(status != Status::OK)

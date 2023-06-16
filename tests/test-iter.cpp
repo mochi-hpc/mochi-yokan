@@ -230,8 +230,10 @@ static MunitResult test_iter_custom_filter(const MunitParameter params[], void* 
                       count, func, &result, &options);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
+        munit_assert_size(result.recv_key.size(), >, 0);
         from_key = result.recv_key.back();
+        // the filter reverses the keys so we have to reverse it back
+        for(unsigned i=0; i < from_key.size()/2; i++) std::swap(from_key[i], from_key[from_key.size()-i-1]);
     }
 
     for(unsigned i=0; i < expected_keys.size(); ++i) {
