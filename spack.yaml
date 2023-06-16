@@ -17,7 +17,7 @@ spack:
   - mochi-margo
   - mercury ~boostsys ^libfabric fabrics=tcp,rxm
   - py-mochi-margo
-  - mochi-bedrock
+  - mochi-bedrock ^mpich
   - ycsb-cpp-interface ^ycsb@master
   - rocksdb+rtti
   - mochi-remi@0.3.3:+bedrock
