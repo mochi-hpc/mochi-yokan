@@ -27,11 +27,16 @@ jobs:
         os: ubuntu-20.04
         ref: develop
 
+    - name: Install mpich
+      run: |
+        sudo apt install -y libmpich-dev
+
     - name: Find external packages
       run: |
         spack -e . external find --not-buildable cmake
         spack -e . external find --not-buildable perl
         spack -e . external find --not-buildable python
+        spack -e . external find --not-buildable mpich
 
     - name: Add mochi-spack-packages
       run: |
