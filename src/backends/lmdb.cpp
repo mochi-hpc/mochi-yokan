@@ -812,6 +812,113 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
+
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, MDB_RDONLY, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+
+        MDB_cursor* cursor = nullptr;
+        ret = mdb_cursor_open(txn, m_db, &cursor);
+        if(ret != MDB_SUCCESS) {
+            mdb_txn_abort(txn);
+            return convertStatus(ret);
+        }
+
+        if(fromKey.size == 0) {
+            MDB_val k, v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_FIRST);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    return Status::OK;
+                }
+                return status;
+            }
+        } else {
+            MDB_val k{ fromKey.size, fromKey.data };
+            MDB_val v;
+            ret = mdb_cursor_get(cursor, &k, &v, MDB_SET_RANGE);
+            if(ret != MDB_SUCCESS) {
+                mdb_txn_abort(txn);
+                auto status = convertStatus(ret);
+                if(status == Status::NotFound) {
+                    return Status::OK;
+                }
+                return status;
+            }
+            if(!inclusive) {
+                if(k.mv_size == fromKey.size
+                && std::memcmp(k.mv_data, fromKey.data, fromKey.size) == 0) {
+                    ret = mdb_cursor_get(cursor, &k, &v, MDB_NEXT);
+                    if(ret != MDB_SUCCESS) {
+                        mdb_txn_abort(txn);
+                        return convertStatus(ret);
+                    }
+                }
+            }
+        }
+
+        size_t i = 0;
+
+        while(max == 0 || i < max) {
+            MDB_val key, val;
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_GET_CURRENT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
+
+            if(!filter->check(key.mv_data, key.mv_size, val.mv_data, val.mv_size)) {
+                if(filter->shouldStop(key.mv_data, key.mv_size, val.mv_data, val.mv_size))
+                    break;
+                ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+                if(ret == MDB_NOTFOUND)
+                    break;
+                if(ret != MDB_SUCCESS) {
+                    mdb_cursor_close(cursor);
+                    mdb_txn_abort(txn);
+                    return convertStatus(ret);
+                }
+                continue;
+            }
+
+            auto key_umem = UserMem{(char*)key.mv_data, key.mv_size};
+            auto val_umem = ignore_values ? UserMem{nullptr, 0} : UserMem{(char*)val.mv_data, val.mv_size};
+
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+
+            i += 1;
+
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+            if(ret == MDB_NOTFOUND)
+                break;
+            if(ret != MDB_SUCCESS) {
+                mdb_cursor_close(cursor);
+                mdb_txn_abort(txn);
+                return convertStatus(ret);
+            }
+        }
+
+        mdb_cursor_close(cursor);
+        mdb_txn_abort(txn);
+
+        return Status::OK;
+    }
+
     struct LMDBMigrationHandle : public MigrationHandle {
 
         LMDBDatabase&   m_db;
