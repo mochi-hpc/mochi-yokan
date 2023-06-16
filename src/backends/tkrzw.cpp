@@ -931,6 +931,84 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    struct Iter : public tkrzw::DBM::RecordProcessor {
+
+        size_t&               m_count;
+        bool                  m_should_stop = false;
+        Status                m_status = Status::OK;
+        std::shared_ptr<KeyValueFilter> m_filter;
+        const DatabaseInterface::IterCallback& m_func;
+
+        Iter(size_t& c, const std::shared_ptr<KeyValueFilter>& filter,
+             const DatabaseInterface::IterCallback& func)
+        : m_count(c)
+        , m_filter(filter)
+        , m_func(func) {}
+
+        std::string_view ProcessFull(std::string_view key,
+                                     std::string_view val) override {
+            if(!m_filter->check(key.data(), key.size(), val.data(), val.size())) {
+                m_should_stop = m_filter->shouldStop(key.data(), key.size(), val.data(), val.size());
+                return tkrzw::DBM::RecordProcessor::NOOP;
+            }
+            m_status = m_func(UserMem{(char*)key.data(), key.size()}, UserMem{(char*)val.data(), val.size()});
+            if(m_status != Status::OK)
+                m_should_stop = true;
+            m_count += 1;
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+
+        std::string_view ProcessEmpty(std::string_view key) override {
+            (void)key;
+            return tkrzw::DBM::RecordProcessor::NOOP;
+        }
+    };
+
+
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        (void)ignore_values;
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+        if(!m_db->IsOrdered())
+            return Status::NotSupported;
+
+        bool inclusive = mode & YOKAN_MODE_INCLUSIVE;
+
+        tkrzw::Status status;
+
+        auto iterator = m_db->MakeIterator();
+        if(fromKey.size == 0) {
+            status = iterator->First();
+        } else {
+            status = iterator->JumpUpper(
+                std::string_view{ fromKey.data, fromKey.size },
+                inclusive);
+        }
+        if(!status.IsOK()) return convertStatus(status);
+
+        size_t i = 0;
+
+        auto processor = Iter{i, filter, func};
+
+        while(max == 0 || i < max) {
+            status = iterator->Process(&processor, false);
+            if(!status.IsOK()) {
+                if(status == tkrzw::Status::NOT_FOUND_ERROR)
+                    break;
+                else return convertStatus(status);
+            }
+            if(processor.m_should_stop)
+                break;
+            status = iterator->Next();
+            if(!status.IsOK()) return convertStatus(status);
+        }
+
+        return processor.m_status;
+    }
+
     struct TkrzwDBMigrationHandle : public MigrationHandle {
 
         TkrzwDatabase&   m_db;
