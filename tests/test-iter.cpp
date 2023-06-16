@@ -144,7 +144,7 @@ static MunitResult test_iter(const MunitParameter params[], void* data)
                       count, func, &result, &options);
         SKIP_IF_NOT_IMPLEMENTED(ret);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
-
+        munit_assert_size(result.recv_key.size(), >, 0);
         from_key = result.recv_key.back();
     }
 

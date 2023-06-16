@@ -765,7 +765,7 @@ retry:
 
         const auto end = m_db->end();
         size_t i = 0;
-        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); ++it, ++i) {
+        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); ++it) {
             auto& key = it->first;
             auto& val = it->second;
             if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
@@ -780,6 +780,7 @@ retry:
             auto status = func(key_umem, val_umem);
             if(status != Status::OK)
                 return status;
+            ++i;
         }
 
         return Status::OK;
