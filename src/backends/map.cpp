@@ -765,7 +765,7 @@ retry:
 
         const auto end = m_db->end();
         size_t i = 0;
-        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); it++) {
+        for(auto it = fromKeyIt; it != end && (max == 0 || i < max); ++it, ++i) {
             auto& key = it->first;
             auto& val = it->second;
             if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
