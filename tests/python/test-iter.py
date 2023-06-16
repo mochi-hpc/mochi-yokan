@@ -77,6 +77,25 @@ class TestIter(unittest.TestCase):
                 self.assertEqual(v_ref, out_vals[i])
                 i += 1
 
+    def test_iter_buffer(self):
+        def callback(i: int, key: memoryview, val: Optional[memoryview]):
+            out_keys.append(bytearray(key).decode('ascii'))
+            if val is None:
+                out_vals.append(val)
+            else:
+                out_vals.append(bytearray(val).decode('ascii'))
+        for prefix in ['', self.prefix]:
+            out_keys = []
+            out_vals = []
+            self.db.iter(callback=callback, from_key=b'', filter=prefix)
+            i = 0
+            for k_ref in sorted(self.reference.keys()):
+                if not k_ref.startswith(prefix):
+                    continue
+                v_ref = self.reference[k_ref]
+                self.assertEqual(k_ref, out_keys[i])
+                self.assertEqual(v_ref, out_vals[i])
+                i += 1
 
 if __name__ == '__main__':
     unittest.main()
