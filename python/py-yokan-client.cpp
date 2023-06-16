@@ -414,11 +414,10 @@ struct to_memory_view<py::buffer> {
 template<typename KeyType, typename FilterType>
 static auto iter_helper(
                 const yokan::Database& db,
-                size_t count,
+                std::function<void(size_t, const KeyType&, const py::object&)> cb,
                 const KeyType& from_key,
                 const FilterType& filter,
-                std::function<void(size_t, const KeyType&, const py::object&)> cb,
-                int32_t mode, unsigned batch_size, bool ignore_values) {
+                size_t count, int32_t mode, unsigned batch_size, bool ignore_values) {
     auto from_key_info = get_buffer_info(from_key);
     CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
     auto filter_info = get_buffer_info(filter);
@@ -432,6 +431,7 @@ static auto iter_helper(
                     cb(i, to_memory_view<KeyType>::apply(key, ksize),
                           to_memory_view<py::buffer>::apply(val, vsize));
             } catch(py::error_already_set &e) {
+                std::cout << e.what() << std::endl;
                 return YOKAN_ERR_OTHER;
             }
             return YOKAN_SUCCESS;
@@ -1184,31 +1184,39 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("iter",
              static_cast<void(*)(
-                const yokan::Database&, size_t, const py::buffer&, const py::buffer&,
+                const yokan::Database&,
                 std::function<void(size_t, const py::buffer&, const py::object&)>,
-                int32_t, unsigned, bool)>(&iter_helper),
-             "count"_a, "from_key"_a, "filter"_a, "callback"_a,
+                const py::buffer&, const py::buffer&,
+                size_t, int32_t, unsigned, bool)>(&iter_helper),
+             "callback"_a,
+             "from_key"_a=py::bytes{}, "filter"_a=py::bytes{}, "count"_a=0,
              "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
         .def("iter",
              static_cast<void(*)(
-                const yokan::Database&, size_t, const py::buffer&, const std::string&,
+                const yokan::Database&,
                 std::function<void(size_t, const py::buffer&, const py::object&)>,
-                int32_t mode, unsigned batch_size, bool ignore_values)>(&iter_helper),
-             "count"_a, "from_key"_a, "filter"_a, "callback"_a,
+                const py::buffer&, const std::string&,
+                size_t, int32_t, unsigned, bool)>(&iter_helper),
+             "callback"_a,
+             "from_key"_a=py::bytes{}, "filter"_a=std::string{}, "count"_a=0,
              "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
         .def("iter",
              static_cast<void(*)(
-                const yokan::Database&, size_t, const std::string&, const py::buffer&,
+                const yokan::Database&,
                 std::function<void(size_t, const std::string&, const py::object&)>,
-                int32_t mode, unsigned batch_size, bool ignore_values)>(&iter_helper),
-             "count"_a, "from_key"_a, "filter"_a, "callback"_a,
+                const std::string&, const py::buffer&,
+                size_t, int32_t, unsigned, bool)>(&iter_helper),
+             "callback"_a,
+             "from_key"_a=std::string{}, "filter"_a=py::bytes{}, "count"_a=0,
              "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
         .def("iter",
              static_cast<void(*)(
-                const yokan::Database&, size_t, const std::string&, const std::string&,
+                const yokan::Database&,
                 std::function<void(size_t, const std::string&, const py::object&)>,
-                int32_t mode, unsigned batch_size, bool ignore_values)>(&iter_helper),
-             "count"_a, "from_key"_a, "filter"_a, "callback"_a,
+                const std::string&, const std::string&,
+                size_t, int32_t, unsigned, bool)>(&iter_helper),
+             "callback"_a,
+             "from_key"_a=std::string{}, "filter"_a=std::string{}, "count"_a=0,
              "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
         // --------------------------------------------------------------
         // COLLECTION MANAGEMENT
