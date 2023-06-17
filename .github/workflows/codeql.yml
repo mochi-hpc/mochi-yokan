@@ -57,11 +57,11 @@ jobs:
       run: |
         jq --sort-keys 'del(.spack.commit) | del(.roots)' tests/spack.lock > key.json
 
-     - name: Restore Spack cache
-       uses: actions/cache@v2
-       with:
-         path: ~/.spack-ci
-         key: spack-${{ hashFiles('key.json') }}
+    - name: Restore Spack cache
+      uses: actions/cache@v2
+      with:
+        path: ~/.spack-ci
+        key: spack-${{ hashFiles('key.json') }}
 
     - name: Install spack environment
       run: |
