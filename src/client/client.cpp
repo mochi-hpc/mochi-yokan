@@ -39,10 +39,8 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         margo_registered_name(mid, "yk_list_keys_direct",    &c->list_keys_direct_id,    &flag);
         margo_registered_name(mid, "yk_list_keyvals",        &c->list_keyvals_id,        &flag);
         margo_registered_name(mid, "yk_list_keyvals_direct", &c->list_keyvals_direct_id, &flag);
-        margo_registered_name(mid, "yk_iter_keys",           &c->iter_keys_id,           &flag);
-        margo_registered_name(mid, "yk_iter_keys_direct",    &c->iter_keys_direct_id,    &flag);
-        margo_registered_name(mid, "yk_iter_keyvals",        &c->iter_keyvals_id,        &flag);
-        margo_registered_name(mid, "yk_iter_keyvals_direct", &c->iter_keyvals_direct_id, &flag);
+        margo_registered_name(mid, "yk_iter",                &c->iter_id,                &flag);
+        margo_registered_name(mid, "yk_iter_irect",          &c->iter_direct_id,         &flag);
 
         margo_registered_name(mid, "yk_coll_create",      &c->coll_create_id,      &flag);
         margo_registered_name(mid, "yk_coll_drop",        &c->coll_drop_id,        &flag);
@@ -119,18 +117,12 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         c->list_keyvals_direct_id =
             MARGO_REGISTER(mid, "yk_list_keyvals_direct",
                            list_keyvals_direct_in_t, list_keyvals_direct_out_t, NULL);
-//        c->iter_keys_id =
-//            MARGO_REGISTER(mid, "yk_iter_keys",
-//                           iter_keys_in_t, iter_keys_out_t, NULL);
-//        c->iter_keys_direct_id =
-//            MARGO_REGISTER(mid, "yk_iter_keys_direct",
-//                           iter_keys_direct_in_t, iter_keys_direct_out_t, NULL);
-//        c->iter_keyvals_id =
-//            MARGO_REGISTER(mid, "yk_iter_keyvals",
-//                           iter_keyvals_in_t, iter_keyvals_out_t, NULL);
-//        c->iter_keyvals_direct_id =
-//            MARGO_REGISTER(mid, "yk_iter_keyvals_direct",
-//                           iter_keyvals_direct_in_t, iter_keyvals_direct_out_t, NULL);
+        c->iter_id =
+            MARGO_REGISTER(mid, "yk_iter",
+                           iter_in_t, iter_out_t, NULL);
+        c->iter_direct_id =
+            MARGO_REGISTER(mid, "yk_iter_direct",
+                           iter_in_t, iter_out_t, NULL);
 
         c->coll_create_id =
             MARGO_REGISTER(mid, "yk_coll_create",
@@ -196,13 +188,18 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
     c->fetch_direct_back_id =
         MARGO_REGISTER(mid, "yk_fetch_direct_back",
                        fetch_direct_back_in_t, fetch_direct_back_out_t, yk_fetch_direct_back_ult);
+    c->iter_back_id =
+        MARGO_REGISTER(mid, "yk_iter_back",
+                       iter_back_in_t, iter_back_out_t, yk_iter_back_ult);
+    c->iter_direct_back_id =
+        MARGO_REGISTER(mid, "yk_iter_direct_back",
+                       iter_direct_back_in_t, iter_direct_back_out_t, yk_iter_direct_back_ult);
     c->doc_fetch_back_id =
         MARGO_REGISTER(mid, "yk_doc_fetch_back",
                        doc_fetch_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_back_ult);
     c->doc_fetch_direct_back_id =
         MARGO_REGISTER(mid, "yk_doc_fetch_direct_back",
                        doc_fetch_direct_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_direct_back_ult);
-
 
     *client = c;
     return YOKAN_SUCCESS;

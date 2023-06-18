@@ -80,10 +80,10 @@ typedef struct yk_provider {
     hg_id_t list_keys_direct_id;
     hg_id_t list_keyvals_id;
     hg_id_t list_keyvals_direct_id;
-    hg_id_t iter_keys_id;
-    hg_id_t iter_keys_direct_id;
-    hg_id_t iter_keyvals_id;
-    hg_id_t iter_keyvals_direct_id;
+    hg_id_t iter_id;
+    hg_id_t iter_direct_id;
+    hg_id_t iter_back_id;
+    hg_id_t iter_direct_back_id;
     hg_id_t coll_create_id;
     hg_id_t coll_drop_id;
     hg_id_t coll_exists_id;
@@ -164,14 +164,11 @@ DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)
 void yk_list_keyvals_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_list_keyvals_direct_ult)
 void yk_list_keyvals_direct_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(yk_iter_keys_ult)
-void yk_iter_keys_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(yk_iter_keys_direct_ult)
-void yk_iter_keys_direct_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(yk_iter_keyvals_ult)
-void yk_iter_keyvals_ult(hg_handle_t h);
-DECLARE_MARGO_RPC_HANDLER(yk_iter_keyvals_direct_ult)
-void yk_iter_keyvals_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_ult)
+void yk_iter_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_direct_ult)
+void yk_iter_direct_ult(hg_handle_t h);
+DECLARE_MARGO_RPC_HANDLER(yk_iter_ult)
 
 DECLARE_MARGO_RPC_HANDLER(yk_coll_create_ult)
 void yk_coll_create_ult(hg_handle_t h);

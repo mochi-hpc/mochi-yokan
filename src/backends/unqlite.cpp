@@ -516,6 +516,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+#if 0
     private:
 
     struct check_from_key_args {
@@ -822,6 +823,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         return Status::OK;
     }
+#endif
 
     struct UnQLiteMigrationHandle : public MigrationHandle {
 

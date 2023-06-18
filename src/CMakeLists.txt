@@ -10,6 +10,7 @@ set (server-src-files
      server/exists.cpp
      server/list_keys.cpp
      server/list_keyvals.cpp
+     server/iter.cpp
      server/coll_create.cpp
      server/coll_drop.cpp
      server/coll_exists.cpp
@@ -106,6 +107,7 @@ set (client-src-files
      client/exists.cpp
      client/list_keys.cpp
      client/list_keyvals.cpp
+     client/iter.cpp
      client/coll_create.cpp
      client/coll_drop.cpp
      client/coll_exists.cpp

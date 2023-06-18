@@ -29,6 +29,16 @@ struct CustomKeyValueFilter : public yokan::KeyValueFilter {
         return vsize % 2 == ((ksize % 2 == 0) ? 1 : 0);
     }
 
+    size_t keySizeFrom(const void* key, size_t ksize) const override {
+        (void)key;
+        return ksize;
+    }
+
+    size_t valSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize + m_to_append.size();
+    }
+
     size_t keyCopy(
         void* dst, size_t max_dst_size,
         const void* key, size_t ksize) const override {

@@ -510,6 +510,44 @@ class Database {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
+    void iter(const void* from_key,
+              size_t from_ksize,
+              const void* filter,
+              size_t filter_size,
+              size_t count,
+              yk_keyvalue_callback_t cb,
+              void* uargs,
+              const yk_iter_options_t* options = nullptr,
+              int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_iter(m_db, mode, from_key, from_ksize,
+                           filter, filter_size, count, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    using iter_callback_type =
+        std::function<yk_return_t(size_t,const void*,size_t,const void*,size_t)>;
+
+    static yk_return_t _iter_dispatch(void* uargs, size_t index,
+                                      const void* key, size_t ksize,
+                                      const void* val, size_t vsize) {
+            const iter_callback_type* cb_ptr =
+                static_cast<const iter_callback_type*>(uargs);
+            return (*cb_ptr)(index, key, ksize, val, vsize);
+    }
+
+    void iter(const void* from_key,
+              size_t from_ksize,
+              const void* filter,
+              size_t filter_size,
+              size_t count,
+              const iter_callback_type& cb,
+              const yk_iter_options_t* options = nullptr,
+              int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_iter(m_db, mode, from_key, from_ksize,
+                           filter, filter_size, count, _iter_dispatch, (void*)&cb, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
     void createCollection(const char* name,
                           int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_collection_create(m_db, name, mode);

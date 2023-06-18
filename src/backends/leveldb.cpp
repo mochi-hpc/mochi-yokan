@@ -608,6 +608,57 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
+        auto fromKeySlice = leveldb::Slice{ fromKey.data, fromKey.size };
+
+        auto iterator = m_db->NewIterator(m_read_options);
+        if(fromKey.size == 0) {
+            iterator->SeekToFirst();
+        } else {
+            iterator->Seek(fromKeySlice);
+            if(!iterator->Valid()) {
+                delete iterator;
+                return Status::OK;
+            }
+            if(!inclusive) {
+                if(iterator->key().compare(fromKeySlice) == 0) {
+                    iterator->Next();
+                }
+            }
+        }
+
+        size_t i = 0;
+
+        while(iterator->Valid() && (max == 0 || i < max)) {
+            auto key = iterator->key();
+            auto val = iterator->value();
+            if(!filter->check(key.data(), key.size(), val.data(), val.size())) {
+                if(filter->shouldStop(key.data(), key.size(), val.data(), val.size()))
+                    break;
+                iterator->Next();
+                continue;
+            }
+            auto key_umem = UserMem{(char*)key.data(), key.size()};
+            auto val_umem = ignore_values ? UserMem{nullptr, 0} : UserMem{(char*)val.data(), val.size()};
+
+            auto status = func(key_umem, val_umem);
+            if(status != Status::OK)
+                return status;
+
+            i += 1;
+            iterator->Next();
+        }
+        delete iterator;
+        return Status::OK;
+    }
+
     struct LevelDBMigrationHandle : public MigrationHandle {
 
         LevelDBDatabase&   m_db;

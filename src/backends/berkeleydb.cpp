@@ -710,6 +710,114 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return ret;
     }
 
+    Status iter(int32_t mode, uint64_t max, const UserMem& fromKey,
+                const std::shared_ptr<KeyValueFilter>& filter,
+                bool ignore_values,
+                const IterCallback& func) const override {
+        if(m_db_type != DB_BTREE)
+            return Status::NotSupported;
+
+        auto inclusive = mode & YOKAN_MODE_INCLUSIVE;
+
+        size_t i = 0;
+        uint32_t flag = DB_CURRENT;
+        auto ret = Status::OK;
+
+        auto fromKeySlice = Dbt{ fromKey.data, (u_int32_t)fromKey.size };
+        fromKeySlice.set_flags(DB_DBT_USERMEM);
+        fromKeySlice.set_ulen(fromKey.size);
+
+        auto dummy_key = Dbt{ nullptr, 0 };
+        dummy_key.set_ulen(0);
+        dummy_key.set_dlen(0);
+        dummy_key.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+
+        auto dummy_val = Dbt{ nullptr, 0 };
+        dummy_val.set_ulen(0);
+        dummy_val.set_dlen(0);
+        dummy_val.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+
+        // Dbt key used to retrieve actual keys
+        auto key = Dbt{ nullptr, 0 };
+        key.set_flags(DB_DBT_REALLOC);
+
+        // Dbt val used to retrieve actual values
+        auto val = Dbt{ nullptr, 0 };
+        val.set_flags(DB_DBT_REALLOC);
+
+        Dbc* cursor = nullptr;
+        int status = m_db->cursor(nullptr, &cursor, 0);
+
+        if(fromKey.size == 0) {
+            // move the cursor to the beginning of the database
+            status = cursor->get(&dummy_key, &dummy_val, DB_FIRST);
+        } else {
+            // move the cursor to fromKeySlice, or right after if not found
+            status = cursor->get(&fromKeySlice, &dummy_val, DB_SET_RANGE);
+            if(status == 0) {
+                // move was correctly done, now check if the key we point to
+                // is fromKeySlice and move to next if not inclusive
+                if(!inclusive) {
+                    bool start_key_found =
+                        (fromKeySlice.get_size() == fromKey.size)
+                        && (std::memcmp(fromKeySlice.get_data(), fromKey.data, fromKey.size) == 0);
+                    if(start_key_found) {
+                        // make it point to the next key
+                        status = cursor->get(&dummy_key, &dummy_val, DB_NEXT);
+                    }
+                }
+            } else if(status == DB_BUFFER_SMALL) {
+                // fromKeySlice buffer too small to hold the next key,
+                // retry with DB_DBT_PARTIAL to make the move succeed
+                fromKeySlice.set_flags(DB_DBT_USERMEM|DB_DBT_PARTIAL);
+                status = cursor->get(&fromKeySlice, &dummy_val, DB_SET_RANGE);
+            }
+        }
+
+        if(status == DB_NOTFOUND) { // empty database
+            goto complete;
+        }
+
+        for(i = 0; (max == 0 || i < max); i++) {
+            // find the next key that matches the filter
+            while(true) {
+                if(ignore_values && !filter->requiresValue())
+                    status = cursor->get(&key, &dummy_val, flag);
+                else
+                    status = cursor->get(&key, &val, flag);
+                flag = DB_NEXT;
+                if(status == DB_NOTFOUND) {
+                    goto complete;
+                }
+                if(status != 0) {
+                    ret = convertStatus(status);
+                    goto complete;
+                }
+                if(filter->check(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
+                    break;
+                else if(filter->shouldStop(key.get_data(), key.get_size(), val.get_data(), val.get_size()))
+                    goto complete;
+            }
+
+            auto key_umem = UserMem{(char*)key.get_data(), key.get_size()};
+            auto val_umem = UserMem{(char*)val.get_data(), val.get_size()};
+
+            auto s = func(key_umem, val_umem);
+            if(s != Status::OK) {
+                ret = s;
+                goto complete;
+            }
+        }
+
+        complete:
+
+        free(key.get_data());
+        free(val.get_data());
+        cursor->close();
+
+        return ret;
+    }
+
     ~BerkeleyDBDatabase() {
         if(m_db) {
             m_db->close(0);
