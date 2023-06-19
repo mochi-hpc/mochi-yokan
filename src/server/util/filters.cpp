@@ -196,6 +196,31 @@ struct LuaKeyValueFilter : public KeyValueFilter {
 };
 #endif
 
+struct DefaultDocFilter : public DocFilter {
+
+    DefaultDocFilter() = default;
+
+    bool check(yk_id_t id, const void* val, size_t vsize) const override {
+        (void)id;
+        (void)val;
+        (void)vsize;
+        return true;
+    }
+
+    size_t docSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize;
+    }
+
+    size_t docCopy(
+          void* dst, size_t max_dst_size,
+          const void* doc, size_t docsize) const override {
+        if (max_dst_size > docsize) return YOKAN_SIZE_TOO_SMALL;
+        std::memcpy(dst, doc, docsize);
+        return docsize;
+    }
+};
+
 #ifdef YOKAN_HAS_LUA
 struct LuaDocFilter : public DocFilter {
 
@@ -217,6 +242,19 @@ struct LuaDocFilter : public DocFilter {
         auto result = m_lua.do_string(std::string_view{ m_code.data, m_code.size });
         if(!result.valid()) return false;
         return static_cast<bool>(result);
+    }
+
+    size_t docSizeFrom(const void* val, size_t vsize) const override {
+        (void)val;
+        return vsize;
+    }
+
+    size_t docCopy(
+          void* dst, size_t max_dst_size,
+          const void* doc, size_t docsize) const override {
+        if (max_dst_size > docsize) return YOKAN_SIZE_TOO_SMALL;
+        std::memcpy(dst, doc, docsize);
+        return docsize;
     }
 };
 #endif
@@ -250,6 +288,15 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
         std::memcpy(&id, (const char*)key + m_key_offset, sizeof(id));
         id = _ensureBigEndian(id);
         return m_doc_filter->check(id, val, vsize);
+    }
+
+    size_t valSizeFrom(const void* val, size_t vsize) const override {
+        return m_doc_filter->docSizeFrom(val, vsize);
+    }
+
+    size_t valCopy(void* dst, size_t max_dst_size,
+                   const void* val, size_t vsize) const override {
+        return m_doc_filter->docCopy(dst, max_dst_size, val, vsize);
     }
 
     static yk_id_t _ensureBigEndian(yk_id_t id) {
@@ -343,7 +390,7 @@ std::shared_ptr<DocFilter> FilterFactory::makeDocFilter(
         }
         return (it->second)(mid, mode, filter_args);
     }
-    return std::make_shared<DocFilter>();
+    return std::make_shared<DefaultDocFilter>();
 }
 
 std::shared_ptr<KeyValueFilter> FilterFactory::docToKeyValueFilter(

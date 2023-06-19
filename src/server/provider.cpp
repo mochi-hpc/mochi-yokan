@@ -470,19 +470,21 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_list_direct_id = id;
 
-    /*
     id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_iter",
             doc_iter_in_t, doc_iter_out_t,
             yk_doc_iter_ult, provider_id, p->pool);
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_iter_id = id;
 
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_iter_direct",
-            doc_iter_direct_in_t, doc_iter_direct_out_t,
-            yk_doc_iter_direct_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->doc_iter_direct_id = id;
-    */
+    margo_registered_name(mid, "yk_doc_iter_back", &id, &flag);
+    if(flag) p->doc_iter_back_id = id;
+    else p->doc_iter_back_id = MARGO_REGISTER(
+        mid, "yk_doc_iter_back", doc_iter_back_in_t, doc_iter_back_out_t, NULL);
+
+    margo_registered_name(mid, "yk_doc_iter_direct_back", &id, &flag);
+    if(flag) p->doc_iter_direct_back_id = id;
+    else p->doc_iter_direct_back_id = MARGO_REGISTER(
+        mid, "yk_doc_iter_direct_back", doc_iter_direct_back_in_t, doc_iter_back_out_t, NULL);
 
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
@@ -541,6 +543,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_length_id);
     margo_deregister(mid, provider->doc_list_id);
     margo_deregister(mid, provider->doc_list_direct_id);
+    margo_deregister(mid, provider->doc_iter_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
     YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");

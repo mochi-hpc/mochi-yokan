@@ -121,12 +121,26 @@ class DocFilter {
     /**
      * @brief Checks whether the document passes the filter.
      */
-    virtual bool check(yk_id_t id, const void* doc, size_t docsize) const {
-        (void)id;
-        (void)doc;
-        (void)docsize;
-        return true;
-    }
+    virtual bool check(yk_id_t id, const void* doc, size_t docsize) const  = 0;
+
+    /**
+     * @brief Compute the new document size from the provided document
+     * after the filter is applied, or an upper bound of the document size.
+     * This function will only be applied to documents that pass the check function
+     * (i.e. you can assume that check has already been called and returned true).
+     */
+    virtual size_t docSizeFrom(
+        const void* val, size_t vsize) const = 0;
+
+    /**
+     * @brief Copy the document to the target destination. This copy may
+     * be implemented differently depending on the mode, and may alter
+     * the content of the document.
+     * This function should return the size actually copied.
+     */
+    virtual size_t docCopy(
+        void* dst, size_t max_dst_size,
+        const void* val, size_t vsize) const = 0;
 };
 
 /**

@@ -23,6 +23,7 @@ set (server-src-files
      server/doc_fetch.cpp
      server/doc_length.cpp
      server/doc_list.cpp
+     server/doc_iter.cpp
      server/util/filters.cpp
      buffer/default_bulk_cache.cpp
      buffer/lru_bulk_cache.cpp
