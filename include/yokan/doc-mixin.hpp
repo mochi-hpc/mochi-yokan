@@ -263,7 +263,6 @@ class DocumentStoreMixin : public DB {
         if(!supportsMode(YOKAN_MODE_NO_PREFIX))
             return Status::NotSupported;
 
-
         auto status = Status::OK;
 
         auto name_len = strlen(collection);
@@ -338,6 +337,65 @@ class DocumentStoreMixin : public DB {
         }
 
         return status;
+    }
+
+    Status docIter(const char* collection, int32_t mode, uint64_t max,
+                   yk_id_t from_id, const std::shared_ptr<DocFilter>& filter,
+                   const DatabaseInterface::DocIterCallback& func) const {
+        if(collection == nullptr || collection[0] == 0)
+            return Status::InvalidArg;
+        if(!supportsMode(YOKAN_MODE_NO_PREFIX))
+            return Status::NotSupported;
+
+        auto status = Status::OK;
+
+        auto name_len = strlen(collection);
+        auto kv_filter = FilterFactory::docToKeyValueFilter(filter, collection);
+
+        CollectionMetadata metadata;
+        {
+            ScopedReadLock lock(m_lock);
+            status = _collGetMetadata(collection, name_len, &metadata);
+            if(status != Status::OK) {
+                return status;
+            }
+        }
+
+        if(isSorted()) { // use the underlying iters function
+
+            auto first_key = _keyFromId(collection, name_len, from_id);
+            auto new_mode  = mode & YOKAN_MODE_INCLUSIVE;
+            auto kv_func   = [&func, name_len](const UserMem& key, const UserMem& val) -> Status {
+                yk_id_t id = _idFromKey(name_len, key.data);
+                return func(id, val);
+            };
+
+            return this->iter(new_mode, max, first_key, kv_filter, false, kv_func);
+
+        } else { // use the underlying fetch function
+
+            yk_id_t id = from_id;
+            size_t i = 0;
+            while((max == 0 || i < max) && id < metadata.next_id) {
+                auto key = _keyFromId(collection, name_len, id);
+                auto ksize = key.size();
+                auto kv_func   = [&func, &filter, &i, name_len](const UserMem& key, const UserMem& val) -> Status {
+                    if(val.size == YOKAN_KEY_NOT_FOUND) return Status::OK;
+                    yk_id_t id = _idFromKey(name_len, key.data);
+                    if(!filter->check(id, val.data, val.size)) return Status::OK;
+                    else {
+                        ++i;
+                        return func(id, val);
+                    }
+                };
+                status = const_cast<DocumentStoreMixin<DB>*>(this)->fetch(
+                        mode, key, BasicUserMem<size_t>{&ksize, 1}, kv_func);
+                if(status != Status::OK) {
+                    return status;
+                }
+                id += 1;
+            }
+        }
     }
 
     private:

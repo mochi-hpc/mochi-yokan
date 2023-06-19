@@ -657,6 +657,32 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+    using DocIterCallback = std::function<Status(yk_id_t, const UserMem&)>;
+
+    /**
+     * @brief Iterate through the documents, calling the provided
+     * function on each id/document pair.
+     *
+     * @param collection Collection
+     * @param mode Mode.
+     * @param max Max number of documents to list (0 to list everything).
+     * @param from_id starting ID.
+     * @param filter Document filter.
+     * @param func Function to call on each key.
+     *
+     * @return Status.
+     */
+    virtual Status docIter(int32_t mode, uint64_t max, yk_id_t from_id,
+                           const std::shared_ptr<DocFilter>& filter,
+                           const DocIterCallback& func) const {
+        (void)max;
+        (void)mode;
+        (void)from_id;
+        (void)filter;
+        (void)func;
+        return Status::NotSupported;
+    }
+
     /**
      * @brief Set the provided unique_ptr to point to a MigrationHandle
      * that can be used by the provider to retrieve the files used by

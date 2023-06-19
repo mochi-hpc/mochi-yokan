@@ -613,12 +613,12 @@ yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
  * @brief Options to pass to yk_doc_iter.
  */
 typedef struct yk_doc_iter_options {
-    unsigned recv_batch_size;
+    unsigned batch_size;
+    ABT_pool pool;
 } yk_doc_iter_options_t;
 
 /**
- * @brief Iterate through up to max documents starting at start_id
- * (excluded by default unless YOKAN_MODE_INCLUSIVE mode is used),
+ * @brief Iterate through up to max documents starting at start_id,
  * calling the callback on each document.
  *
  * @param[in] dbh Database handle.
