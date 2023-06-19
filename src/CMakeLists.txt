@@ -119,7 +119,8 @@ set (client-src-files
      client/doc_length.cpp
      client/doc_load.cpp
      client/doc_fetch.cpp
-     client/doc_list.cpp)
+     client/doc_list.cpp
+     client/doc_iter.cpp)
 
 set (admin-src-files
      admin/admin.c)

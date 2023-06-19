@@ -588,6 +588,39 @@ MERCURY_GEN_PROC(doc_list_direct_out_t,
         ((raw_data)(docs))\
         ((int32_t)(ret)))
 
+/* doc_iter */
+MERCURY_GEN_PROC(doc_iter_in_t,
+        ((yk_database_id_t)(db_id))\
+        ((int32_t)(mode))\
+        ((uint32_t)(batch_size))\
+        ((hg_string_t)(coll_name))\
+        ((uint64_t)(count))\
+        ((yk_id_t)(from_id))\
+        ((raw_data)(filter))\
+        ((uint64_t)(op_ref)))
+MERCURY_GEN_PROC(doc_iter_out_t,
+        ((int32_t)(ret)))
+
+/* doc_iter_back */
+MERCURY_GEN_PROC(doc_iter_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_t)(count))\
+        ((uint64_t)(size))\
+        ((hg_bulk_t)(bulk)))
+MERCURY_GEN_PROC(doc_iter_back_out_t,
+        ((int32_t)(ret)))
+
+/* doc_iter_back (direct) */
+MERCURY_GEN_PROC(doc_iter_direct_back_in_t,
+        ((uint64_t)(op_ref))\
+        ((uint64_t)(start))\
+        ((uint64_list)(ids))\
+        ((uint64_list)(doc_sizes))\
+        ((raw_data)(docs)))
+MERCURY_GEN_PROC(doc_iter_direct_back_out_t,
+        ((int32_t)(ret)))
+
 /* Extra hand-coded serialization functions */
 
 static inline hg_return_t hg_proc_yk_id_t(
