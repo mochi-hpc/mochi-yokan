@@ -3,7 +3,7 @@
 CMD=$1
 
 if [[ -z "${YOKAN_TEST_BACKEND}" ]]; then
-  $CMD
+  $CMD --color always
 else
-  $CMD --param backend ${YOKAN_TEST_BACKEND}
+  $CMD --color always --param backend ${YOKAN_TEST_BACKEND}
 fi
