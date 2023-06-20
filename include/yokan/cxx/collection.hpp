@@ -292,6 +292,43 @@ class Collection {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
+    void iter(yk_id_t from_id,
+              const void* filter,
+              size_t filter_size,
+              size_t max,
+              yk_document_callback_t cb,
+              void* uargs,
+              const yk_doc_iter_options_t* options = nullptr,
+              int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_iter(m_db.handle(), m_name.c_str(),
+                               mode, from_id, filter, filter_size,
+                               max, cb, uargs, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
+    using iter_callback_type =
+        std::function<yk_return_t(size_t,yk_id_t,const void*,size_t)>;
+
+    static yk_return_t _iter_dispatch(void* uargs, size_t index, yk_id_t id,
+                                       const void* val, size_t vsize) {
+        const iter_callback_type* cb_ptr =
+            static_cast<const iter_callback_type*>(uargs);
+        return (*cb_ptr)(index, id, val, vsize);
+    }
+
+    void iter(yk_id_t from_id,
+              const void* filter,
+              size_t filter_size,
+              size_t max,
+              const iter_callback_type& cb,
+              const yk_doc_iter_options_t* options = nullptr,
+              int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_doc_iter(m_db.handle(), m_name.c_str(),
+                               mode, from_id, filter, filter_size,
+                               max, _iter_dispatch, (void*)&cb, options);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
     private:
 
     Database    m_db;
