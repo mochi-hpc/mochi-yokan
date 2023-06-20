@@ -286,9 +286,8 @@ class DocumentStoreMixin : public DB {
             std::vector<size_t> ksizes(count, sizeof(yk_id_t));
             auto ksizes_umem = BasicUserMem<size_t> {ksizes};
 
-            auto new_mode = (mode & YOKAN_MODE_INCLUSIVE)|YOKAN_MODE_NO_PREFIX;
-
-            status = listKeyValues(new_mode, packed, first_key, kv_filter,
+            status = listKeyValues(YOKAN_MODE_INCLUSIVE|YOKAN_MODE_NO_PREFIX,
+                             packed, first_key, kv_filter,
                              keys_umem, ksizes_umem, documents, docSizes);
             if(status == Status::OK) {
                 for(size_t i=0; i < count; i++) {
@@ -341,11 +340,9 @@ class DocumentStoreMixin : public DB {
 
     Status docIter(const char* collection, int32_t mode, uint64_t max,
                    yk_id_t from_id, const std::shared_ptr<DocFilter>& filter,
-                   const DatabaseInterface::DocIterCallback& func) const {
+                   const DatabaseInterface::DocIterCallback& func) const override {
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
-        if(!supportsMode(YOKAN_MODE_NO_PREFIX))
-            return Status::NotSupported;
 
         auto status = Status::OK;
 
@@ -364,13 +361,12 @@ class DocumentStoreMixin : public DB {
         if(isSorted()) { // use the underlying iters function
 
             auto first_key = _keyFromId(collection, name_len, from_id);
-            auto new_mode  = mode & YOKAN_MODE_INCLUSIVE;
             auto kv_func   = [&func, name_len](const UserMem& key, const UserMem& val) -> Status {
                 yk_id_t id = _idFromKey(name_len, key.data);
                 return func(id, val);
             };
 
-            return this->iter(new_mode, max, first_key, kv_filter, false, kv_func);
+            return this->iter(YOKAN_MODE_INCLUSIVE, max, first_key, kv_filter, false, kv_func);
 
         } else { // use the underlying fetch function
 
@@ -396,6 +392,8 @@ class DocumentStoreMixin : public DB {
                 id += 1;
             }
         }
+
+        return Status::OK;
     }
 
     private:

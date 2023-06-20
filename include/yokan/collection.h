@@ -516,12 +516,14 @@ yk_return_t yk_doc_erase_multi(yk_database_handle_t dbh,
 
 /**
  * @brief List up to max documents starting at start_id
- * (excluded by default unless YOKAN_MODE_INCLUSIVE mode is used).
  * Contrary to yk_list_keys and yk_list_keyvals, for which the
  * filter is applied to the key, the filter here is applied to
  * the document's content. By default, the filter is ignored.
  * If fewer than max documents are returned, the extra doc_sizes
  * are set to YOKAN_NO_MORE_DOCS.
+ *
+ * Important: start_id is inclusive, whether YOKAN_MODE_INCLUSIVE
+ * is set or not. To exclude it, simply start at start_id+1.
  *
  * @param[in] dbh Database handle.
  * @param[in] collection Collection
@@ -620,6 +622,9 @@ typedef struct yk_doc_iter_options {
 /**
  * @brief Iterate through up to max documents starting at start_id,
  * calling the callback on each document.
+ *
+ * Important: start_id is inclusive, whether YOKAN_MODE_INCLUSIVE
+ * is set or not. To exclude it, simply start at start_id+1.
  *
  * @param[in] dbh Database handle.
  * @param[in] collection Collection

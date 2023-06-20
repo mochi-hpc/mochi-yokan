@@ -215,7 +215,7 @@ struct DefaultDocFilter : public DocFilter {
     size_t docCopy(
           void* dst, size_t max_dst_size,
           const void* doc, size_t docsize) const override {
-        if (max_dst_size > docsize) return YOKAN_SIZE_TOO_SMALL;
+        if (max_dst_size < docsize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, doc, docsize);
         return docsize;
     }
@@ -252,7 +252,7 @@ struct LuaDocFilter : public DocFilter {
     size_t docCopy(
           void* dst, size_t max_dst_size,
           const void* doc, size_t docsize) const override {
-        if (max_dst_size > docsize) return YOKAN_SIZE_TOO_SMALL;
+        if (max_dst_size < docsize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, doc, docsize);
         return docsize;
     }

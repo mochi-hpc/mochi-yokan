@@ -476,6 +476,12 @@ yk_return_t yk_provider_register(
     margo_register_data(mid, id, (void*)p, NULL);
     p->doc_iter_id = id;
 
+    id = MARGO_REGISTER_PROVIDER(mid, "yk_doc_iter_direct",
+            doc_iter_in_t, doc_iter_out_t,
+            yk_doc_iter_direct_ult, provider_id, p->pool);
+    margo_register_data(mid, id, (void*)p, NULL);
+    p->doc_iter_direct_id = id;
+
     margo_registered_name(mid, "yk_doc_iter_back", &id, &flag);
     if(flag) p->doc_iter_back_id = id;
     else p->doc_iter_back_id = MARGO_REGISTER(

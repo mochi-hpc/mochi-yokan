@@ -672,9 +672,11 @@ class DatabaseInterface {
      *
      * @return Status.
      */
-    virtual Status docIter(int32_t mode, uint64_t max, yk_id_t from_id,
+    virtual Status docIter(const char* collection,
+                           int32_t mode, uint64_t max, yk_id_t from_id,
                            const std::shared_ptr<DocFilter>& filter,
                            const DocIterCallback& func) const {
+        (void)collection;
         (void)max;
         (void)mode;
         (void)from_id;
