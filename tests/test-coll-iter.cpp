@@ -68,8 +68,13 @@ static MunitResult test_coll_iter(const MunitParameter params[], void* data)
     };
 
     yk_doc_iter_options_t options;
-    options.batch_size = 0;
-    options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(munit_parameters_get(params, "batch-size"));
+    if(to_bool(munit_parameters_get(params, "use-pool"))) {
+        margo_get_progress_pool(context->mid, &options.pool);
+    } else {
+        options.pool = ABT_POOL_NULL;
+    }
+
     size_t i = 0;
     while(i < g_num_items) {
         ret = yk_doc_iter(dbh, "abcd", context->mode,
@@ -136,8 +141,13 @@ static MunitResult test_coll_iter_lua(const MunitParameter params[], void* data)
     };
 
     yk_doc_iter_options_t options;
-    options.batch_size = 0;
-    options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(munit_parameters_get(params, "batch-size"));
+    if(to_bool(munit_parameters_get(params, "use-pool"))) {
+        margo_get_progress_pool(context->mid, &options.pool);
+    } else {
+        options.pool = ABT_POOL_NULL;
+    }
+
     size_t i = 0;
     while(i < g_num_items) {
         ret = yk_doc_iter(dbh, "abcd", context->mode|YOKAN_MODE_LUA_FILTER,
@@ -188,8 +198,13 @@ static MunitResult test_coll_iter_custom_filter(const MunitParameter params[], v
     };
 
     yk_doc_iter_options_t options;
-    options.batch_size = 0;
-    options.pool = ABT_POOL_NULL;
+    options.batch_size = atol(munit_parameters_get(params, "batch-size"));
+    if(to_bool(munit_parameters_get(params, "use-pool"))) {
+        margo_get_progress_pool(context->mid, &options.pool);
+    } else {
+        options.pool = ABT_POOL_NULL;
+    }
+
     while(true) {
         size_t i = result.recv_ids.size();
         ret = yk_doc_iter(dbh, "abcd", context->mode|YOKAN_MODE_LIB_FILTER,
@@ -213,12 +228,17 @@ static MunitResult test_coll_iter_custom_filter(const MunitParameter params[], v
     return MUNIT_OK;
 }
 
-static char* no_rdma_params[] = {
+static char* true_false_params[] = {
     (char*)"true", (char*)"false", (char*)NULL };
+
+static char* batch_size_params[] = {
+    (char*)"0", (char*)"5", (char*)NULL };
 
 static MunitParameterEnum test_params[] = {
   { (char*)"backend", (char**)available_backends },
-  { (char*)"no-rdma", (char**)no_rdma_params },
+  { (char*)"no-rdma", (char**)true_false_params },
+  { (char*)"batch-size", (char**)batch_size_params },
+  { (char*)"use-pool", (char**)true_false_params },
   { (char*)"min-val-size", NULL },
   { (char*)"max-val-size", NULL },
   { (char*)"num-items", NULL },
