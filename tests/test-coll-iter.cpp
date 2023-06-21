@@ -88,7 +88,7 @@ static MunitResult test_coll_iter(const MunitParameter params[], void* data)
 
     munit_assert_size(result.recv_ids.size(), ==, context->reference.size());
 
-    for(uint64_t i=0; i < result.recv_ids.size(); i++) {
+    for(i=0; i < result.recv_ids.size(); i++) {
         munit_assert_uint64(result.recv_ids[i], ==, i);
         munit_assert_size(result.recv_docs[i].size(), ==, context->reference[i].size());
         munit_assert_memory_equal(result.recv_docs[i].size(), result.recv_docs[i].data(), context->reference[i].data());
@@ -159,7 +159,7 @@ static MunitResult test_coll_iter_lua(const MunitParameter params[], void* data)
         start_id += g_items_per_op;
     }
 
-    for(uint64_t i=0; i < result.recv_ids.size(); i++) {
+    for(i=0; i < result.recv_ids.size(); i++) {
         auto id = result.recv_ids[i];
         munit_assert_uint64(id, < , context->reference.size());
         munit_assert_true((id % 3 == 0) || (result.recv_docs[i].size() > 0 && result.recv_docs[i][0] < 100));
