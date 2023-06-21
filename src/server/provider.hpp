@@ -104,6 +104,8 @@ typedef struct yk_provider {
     hg_id_t doc_list_direct_id;
     hg_id_t doc_iter_id;
     hg_id_t doc_iter_direct_id;
+    hg_id_t doc_iter_back_id;
+    hg_id_t doc_iter_direct_back_id;
 
     // REMI information
     struct {

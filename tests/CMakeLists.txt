@@ -15,7 +15,7 @@ foreach (test-source ${test-sources})
         yokan-admin
         yokan-client
         nlohmann_json)
-    add_test (NAME ${test-target} COMMAND timeout 300 ${CMAKE_CURRENT_SOURCE_DIR}/run-test.sh ./${test-target})
+    add_test (NAME ${test-target} COMMAND timeout 600 ${CMAKE_CURRENT_SOURCE_DIR}/run-test.sh ./${test-target})
 endforeach ()
 
 if (ENABLE_PYTHON)

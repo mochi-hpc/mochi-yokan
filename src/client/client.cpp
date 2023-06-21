@@ -172,12 +172,12 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         c->doc_list_direct_id =
             MARGO_REGISTER(mid, "yk_doc_list_direct",
                            doc_list_direct_in_t, doc_list_direct_out_t, NULL);
-//        c->doc_iter_id =
-//            MARGO_REGISTER(mid, "yk_doc_iter",
-//                           doc_iter_in_t, doc_iter_out_t, NULL);
-//        c->doc_iter_direct_id =
-//            MARGO_REGISTER(mid, "yk_doc_iter_direct",
-//                           doc_iter_direct_in_t, doc_iter_direct_out_t, NULL);
+        c->doc_iter_id =
+            MARGO_REGISTER(mid, "yk_doc_iter",
+                           doc_iter_in_t, doc_iter_out_t, NULL);
+        c->doc_iter_direct_id =
+            MARGO_REGISTER(mid, "yk_doc_iter_direct",
+                           doc_iter_in_t, doc_iter_out_t, NULL);
     }
 
     // The RPCs bellow should be registered regardless of whether they already were registered
@@ -200,6 +200,12 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
     c->doc_fetch_direct_back_id =
         MARGO_REGISTER(mid, "yk_doc_fetch_direct_back",
                        doc_fetch_direct_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_direct_back_ult);
+    c->doc_iter_back_id =
+        MARGO_REGISTER(mid, "yk_doc_iter_back",
+                       doc_iter_back_in_t, doc_iter_back_out_t, yk_doc_iter_back_ult);
+    c->doc_iter_direct_back_id =
+        MARGO_REGISTER(mid, "yk_doc_iter_direct_back",
+                       doc_iter_direct_back_in_t, doc_iter_direct_back_out_t, yk_doc_iter_direct_back_ult);
 
     *client = c;
     return YOKAN_SUCCESS;

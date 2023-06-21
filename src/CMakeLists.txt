@@ -23,6 +23,7 @@ set (server-src-files
      server/doc_fetch.cpp
      server/doc_length.cpp
      server/doc_list.cpp
+     server/doc_iter.cpp
      server/util/filters.cpp
      buffer/default_bulk_cache.cpp
      buffer/lru_bulk_cache.cpp
@@ -119,7 +120,8 @@ set (client-src-files
      client/doc_length.cpp
      client/doc_load.cpp
      client/doc_fetch.cpp
-     client/doc_list.cpp)
+     client/doc_list.cpp
+     client/doc_iter.cpp)
 
 set (admin-src-files
      admin/admin.c)

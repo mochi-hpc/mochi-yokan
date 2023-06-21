@@ -407,7 +407,7 @@ struct to_memory_view<std::string> {
 template<>
 struct to_memory_view<py::buffer> {
     static inline py::memoryview apply(const void* data, size_t size) {
-        return py::memoryview::from_memory(data, size);
+        return py::memoryview::from_memory((void*)data, size, true);
     }
 };
 
@@ -616,6 +616,32 @@ static auto list_docs_packed_helper(const yokan::Collection& coll,
             result.append(std::make_pair(ids[i], doc_sizes[i]));
     }
     return result;
+}
+
+template<typename FilterType>
+static auto doc_iter_helper(
+                const yokan::Collection& coll,
+                std::function<void(size_t, yk_id_t, const py::buffer&)> cb,
+                yk_id_t from_id,
+                const FilterType& filter,
+                size_t max, int32_t mode, unsigned batch_size) {
+    auto filter_info = get_buffer_info(filter);
+    CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
+    yokan::Collection::iter_callback_type func =
+        [&cb](size_t i, yk_id_t id, const void* doc, size_t docsize) -> yk_return_t {
+            try {
+                cb(i, id, py::memoryview::from_memory((void*)doc, docsize, true));
+            } catch(py::error_already_set &e) {
+                std::cout << e.what() << std::endl;
+                return YOKAN_ERR_OTHER;
+            }
+            return YOKAN_SUCCESS;
+        };
+    yk_doc_iter_options_t options;
+    options.batch_size    = batch_size;
+    options.pool          = ABT_POOL_NULL;
+    coll.iter(from_id, filter_info.ptr, filter_info.itemsize*filter_info.size,
+              max, func, &options, mode);
 }
 
 
@@ -1506,6 +1532,27 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 int32_t)>(&list_docs_packed_helper),
              "start_id"_a, "buffer"_a, "count"_a,
              "filter"_a=std::string(), "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
+        // DOC_ITER
+        // --------------------------------------------------------------
+        .def("iter",
+             static_cast<void(*)(
+                const yokan::Collection&,
+                std::function<void(size_t, yk_id_t, const py::buffer&)>,
+                yk_id_t, const py::buffer&,
+                size_t, int32_t, unsigned)>(&doc_iter_helper),
+             "callback"_a,
+             "from_id"_a=0, "filter"_a=py::bytes{}, "count"_a=0,
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+        .def("iter",
+             static_cast<void(*)(
+                const yokan::Collection&,
+                std::function<void(size_t, yk_id_t, const py::buffer&)>,
+                yk_id_t, const std::string&,
+                size_t, int32_t, unsigned)>(&doc_iter_helper),
+             "callback"_a,
+             "from_id"_a=0, "filter"_a=std::string{}, "count"_a=0,
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         ;
 }
 

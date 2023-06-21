@@ -58,12 +58,9 @@ class TestIter(unittest.TestCase):
         self.engine.finalize()
 
     def test_iter(self):
-        def callback(i: int, key: str, val: Optional[memoryview]):
+        def callback(i: int, key: str, val: memoryview):
             out_keys.append(key)
-            if val is None:
-                out_vals.append(val)
-            else:
-                out_vals.append(bytearray(val).decode('ascii'))
+            out_vals.append(bytearray(val).decode('ascii'))
         for prefix in ['', self.prefix]:
             out_keys = []
             out_vals = []
@@ -78,12 +75,9 @@ class TestIter(unittest.TestCase):
                 i += 1
 
     def test_iter_buffer(self):
-        def callback(i: int, key: memoryview, val: Optional[memoryview]):
+        def callback(i: int, key: memoryview, val: memoryview):
             out_keys.append(bytearray(key).decode('ascii'))
-            if val is None:
-                out_vals.append(val)
-            else:
-                out_vals.append(bytearray(val).decode('ascii'))
+            out_vals.append(bytearray(val).decode('ascii'))
         for prefix in ['', self.prefix]:
             out_keys = []
             out_vals = []

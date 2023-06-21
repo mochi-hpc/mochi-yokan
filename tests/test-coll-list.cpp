@@ -75,7 +75,7 @@ static MunitResult test_coll_list(const MunitParameter params[], void* data)
 
     i = 0;
     while(i < g_num_items) {
-        ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|context->mode,
+        ret = yk_doc_list(dbh, "abcd", context->mode,
                           start_id, nullptr, 0,
                           g_items_per_op, ids.data()+i,
                           buf_ptrs.data()+i, buf_sizes.data()+i);
@@ -148,7 +148,7 @@ static MunitResult test_coll_list_packed(const MunitParameter params[], void* da
     unsigned i = 0;
     size_t doc_offset = 0;
     while(i < g_num_items) {
-        ret = yk_doc_list_packed(dbh, "abcd", YOKAN_MODE_INCLUSIVE|context->mode,
+        ret = yk_doc_list_packed(dbh, "abcd", context->mode,
                                  start_id, nullptr, 0,
                                  g_items_per_op, ids.data()+i,
                                  buffer.size()-doc_offset,
@@ -235,7 +235,7 @@ static MunitResult test_coll_list_lua(const MunitParameter params[], void* data)
         "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
     size_t code_size = strlen(lua_code);
 
-    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER|context->mode;
+    int32_t mode = YOKAN_MODE_LUA_FILTER|context->mode;
     while(start_id != YOKAN_NO_MORE_DOCS) {
         ret = yk_doc_list(dbh, "abcd", mode, start_id,
                           lua_code, code_size,
@@ -278,7 +278,7 @@ static MunitResult test_coll_list_packed_lua(const MunitParameter params[], void
         "return (__id__ % 3 == 0) or ((string.len(__doc__) > 0) and (__doc__:byte(1) < 100))";
     size_t code_size = strlen(lua_code);
 
-    int32_t mode = YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LUA_FILTER|YOKAN_MODE_FILTER_VALUE;
+    int32_t mode = YOKAN_MODE_LUA_FILTER|YOKAN_MODE_FILTER_VALUE;
     mode |= context->mode;
     while(start_id != YOKAN_NO_MORE_DOCS) {
         ret = yk_doc_list_packed(dbh, "abcd", mode, start_id,
@@ -332,7 +332,7 @@ static MunitResult test_coll_list_custom_filter(const MunitParameter params[], v
     yk_id_t start_id = 0;
     std::string filter = "libcustom-filters.so:custom_doc:";
 
-    ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_INCLUSIVE|YOKAN_MODE_LIB_FILTER|context->mode, start_id,
+    ret = yk_doc_list(dbh, "abcd", YOKAN_MODE_LIB_FILTER|context->mode, start_id,
             filter.data(), filter.size(), count, ids.data(), buf_ptrs.data(), buf_sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
