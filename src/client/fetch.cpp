@@ -86,12 +86,6 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
     return ret;
 }
 
-/**
- * The fetch operations use a single bulk handle exposing data as follows:
- * - The first count*sizeof(size_t) bytes expose the list of key sizes
- * - The following count * sizeof(size_t) bytes expose value sizes
- */
-
 extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
                                      int32_t mode,
                                      size_t count,
