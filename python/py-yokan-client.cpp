@@ -13,8 +13,8 @@ using namespace pybind11::literals;
 typedef py::capsule py_margo_instance_id;
 typedef py::capsule py_hg_addr_t;
 
-#define MID2CAPSULE(__mid)   py::capsule((void*)(__mid),  "margo_instance_id", nullptr)
-#define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t", nullptr)
+#define MID2CAPSULE(__mid)   py::capsule((void*)(__mid),  "margo_instance_id")
+#define ADDR2CAPSULE(__addr) py::capsule((void*)(__addr), "hg_addr_t")
 
 
 static auto get_buffer_info(const py::buffer& buf) {
