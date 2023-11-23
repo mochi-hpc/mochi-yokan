@@ -1,4 +1,6 @@
 #include "config.h"
+#include <string>
+#include <iostream>
 
 static const char* available_backends[] = {
     "map",
@@ -88,6 +90,17 @@ inline static const char* find_backend_config_for(const char* backend) {
         i += 1;
     }
     return NULL;
+}
+
+inline static std::string make_provider_config(const char* backend) {
+    auto backend_config = find_backend_config_for(backend);
+    std::string result = "{\"database\":{\"type\":\"";
+    result += backend;
+    result += "\",\"config\":";
+    result += backend_config;
+    result += "}}";
+    std::cerr << result << std::endl;
+    return result;
 }
 
 #define SKIP_IF_NOT_IMPLEMENTED(__ret__) \

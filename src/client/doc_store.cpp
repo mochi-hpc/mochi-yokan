@@ -36,7 +36,6 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
     out.ids.ids   = ids;
     out.ids.count = count;
 
-    in.db_id       = dbh->database_id;
     in.mode        = mode;
     in.coll_name   = (char*)collection;
     in.sizes.count = count;
@@ -90,7 +89,6 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
     out.ids.ids   = ids;
     out.ids.count = count;
 
-    in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)name;
     in.count     = count;

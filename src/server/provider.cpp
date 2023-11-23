@@ -24,17 +24,12 @@
 
 static void yk_finalize_provider(void* p);
 
-/* Function to check the validity of the token sent by an admin
- * (returns false is the token is incorrect) */
-static inline bool check_token(
-        yk_provider_t provider,
-        const char* token);
-
-static inline bool open_backends_from_config(yk_provider_t provider);
+static inline bool open_database_from_config(yk_provider_t provider);
 
 yk_return_t yk_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
+        const char* config_str,
         const struct yk_provider_args* args,
         yk_provider_t* provider)
 {
@@ -54,7 +49,7 @@ yk_return_t yk_provider_register(
         // LCOV_EXCL_STOP
     }
 
-    margo_provider_registered_name(mid, "yk_open_database", provider_id, &id, &flag);
+    margo_provider_registered_name(mid, "yk_count", provider_id, &id, &flag);
     if(flag == HG_TRUE) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(mid, "a provider with id %u is already registered", provider_id);
@@ -63,22 +58,25 @@ yk_return_t yk_provider_register(
     }
 
     json config;
-    if(a.config != NULL && a.config[0] != '\0') {
+    if(config_str != NULL && config_str[0] != '\0') {
         try {
-            config = json::parse(a.config);
+            config = json::parse(config_str);
         } catch(const std::exception& ex) {
             YOKAN_LOG_ERROR(mid, "failed to parse JSON configuration: %s", ex.what());
             return YOKAN_ERR_INVALID_CONFIG;
         }
     } else {
-        config = json::object();
+        YOKAN_LOG_ERROR(mid, "missing configuration string in yk_provider_register");
+        return YOKAN_ERR_INVALID_ARGS;
     }
 
     // checking databases field
-    if(not config.contains("databases"))
-        config["databases"] = json::array();
-    if(not config["databases"].is_array()) {
-        YOKAN_LOG_ERROR(mid, "\"databases\" field in configuration is not an array");
+    if(not config.contains("database")) {
+        YOKAN_LOG_ERROR(mid, "\"database\" field missing in configuration");
+        return YOKAN_ERR_INVALID_CONFIG;
+    }
+    if(not config["database"].is_object()) {
+        YOKAN_LOG_ERROR(mid, "\"database\" field in configuration is not an object");
         return YOKAN_ERR_INVALID_CONFIG;
     }
 
@@ -122,7 +120,6 @@ yk_return_t yk_provider_register(
     p->provider_id = provider_id;
     p->pool = a.pool;
     p->config = config;
-    p->token = (a.token && strlen(a.token)) ? a.token : "";
 
     /* REMI client and provider */
 #ifdef YOKAN_HAS_REMI
@@ -187,48 +184,12 @@ yk_return_t yk_provider_register(
         // LCOV_EXCL_STOP
     }
 
-    if(!open_backends_from_config(p)) {
+    if(!open_database_from_config(p)) {
+        delete p;
         return YOKAN_ERR_INVALID_CONFIG;
     }
 
-    /* Admin RPCs */
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_open_database",
-            open_database_in_t, open_database_out_t,
-            yk_open_database_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->open_database_id = id;
-
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_close_database",
-            close_database_in_t, close_database_out_t,
-            yk_close_database_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->close_database_id = id;
-
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_destroy_database",
-            destroy_database_in_t, destroy_database_out_t,
-            yk_destroy_database_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->destroy_database_id = id;
-
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_list_databases",
-            list_databases_in_t, list_databases_out_t,
-            yk_list_databases_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->list_databases_id = id;
-
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_migrate_database",
-            migrate_database_in_t, migrate_database_out_t,
-            yk_migrate_database_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->migrate_database_id = id;
-
     /* Client RPCs */
-
-    id = MARGO_REGISTER_PROVIDER(mid, "yk_find_by_name",
-            find_by_name_in_t, find_by_name_out_t,
-            yk_find_by_name_ult, provider_id, p->pool);
-    margo_register_data(mid, id, (void*)p, NULL);
-    p->find_by_name_id = id;
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_count",
             count_in_t, count_out_t,
@@ -504,17 +465,9 @@ static void yk_finalize_provider(void* p)
 {
     yk_provider_t provider = (yk_provider_t)p;
     margo_instance_id mid = provider->mid;
-    for(auto pair : provider->dbs) {
-        // LCOV_EXCL_START
-        delete pair.second;
-        // LCOV_EXCL_STOP
-    }
+    provider->db->destroy();
+    delete provider->db;
     YOKAN_LOG_TRACE(mid, "Finalizing YOKAN provider");
-    margo_deregister(mid, provider->open_database_id);
-    margo_deregister(mid, provider->close_database_id);
-    margo_deregister(mid, provider->destroy_database_id);
-    margo_deregister(mid, provider->list_databases_id);
-    margo_deregister(mid, provider->find_by_name_id);
     margo_deregister(mid, provider->count_id);
     margo_deregister(mid, provider->exists_id);
     margo_deregister(mid, provider->exists_direct_id);
@@ -573,216 +526,7 @@ char* yk_provider_get_config(yk_provider_t provider)
     return strdup(provider->config.dump().c_str());
 }
 
-void yk_open_database_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    open_database_in_t  in;
-    open_database_out_t out;
-    yk_database_id_t id;
-    bool has_backend_type;
-    yk_database_t database;
-    char id_str[37];
-
-    DEFER(margo_destroy(h));
-    DEFER(margo_respond(h, &out));
-
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-    CHECK_MID(mid, margo_hg_handle_get_instance);
-
-    const struct hg_info* info = margo_get_info(h);
-    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
-    CHECK_PROVIDER(provider);
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
-    DEFER(margo_free_input(h, &in));
-
-    if(!check_token(provider, in.token)) {
-        YOKAN_LOG_ERROR(mid, "invalid token");
-        out.ret = YOKAN_ERR_INVALID_TOKEN;
-        return;
-    }
-
-    has_backend_type = yokan::DatabaseFactory::hasBackendType(in.type);
-
-    if(!has_backend_type) {
-        YOKAN_LOG_ERROR(mid, "could not find backend of type \"%s\"", in.type);
-        out.ret = YOKAN_ERR_INVALID_BACKEND;
-        return;
-    }
-
-    if(in.name && in.name[0]) {
-        if(provider->db_names.count(std::string(in.name))) {
-            YOKAN_LOG_ERROR(mid, "a database with name %s already exists in this provider", in.name);
-            out.ret = YOKAN_ERR_INVALID_ARGS;
-            return;
-        }
-    }
-
-    uuid_generate(id.uuid);
-
-    auto name = std::string{in.name ? in.name : ""};
-    auto status = yokan::DatabaseFactory::makeDatabase(in.type, name, in.config, &database);
-    if(status != yokan::Status::OK) {
-        YOKAN_LOG_ERROR(mid, "failed to open database of type %s", in.type);
-        out.ret = static_cast<yk_return_t>(status);
-        return;
-    }
-    provider->dbs[id] = database;
-    if(in.name && in.name[0]) {
-        provider->db_names[std::string(in.name)] = id;
-    }
-
-    out.ret = YOKAN_SUCCESS;
-    out.id = id;
-
-    yk_database_id_to_string(id, id_str);
-    YOKAN_LOG_INFO(mid, "created database %s of type \"%s\"", id_str, in.type);
-
-}
-DEFINE_MARGO_RPC_HANDLER(yk_open_database_ult)
-
-void yk_close_database_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    close_database_in_t  in;
-    close_database_out_t out;
-    char id_str[37];
-
-    yk_database_id_to_string(in.id, id_str);
-
-    DEFER(margo_destroy(h));
-    DEFER(margo_respond(h, &out));
-
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-    CHECK_MID(mid, margo_hg_handle_get_instance);
-
-    const struct hg_info* info = margo_get_info(h);
-    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
-    CHECK_PROVIDER(provider);
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
-    DEFER(margo_free_input(h, &in));
-
-    if(!check_token(provider, in.token)) {
-        YOKAN_LOG_ERROR(mid, "invalid token");
-        out.ret = YOKAN_ERR_INVALID_TOKEN;
-        return;
-    }
-
-    auto database = find_database(provider, &in.id);
-    CHECK_DATABASE(database, in.id);
-
-    delete provider->dbs[in.id];
-    provider->dbs.erase(in.id);
-
-    auto it = std::find_if(provider->db_names.begin(),
-                           provider->db_names.end(),
-                           [&in](auto& p) { return p.second == in.id; });
-    if(it != provider->db_names.end())
-        provider->db_names.erase(it);
-
-    out.ret = YOKAN_SUCCESS;
-
-    char db_id_str[37];
-    yk_database_id_to_string(in.id, db_id_str);
-    YOKAN_LOG_INFO(mid, "closed database %s", db_id_str);
-}
-DEFINE_MARGO_RPC_HANDLER(yk_close_database_ult)
-
-void yk_destroy_database_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    destroy_database_in_t  in;
-    destroy_database_out_t out;
-
-    DEFER(margo_destroy(h));
-    DEFER(margo_respond(h, &out));
-
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-    CHECK_MID(mid, margo_hg_handle_get_instance);
-
-    const struct hg_info* info = margo_get_info(h);
-    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
-    CHECK_PROVIDER(provider);
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
-    DEFER(margo_free_input(h, &in));
-
-    if(!check_token(provider, in.token)) {
-        YOKAN_LOG_ERROR(mid, "invalid token");
-        out.ret = YOKAN_ERR_INVALID_TOKEN;
-        return;
-    }
-
-    auto database = find_database(provider, &in.id);
-    CHECK_DATABASE(database, in.id);
-
-    database->destroy();
-    delete database;
-    provider->dbs.erase(in.id);
-
-    auto it = std::find_if(provider->db_names.begin(),
-                           provider->db_names.end(),
-                           [&in](auto& p) { return p.second == in.id; });
-    if(it != provider->db_names.end())
-        provider->db_names.erase(it);
-
-    char db_id_str[37];
-    yk_database_id_to_string(in.id, db_id_str);
-    YOKAN_LOG_INFO(mid, "destroyed database %s", db_id_str);
-
-    out.ret = YOKAN_SUCCESS;
-}
-DEFINE_MARGO_RPC_HANDLER(yk_destroy_database_ult)
-
-void yk_list_databases_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    list_databases_in_t  in;
-    list_databases_out_t out;
-    out.ids = nullptr;
-    out.count = 0;
-    unsigned i;
-
-    DEFER(free(out.ids));
-    DEFER(margo_destroy(h));
-    DEFER(margo_respond(h, &out));
-
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-    CHECK_MID(mid, margo_hg_handle_get_instance);
-
-    const struct hg_info* info = margo_get_info(h);
-    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
-    CHECK_PROVIDER(provider);
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
-    DEFER(margo_free_input(h, &in));
-
-    if(!check_token(provider, in.token)) {
-        YOKAN_LOG_ERROR(mid, "invalid token");
-        out.ret = YOKAN_ERR_INVALID_TOKEN;
-        return;
-    }
-
-    out.ret   = YOKAN_SUCCESS;
-    out.count = provider->dbs.size() < in.max_ids ? provider->dbs.size() : in.max_ids;
-    out.ids   = (yk_database_id_t*)calloc(out.count, sizeof(*out.ids));
-
-    i = 0;
-    for(auto& pair : provider->dbs) {
-        out.ids[i] = pair.first;
-        i += 1;
-        if(i == out.count)
-            break;
-    }
-    out.count = i;
-}
-DEFINE_MARGO_RPC_HANDLER(yk_list_databases_ult)
-
+#if 0
 void yk_migrate_database_ult(hg_handle_t h)
 {
     hg_return_t hret;
@@ -900,72 +644,29 @@ void yk_migrate_database_ult(hg_handle_t h)
 #endif
 }
 DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
+#endif
 
-void yk_find_by_name_ult(hg_handle_t h)
-{
-    hg_return_t hret;
-    find_by_name_in_t  in;
-    find_by_name_out_t out;
-    out.ret = YOKAN_SUCCESS;
-
-    DEFER(margo_destroy(h));
-    DEFER(margo_respond(h, &out));
-
-    margo_instance_id mid = margo_hg_handle_get_instance(h);
-    CHECK_MID(mid, margo_hg_handle_get_instance);
-
-    const struct hg_info* info = margo_get_info(h);
-    yk_provider_t provider = (yk_provider_t)margo_registered_data(mid, info->id);
-    CHECK_PROVIDER(provider);
-
-    hret = margo_get_input(h, &in);
-    CHECK_HRET_OUT(hret, margo_get_input);
-    DEFER(margo_free_input(h, &in));
-
-    const auto name = std::string(in.db_name);
-    auto it = provider->db_names.find(name);
-    if(it == provider->db_names.end())
-        out.ret = YOKAN_ERR_INVALID_DATABASE;
-    else
-        out.db_id = it->second;
-}
-DEFINE_MARGO_RPC_HANDLER(yk_find_by_name_ult)
-
-static inline bool check_token(
-        yk_provider_t provider,
-        const char* token)
-{
-    if(provider->token.empty()) return true;
-    return provider->token == token;
-}
-
-static inline bool open_backends_from_config(yk_provider_t provider)
+static inline bool open_database_from_config(yk_provider_t provider)
 {
     auto& config = provider->config;
-    auto& databases = config["databases"];
-    // Check that all the backend entries are objects and have a "type" field,
-    // and an optional "config" field that is an object. If the "config" field
-    // is not found, it will be added.
-    for(auto& db : databases) {
-        if(not db.is_object()) {
-            YOKAN_LOG_ERROR(provider->mid,
-                "\"databases\" should only contain objects");
-            return false;
-        }
+    auto& db = config["database"];
+    std::string type;
+    {
+        // Check that we have a "type" field,
+        // and an optional "config" field that is an object.
+        // If the "config" field is not found, it will be added.
         if(not db.contains("type")) {
             YOKAN_LOG_ERROR(provider->mid,
-                "\"type\" field not found in database configuration");
+                    "\"type\" field not found in database configuration");
             return false;
         }
-        if(db.contains("name")) {
-            if(!db["name"].is_string()) {
-                YOKAN_LOG_ERROR(provider->mid,
-                    "\"name\" field of database should be a string");
-                return false;
-            }
+        if(not db["type"].is_string()) {
+            YOKAN_LOG_ERROR(provider->mid,
+                    "\"type\" field in database configuration should be a string");
+            return false;
         }
-        auto full_type = db["type"].get<std::string>();
-        auto type = full_type;
+        auto& full_type = db["type"].get_ref<const std::string&>();
+        type = full_type;
         {
             auto p = full_type.find(':');
             if(p != std::string::npos) {
@@ -976,7 +677,7 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         bool has_backend_type = yokan::DatabaseFactory::hasBackendType(type);
         if(!has_backend_type) {
             YOKAN_LOG_ERROR(provider->mid,
-                "could not find backend of type \"%s\"", type.c_str());
+                    "could not find backend of type \"%s\"", type.c_str());
             return false;
         }
         if(!db.contains("config"))
@@ -984,20 +685,17 @@ static inline bool open_backends_from_config(yk_provider_t provider)
         auto& db_config = db["config"];
         if(not db_config.is_object()) {
             YOKAN_LOG_ERROR(provider->mid,
-                "\"config\" field in database definition should be an object");
+                    "\"config\" field in database definition should be an object");
             return false;
         }
     }
-    // Ok, seems like all the store configurations are good
-    for(auto& db : databases) {
-        yk_database_id_t id;
+    // Ok, seems like the configuration is good
+    {
         yk_database_t database;
-        uuid_generate(id.uuid);
-        auto type = db["type"].get<std::string>();
-        auto name = db.value("name", "");
+        auto db_type = db["type"].get<std::string>();
         auto& initial_db_config =  db["config"];
-        auto config = initial_db_config.dump();
-        auto status = yokan::DatabaseFactory::makeDatabase(type, name, config, &database);
+        auto db_config = initial_db_config.dump();
+        auto status = yokan::DatabaseFactory::makeDatabase(type, db_config, &database);
         if(status != yokan::Status::OK) {
             YOKAN_LOG_ERROR(provider->mid,
                 "failed to open database of type %s", type.c_str());
@@ -1008,15 +706,8 @@ static inline bool open_backends_from_config(yk_provider_t provider)
             if(not final_db_config.contains(config_entry.key()))
                 final_db_config[config_entry.key()] = config_entry.value();
         }
-        char db_id[37];
-        yk_database_id_to_string(id, db_id);
-        db["__id__"] = std::string(db_id);
         db["config"] = std::move(final_db_config);
-        provider->dbs[id] = database;
-        if(!name.empty())
-            provider->db_names[name] = id;
-
-        YOKAN_LOG_INFO(provider->mid, "opened database %s", db_id);
+        provider->db = database;
     }
     return true;
 }

@@ -33,29 +33,6 @@ typedef struct yk_database_handle *yk_database_handle_t;
 typedef yk_return_t (*yk_keyvalue_callback_t)(void*, size_t, const void*, size_t, const void*, size_t);
 
 /**
- * @brief If a database has a "name":"something" entry in its
- * configuration, this function will find the corresponding
- * database id.
- *
- * Note that if multiple databases have the same name, this
- * function will return the first one.
- *
- * @param[in] client Client
- * @param[in] addr Server address
- * @param[in] provider_id Provider id
- * @param[in] db_name Database name
- * @param[out] database_id Database id
- *
- * @return YOKAN_SUCCESS or error code defined in common.h
- */
-yk_return_t yk_database_find_by_name(
-        yk_client_t client,
-        hg_addr_t addr,
-        uint16_t provider_id,
-        const char* db_name,
-        yk_database_id_t* database_id);
-
-/**
  * @brief Creates a YOKAN database handle.
  *
  * @param[in] client YOKAN client responsible for the database handle
@@ -69,7 +46,6 @@ yk_return_t yk_database_handle_create(
         yk_client_t client,
         hg_addr_t addr,
         uint16_t provider_id,
-        yk_database_id_t database_id,
         yk_database_handle_t* handle);
 
 /**
@@ -81,7 +57,6 @@ yk_return_t yk_database_handle_create(
  * @param[out] client Client used to create the handle
  * @param[out] addr Address of the handle
  * @param[out] provider_id Provider id of the handle
- * @param[out] database_id Database id of the handle
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
@@ -89,8 +64,7 @@ yk_return_t yk_database_handle_get_info(
         yk_database_handle_t handle,
         yk_client_t* client,
         hg_addr_t* addr,
-        uint16_t* provider_id,
-        yk_database_id_t* database_id);
+        uint16_t* provider_id);
 
 /**
  * @brief Increments the reference counter of a database handle.

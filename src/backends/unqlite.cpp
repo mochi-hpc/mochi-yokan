@@ -86,7 +86,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
         if(processConfig(config, cfg) != Status::OK)
@@ -130,12 +130,11 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             if(ret != UNQLITE_OK) return convertStatus(ret);
         }
 
-        *kvs = new UnQLiteDatabase(name, std::move(cfg), use_lock, db);
+        *kvs = new UnQLiteDatabase(std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name,
             const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files,
@@ -180,19 +179,13 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             if(ret != UNQLITE_OK) return convertStatus(ret);
         }
 
-        *kvs = new UnQLiteDatabase(name, std::move(cfg), use_lock, db);
+        *kvs = new UnQLiteDatabase(std::move(cfg), use_lock, db);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "unqlite";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -881,9 +874,8 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    UnQLiteDatabase(const std::string& name, json cfg, bool use_lock, unqlite* db)
-    : m_name(name)
-    , m_db(db)
+    UnQLiteDatabase(json cfg, bool use_lock, unqlite* db)
+    : m_db(db)
     , m_config(std::move(cfg))
     {
         if(use_lock)
@@ -892,7 +884,6 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    std::string m_name;
     unqlite*    m_db;
     json        m_config;
     ABT_rwlock  m_lock = ABT_RWLOCK_NULL;

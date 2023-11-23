@@ -60,7 +60,6 @@ yk_return_t yk_iter(yk_database_handle_t dbh,
         context.options.ignore_values = false;
     }
 
-    in.db_id         = dbh->database_id;
     in.mode          = mode;
     in.no_values     = context.options.ignore_values;
     in.batch_size    = context.options.batch_size;

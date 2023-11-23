@@ -58,7 +58,6 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
         context.options.pool          = ABT_POOL_NULL;
     }
 
-    in.db_id        = dbh->database_id;
     in.coll_name    = (char*)collection;
     in.mode         = mode;
     in.batch_size   = context.options.batch_size;

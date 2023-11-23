@@ -42,7 +42,6 @@ static yk_return_t yk_doc_list_direct(yk_database_handle_t dbh,
     doc_list_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id         = dbh->database_id;
     in.mode          = mode;
     in.count         = count;
     in.from_id       = start_id;
@@ -117,7 +116,6 @@ extern "C" yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
     doc_list_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id         = dbh->database_id;
     in.mode          = mode;
     in.coll_name     = (char*)collection;
     in.packed        = packed;

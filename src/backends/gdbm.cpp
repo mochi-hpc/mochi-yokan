@@ -32,7 +32,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         bool use_lock;
         std::string path;
@@ -52,12 +52,11 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;
 
         auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
-        *kvs = new GDBMDatabase(std::move(cfg), name, path, use_lock, db);
+        *kvs = new GDBMDatabase(std::move(cfg), path, use_lock, db);
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name,
             const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files,
@@ -86,19 +85,13 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;
 
         auto db = gdbm_open(path.c_str(), 0, GDBM_WRCREAT, 0600, 0);
-        *kvs = new GDBMDatabase(std::move(cfg), name, path, use_lock, db);
+        *kvs = new GDBMDatabase(std::move(cfg), path, use_lock, db);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "gdbm";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -404,10 +397,9 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    GDBMDatabase(json cfg, const std::string& name, const std::string& path, bool use_lock, GDBM_FILE db)
+    GDBMDatabase(json cfg, const std::string& path, bool use_lock, GDBM_FILE db)
     : m_config(std::move(cfg))
     , m_db(db)
-    , m_name(name)
     , m_path(path)
     {
         if(use_lock)
@@ -418,7 +410,6 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     json        m_config;
     GDBM_FILE   m_db;
-    std::string m_name;
     std::string m_path;
     ABT_rwlock  m_lock = ABT_RWLOCK_NULL;
     bool        m_migrated = false;

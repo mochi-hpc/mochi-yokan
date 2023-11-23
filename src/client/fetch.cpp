@@ -60,7 +60,6 @@ static yk_return_t yk_fetch_direct(yk_database_handle_t dbh,
         key_offset += ksize;
     }
 
-    in.db_id        = dbh->database_id;
     in.mode         = mode;
     in.ksizes.sizes = (size_t*)ksizes;
     in.ksizes.count = count;
@@ -183,7 +182,6 @@ extern "C" yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
         }
     }
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.count  = count;
     in.bulk   = data;

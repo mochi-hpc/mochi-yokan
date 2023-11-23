@@ -36,11 +36,10 @@ class Database {
 
     Database(yk_client_t client,
              hg_addr_t addr,
-             uint16_t provider_id,
-             yk_database_id_t database_id)
+             uint16_t provider_id)
     {
         auto err = yk_database_handle_create(client,
-            addr, provider_id, database_id, &m_db);
+            addr, provider_id, &m_db);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -88,14 +87,6 @@ class Database {
         if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
             yk_database_handle_release(m_db);
         }
-    }
-
-    yk_database_id_t id() const {
-        yk_database_id_t db_id;
-        auto err = yk_database_handle_get_info(m_db,
-            NULL, NULL, NULL, &db_id);
-        YOKAN_CONVERT_AND_THROW(err);
-        return db_id;
     }
 
     size_t count(int32_t mode = YOKAN_MODE_DEFAULT) const {

@@ -25,20 +25,14 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
-        *kvs = new NullDatabase(name, json::parse(config));
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
+        *kvs = new NullDatabase(json::parse(config));
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "null";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -162,15 +156,13 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    NullDatabase(const std::string& name, json cfg)
-    : m_name(name)
-    , m_config(std::move(cfg))
+    NullDatabase(json cfg)
+    : m_config(std::move(cfg))
     {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    std::string m_name;
     json        m_config;
 };
 

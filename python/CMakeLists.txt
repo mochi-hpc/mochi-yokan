@@ -8,11 +8,6 @@ target_link_libraries (pyyokan_client PRIVATE pybind11::module yokan-client PRIV
 pybind11_extension (pyyokan_client)
 pybind11_strip (pyyokan_client)
 
-add_library (pyyokan_admin MODULE py-yokan-admin.cpp)
-target_link_libraries (pyyokan_admin PRIVATE pybind11::module yokan-admin PRIVATE coverage_config)
-pybind11_extension (pyyokan_admin)
-pybind11_strip (pyyokan_admin)
-
 add_library (pyyokan_server MODULE py-yokan-server.cpp)
 target_link_libraries (pyyokan_server PRIVATE pybind11::module yokan-server PRIVATE coverage_config)
 pybind11_extension (pyyokan_server)
@@ -20,7 +15,7 @@ pybind11_strip (pyyokan_server)
 
 set (PY_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
 
-install (TARGETS pyyokan_common pyyokan_client pyyokan_admin pyyokan_server
+install (TARGETS pyyokan_common pyyokan_client pyyokan_server
          EXPORT yokan-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
          LIBRARY DESTINATION lib/python${PY_VERSION}/site-packages)

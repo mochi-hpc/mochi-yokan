@@ -50,8 +50,7 @@ void yk_fetch_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yk_buffer_t keys_buffer = provider->bulk_cache.get(
@@ -236,8 +235,7 @@ void yk_fetch_direct_ult(hg_handle_t h)
 
     size_t num_batches = (size_t)std::ceil((double)in.ksizes.count/(double)in.batch_size);
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto count = in.ksizes.count;

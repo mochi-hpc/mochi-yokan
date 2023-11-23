@@ -34,7 +34,6 @@ static yk_return_t yk_length_direct(yk_database_handle_t dbh,
     length_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id       = dbh->database_id;
     in.mode        = mode;
     in.keys.data   = (char*)keys;
     in.keys.size   = std::accumulate(ksizes, ksizes+count, (size_t)0);
@@ -95,7 +94,6 @@ extern "C" yk_return_t yk_length_bulk(yk_database_handle_t dbh,
     length_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.count  = count;
     in.bulk   = data;

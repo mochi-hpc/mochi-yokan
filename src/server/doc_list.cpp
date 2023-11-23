@@ -44,8 +44,7 @@ void yk_doc_list_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     size_t buffer_size = in.filter_size
@@ -137,8 +136,7 @@ void yk_doc_list_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     doc_sizes.resize(in.count);

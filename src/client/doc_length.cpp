@@ -35,7 +35,6 @@ extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
     out.sizes.sizes = rsizes;
     out.sizes.count = count;
 
-    in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)collection;
     in.ids.count = count;

@@ -55,7 +55,7 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
 
 #define CHECK_TYPE_AND_SET_DEFAULT(__cfg__, __field__, __type__, __default__) \
@@ -128,19 +128,13 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(status);
         }
 
-        *kvs = new BerkeleyDBDatabase(cfg, name, db_type, db_env, db);
+        *kvs = new BerkeleyDBDatabase(cfg, db_type, db_env, db);
         return Status::OK;
     }
 
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "berkeleydb";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -838,12 +832,11 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     std::string m_name;
     bool        m_is_sorted;
 
-    BerkeleyDBDatabase(json cfg, const std::string& name, int db_type, DbEnv* env, Db* db)
+    BerkeleyDBDatabase(json cfg, int db_type, DbEnv* env, Db* db)
     : m_config(std::move(cfg))
     , m_db_type(db_type)
     , m_db_env(env)
-    , m_db(db)
-    , m_name(name) {
+    , m_db(db) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
         m_is_sorted = m_config["type"] == "btree";

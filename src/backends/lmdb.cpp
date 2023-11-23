@@ -94,7 +94,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         if(processConfig(config, cfg) != Status::OK)
             return Status::InvalidConf;
@@ -134,13 +134,12 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBDatabase(std::move(cfg), env, db, name);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db);
 
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name,
             const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files,
@@ -189,7 +188,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(ret);
         }
 
-        *kvs = new LMDBDatabase(std::move(cfg), env, db, name);
+        *kvs = new LMDBDatabase(std::move(cfg), env, db);
 
         return Status::OK;
     }
@@ -197,12 +196,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "lmdb";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -972,11 +965,10 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db, const std::string& name)
+    LMDBDatabase(json&& cfg, MDB_env* env, MDB_dbi db)
     : m_config(std::move(cfg))
     , m_env(env)
-    , m_db(db)
-    , m_name(name) {
+    , m_db(db) {
         auto disable_doc_mixin_lock = m_config.value("disable_doc_mixin_lock", false);
         if(disable_doc_mixin_lock) disableDocMixinLock();
         ABT_rwlock_create(&m_migration_lock);
@@ -985,7 +977,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     json        m_config;
     MDB_env*    m_env = nullptr;
     MDB_dbi     m_db;
-    std::string m_name;
 
     bool        m_migrated = false;
     ABT_rwlock  m_migration_lock = ABT_RWLOCK_NULL;

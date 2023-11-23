@@ -40,8 +40,7 @@ void yk_doc_fetch_ult(hg_handle_t h)
 
     size_t num_batches = (size_t)std::ceil((double)in.ids.count/(double)in.batch_size);
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     bool direct = in.mode & YOKAN_MODE_NO_RDMA;

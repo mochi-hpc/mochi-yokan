@@ -23,7 +23,6 @@ class YokanDB : public ycsb::DB {
         std::string protocol;
         std::string provider_address;
         uint16_t    provider_id = 0;
-        std::string database_name;
         bool        use_progress_thread = false;
     };
 
@@ -84,10 +83,6 @@ class YokanDB : public ycsb::DB {
                     "should be true or false, defaulting to false" << std::endl;
         }
 
-        it = properties.find("yokan.database.name");
-        CHECK_MISSING_PROPERTY("yokan.database.name");
-        settings.database_name = it->second;
-
         margo_instance_id mid = margo_init(
             settings.protocol.c_str(), MARGO_SERVER_MODE,
             settings.use_progress_thread, 0);
@@ -110,14 +105,14 @@ class YokanDB : public ycsb::DB {
         yokan::Client client = yokan::Client(mid);
         yokan::Database db;
         try {
-            db = client.findDatabaseByName(
-                addr, settings.provider_id, settings.database_name.c_str());
+            db = client.makeDatabaseHandle(addr, settings.provider_id);
         } catch(const yokan::Exception& ex) {
             std::cerr << "[ERROR] " << ex.what() << std::endl;
             margo_addr_free(mid, addr);
             margo_finalize(mid);
         }
 
+        margo_addr_free(mid, addr);
         return new YokanDB(mid, std::move(client), std::move(db));
     }
 

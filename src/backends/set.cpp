@@ -70,7 +70,7 @@ class SetDatabase : public DatabaseInterface {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
         yk_allocator_init_fn key_alloc_init, node_alloc_init;
@@ -129,12 +129,12 @@ class SetDatabase : public DatabaseInterface {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new SetDatabase(name, cfg, cmp, node_alloc, key_alloc);
+        *kvs = new SetDatabase(cfg, cmp, node_alloc, key_alloc);
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name, const std::string& config,
+            const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files, DatabaseInterface** kvs) {
         (void)migrationConfig;
@@ -148,7 +148,7 @@ class SetDatabase : public DatabaseInterface {
             ifs.close();
             remove(filename.c_str());
         };
-        auto status = create(name, config, kvs);
+        auto status = create(config, kvs);
         if(status != Status::OK) {
             remove_file();
             return status;
@@ -179,12 +179,6 @@ class SetDatabase : public DatabaseInterface {
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "set";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -749,13 +743,11 @@ class SetDatabase : public DatabaseInterface {
     using allocator = Allocator<key_type>;
     using set_type = std::set<key_type, comparator, allocator>;
 
-    SetDatabase(const std::string& name,
-                json cfg,
+    SetDatabase(json cfg,
                 cmp_type cmp_fun,
                 const yk_allocator_t& node_allocator,
                 const yk_allocator_t& key_allocator)
-    : m_name(name)
-    , m_config(std::move(cfg))
+    : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     {
@@ -764,7 +756,6 @@ class SetDatabase : public DatabaseInterface {
         m_db = new set_type(cmp_fun, allocator(m_node_allocator));
     }
 
-    std::string        m_name;
     set_type*          m_db;
     json               m_config;
     ABT_rwlock         m_lock = ABT_RWLOCK_NULL;

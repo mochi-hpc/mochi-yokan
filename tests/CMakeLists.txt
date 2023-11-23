@@ -11,10 +11,9 @@ foreach (test-source ${test-sources})
       ${CMAKE_CURRENT_BINARY_DIR}/../src
     )
     target_link_libraries (${test-target}
-        yokan-server
-        yokan-admin
-        yokan-client
-        nlohmann_json)
+        yokan::server
+        yokan::client
+        nlohmann_json::nlohmann_json)
     add_test (NAME ${test-target} COMMAND timeout 600 ${CMAKE_CURRENT_SOURCE_DIR}/run-test.sh ./${test-target})
 endforeach ()
 

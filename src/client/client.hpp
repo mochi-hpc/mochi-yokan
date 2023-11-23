@@ -13,7 +13,6 @@
 typedef struct yk_client {
     margo_instance_id mid;
 
-    hg_id_t           find_by_name_id;
     hg_id_t           count_id;
     hg_id_t           exists_id;
     hg_id_t           exists_direct_id;
@@ -69,7 +68,6 @@ typedef struct yk_database_handle {
     hg_addr_t        addr;
     uint16_t         provider_id;
     uint64_t         refcount;
-    yk_database_id_t database_id;
 } yk_database_handle;
 
 DECLARE_MARGO_RPC_HANDLER(yk_fetch_back_ult)

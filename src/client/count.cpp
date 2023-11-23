@@ -24,7 +24,6 @@ extern "C" yk_return_t yk_count(yk_database_handle_t dbh,
     count_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id = dbh->database_id;
     in.mode  = mode;
 
     hret = margo_create(mid, dbh->addr, dbh->client->count_id, &handle);

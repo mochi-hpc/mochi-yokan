@@ -43,8 +43,7 @@ void yk_get_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yk_buffer_t buffer = provider->bulk_cache.get(
@@ -176,8 +175,7 @@ void yk_get_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto count = in.ksizes.count;

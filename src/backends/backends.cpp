@@ -10,13 +10,11 @@ namespace yokan {
 std::unordered_map<std::string,
             std::function<Status(
                     const std::string&,
-                    const std::string&,
                     DatabaseInterface**)>>
     DatabaseFactory::make_fn;
 
 std::unordered_map<std::string,
             std::function<Status(
-                    const std::string&,
                     const std::string&,
                     const std::string&,
                     const std::list<std::string>&,

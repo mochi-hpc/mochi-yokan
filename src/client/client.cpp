@@ -21,7 +21,6 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
 
     if(flag == HG_TRUE) {
 
-        margo_registered_name(mid, "yk_find_by_name",        &c->find_by_name_id,        &flag);
         margo_registered_name(mid, "yk_count",               &c->count_id,               &flag);
         margo_registered_name(mid, "yk_exists",              &c->exists_id,              &flag);
         margo_registered_name(mid, "yk_exists_direct",       &c->exists_direct_id,       &flag);
@@ -63,9 +62,6 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
 
     } else {
 
-        c->find_by_name_id =
-            MARGO_REGISTER(mid, "yk_find_by_name",
-                           find_by_name_in_t, find_by_name_out_t, NULL);
         c->count_id =
             MARGO_REGISTER(mid, "yk_count",
                            count_in_t, count_out_t, NULL);
@@ -228,7 +224,6 @@ extern "C" yk_return_t yk_database_handle_create(
         yk_client_t client,
         hg_addr_t addr,
         uint16_t provider_id,
-        yk_database_id_t database_id,
         yk_database_handle_t* handle)
 {
     if(client == YOKAN_CLIENT_NULL)
@@ -247,7 +242,6 @@ extern "C" yk_return_t yk_database_handle_create(
 
     rh->client      = client;
     rh->provider_id = provider_id;
-    rh->database_id = database_id;
     rh->refcount    = 1;
 
     client->num_database_handles += 1;
@@ -260,15 +254,13 @@ extern "C" yk_return_t yk_database_handle_get_info(
         yk_database_handle_t handle,
         yk_client_t* client,
         hg_addr_t* addr,
-        uint16_t* provider_id,
-        yk_database_id_t* database_id)
+        uint16_t* provider_id)
 {
     if(handle == YOKAN_DATABASE_HANDLE_NULL)
         return YOKAN_ERR_INVALID_ARGS;
     if(client) *client = handle->client;
     if(addr) margo_addr_dup(handle->client->mid, handle->addr, addr);
     if(provider_id) *provider_id = handle->provider_id;
-    if(database_id) *database_id = handle->database_id;
     return YOKAN_SUCCESS;
 }
 

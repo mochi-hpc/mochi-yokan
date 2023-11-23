@@ -34,7 +34,6 @@ static yk_return_t yk_doc_update_direct(yk_database_handle_t dbh,
     doc_update_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id       = dbh->database_id;
     in.mode        = mode;
     in.coll_name   = (char*)collection;
     in.ids.count   = count;
@@ -82,7 +81,6 @@ extern "C" yk_return_t yk_doc_update_bulk(yk_database_handle_t dbh,
     doc_update_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)name;
     in.ids.count = count;

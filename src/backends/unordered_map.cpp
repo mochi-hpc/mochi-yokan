@@ -48,7 +48,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
         yk_allocator_t key_alloc, val_alloc, node_alloc;
@@ -127,12 +127,12 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new UnorderedMapDatabase(name, std::move(cfg), node_alloc, key_alloc, val_alloc);
+        *kvs = new UnorderedMapDatabase(std::move(cfg), node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name, const std::string& config,
+            const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files, DatabaseInterface** kvs) {
         (void)migrationConfig;
@@ -146,7 +146,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             ifs.close();
             remove(filename.c_str());
         };
-        auto status = create(name, config, kvs);
+        auto status = create(config, kvs);
         if(status != Status::OK) {
             remove_file();
             return status;
@@ -182,12 +182,6 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "unordered_map";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -681,13 +675,11 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     using hash_type = UnorderedMapDatabaseHash<key_type>;
     using unordered_map_type = std::unordered_map<key_type, value_type, hash_type, equal_type, allocator>;
 
-    UnorderedMapDatabase(const std::string& name,
-                         json cfg,
+    UnorderedMapDatabase(json cfg,
                          const yk_allocator_t& node_allocator,
                          const yk_allocator_t& key_allocator,
                          const yk_allocator_t& val_allocator)
-    : m_name(name)
-    , m_config(std::move(cfg))
+    : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
@@ -703,7 +695,6 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(disable_doc_mixin_lock) disableDocMixinLock();
     }
 
-    std::string            m_name;
     unordered_map_type*    m_db;
     json                   m_config;
     ABT_rwlock             m_lock = ABT_RWLOCK_NULL;

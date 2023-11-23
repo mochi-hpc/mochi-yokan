@@ -56,7 +56,6 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
     context.uargs   = uargs;
     context.options = options;
 
-    in.db_id      = dbh->database_id;
     in.mode       = mode;
     in.batch_size = options ? options->batch_size : 0;
     in.coll_name  = (char*)collection;

@@ -44,98 +44,14 @@ typedef struct uint64_list {
     };
 } uint64_list;
 
-static inline hg_return_t hg_proc_yk_database_id_t(hg_proc_t proc, yk_database_id_t *id);
 static inline hg_return_t hg_proc_yk_id_t(hg_proc_t proc, yk_id_t *id);
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* list);
 static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* raw);
 
-/* Admin RPC types */
-
-MERCURY_GEN_PROC(open_database_in_t,
-        ((hg_string_t)(name))\
-        ((hg_string_t)(type))\
-        ((hg_string_t)(config))\
-        ((hg_string_t)(token)))
-
-MERCURY_GEN_PROC(open_database_out_t,
-        ((int32_t)(ret))\
-        ((yk_database_id_t)(id)))
-
-MERCURY_GEN_PROC(close_database_in_t,
-        ((hg_string_t)(token))\
-        ((yk_database_id_t)(id)))
-
-MERCURY_GEN_PROC(close_database_out_t,
-        ((int32_t)(ret)))
-
-MERCURY_GEN_PROC(destroy_database_in_t,
-        ((hg_string_t)(token))\
-        ((yk_database_id_t)(id)))
-
-MERCURY_GEN_PROC(destroy_database_out_t,
-        ((int32_t)(ret)))
-
-MERCURY_GEN_PROC(list_databases_in_t,
-        ((hg_string_t)(token))\
-        ((hg_size_t)(max_ids)))
-
-typedef struct list_databases_out_t {
-    int32_t ret;
-    hg_size_t count;
-    yk_database_id_t* ids;
-} list_databases_out_t;
-
-static inline hg_return_t hg_proc_list_databases_out_t(hg_proc_t proc, void *data)
-{
-    list_databases_out_t* out = (list_databases_out_t*)data;
-    hg_return_t ret;
-
-    ret = hg_proc_hg_int32_t(proc, &(out->ret));
-    if(ret != HG_SUCCESS) return ret;
-
-    ret = hg_proc_hg_size_t(proc, &(out->count));
-    if(ret != HG_SUCCESS) return ret;
-
-    switch(hg_proc_get_op(proc)) {
-    case HG_DECODE:
-        out->ids = (yk_database_id_t*)calloc(out->count, sizeof(*(out->ids)));
-        /* fall through */
-    case HG_ENCODE:
-        if(out->ids)
-            ret = hg_proc_memcpy(proc, out->ids, sizeof(*(out->ids))*out->count);
-        break;
-    case HG_FREE:
-        free(out->ids);
-        break;
-    }
-    return ret;
-}
-
-MERCURY_GEN_PROC(migrate_database_in_t,
-        ((hg_string_t)(token))\
-        ((hg_string_t)(new_root))\
-        ((hg_string_t)(extra_config))\
-        ((hg_size_t)(xfer_size))\
-        ((yk_database_id_t)(origin_id))\
-        ((hg_string_t)(target_address))\
-        ((uint16_t)(target_provider_id)))
-
-MERCURY_GEN_PROC(migrate_database_out_t,
-        ((yk_database_id_t)(target_id))\
-        ((int32_t)(ret)))
-
 /* Client RPC types */
-
-/* find_by_name */
-MERCURY_GEN_PROC(find_by_name_in_t,
-        ((hg_string_t)(db_name)))
-MERCURY_GEN_PROC(find_by_name_out_t,
-        ((int32_t)(ret))\
-        ((yk_database_id_t)(db_id)))
 
 /* count */
 MERCURY_GEN_PROC(count_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode)))
 MERCURY_GEN_PROC(count_out_t,
         ((int32_t)(ret))\
@@ -143,7 +59,6 @@ MERCURY_GEN_PROC(count_out_t,
 
 /* exists */
 MERCURY_GEN_PROC(exists_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -155,7 +70,6 @@ MERCURY_GEN_PROC(exists_out_t,
 
 /* exists (direct) */
 MERCURY_GEN_PROC(exists_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((raw_data)(keys))\
         ((uint64_list)(sizes)))
@@ -165,7 +79,6 @@ MERCURY_GEN_PROC(exists_direct_out_t,
 
 /* length */
 MERCURY_GEN_PROC(length_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -177,7 +90,6 @@ MERCURY_GEN_PROC(length_out_t,
 
 /* length (direct) */
 MERCURY_GEN_PROC(length_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((raw_data)(keys))\
         ((uint64_list)(sizes)))
@@ -187,7 +99,6 @@ MERCURY_GEN_PROC(length_direct_out_t,
 
 /* put */
 MERCURY_GEN_PROC(put_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -199,7 +110,6 @@ MERCURY_GEN_PROC(put_out_t,
 
 /* put (direct) */
 MERCURY_GEN_PROC(put_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_list)(ksizes))\
         ((uint64_list)(vsizes))\
@@ -210,7 +120,6 @@ MERCURY_GEN_PROC(put_direct_out_t,
 
 /* get */
 MERCURY_GEN_PROC(get_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -223,7 +132,6 @@ MERCURY_GEN_PROC(get_out_t,
 
 /* get (direct) */
 MERCURY_GEN_PROC(get_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_size_t)(vbufsize))\
         ((uint64_list)(ksizes))\
@@ -235,7 +143,6 @@ MERCURY_GEN_PROC(get_direct_out_t,
 
 /* fetch */
 MERCURY_GEN_PROC(fetch_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint32_t)(batch_size))\
         ((uint64_t)(count))\
@@ -249,7 +156,6 @@ MERCURY_GEN_PROC(fetch_out_t,
 
 /* fetch (direct) */
 MERCURY_GEN_PROC(fetch_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint32_t)(batch_size))\
         ((uint64_list)(ksizes))\
@@ -279,7 +185,6 @@ MERCURY_GEN_PROC(fetch_direct_back_out_t,
 
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -291,7 +196,6 @@ MERCURY_GEN_PROC(erase_out_t,
 
 /* erase (direct) */
 MERCURY_GEN_PROC(erase_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_list)(ksizes))\
         ((raw_data)(keys)))
@@ -300,7 +204,6 @@ MERCURY_GEN_PROC(erase_direct_out_t,
 
 /* list_keys */
 MERCURY_GEN_PROC(list_keys_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
@@ -315,7 +218,6 @@ MERCURY_GEN_PROC(list_keys_out_t,
 
 /* list_keys (direct) */
 MERCURY_GEN_PROC(list_keys_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((raw_data)(from_key))\
@@ -328,7 +230,6 @@ MERCURY_GEN_PROC(list_keys_direct_out_t,
 
 /* list_keyvals */
 MERCURY_GEN_PROC(list_keyvals_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
@@ -344,7 +245,6 @@ MERCURY_GEN_PROC(list_keyvals_out_t,
 
 /* list_keyvals (direct) */
 MERCURY_GEN_PROC(list_keyvals_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((raw_data)(from_key))\
@@ -360,7 +260,6 @@ MERCURY_GEN_PROC(list_keyvals_direct_out_t,
 
 /* iter */
 MERCURY_GEN_PROC(iter_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_bool_t)(no_values))\
         ((uint32_t)(batch_size))\
@@ -394,7 +293,6 @@ MERCURY_GEN_PROC(iter_direct_back_out_t,
 
 /* coll_create */
 MERCURY_GEN_PROC(coll_create_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_create_out_t,
@@ -402,7 +300,6 @@ MERCURY_GEN_PROC(coll_create_out_t,
 
 /* coll_drop */
 MERCURY_GEN_PROC(coll_drop_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_drop_out_t,
@@ -410,7 +307,6 @@ MERCURY_GEN_PROC(coll_drop_out_t,
 
 /* coll_exists */
 MERCURY_GEN_PROC(coll_exists_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_exists_out_t,
@@ -419,7 +315,6 @@ MERCURY_GEN_PROC(coll_exists_out_t,
 
 /* coll_last_id */
 MERCURY_GEN_PROC(coll_last_id_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_last_id_out_t,
@@ -428,7 +323,6 @@ MERCURY_GEN_PROC(coll_last_id_out_t,
 
 /* coll_size */
 MERCURY_GEN_PROC(coll_size_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_size_out_t,
@@ -437,7 +331,6 @@ MERCURY_GEN_PROC(coll_size_out_t,
 
 /* doc_erase */
 MERCURY_GEN_PROC(doc_erase_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids)))
@@ -446,7 +339,6 @@ MERCURY_GEN_PROC(doc_erase_out_t,
 
 /* doc_store */
 MERCURY_GEN_PROC(doc_store_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_t)(count))\
@@ -460,7 +352,6 @@ MERCURY_GEN_PROC(doc_store_out_t,
 
 /* doc_store (direct) */
 MERCURY_GEN_PROC(doc_store_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(sizes))\
@@ -471,7 +362,6 @@ MERCURY_GEN_PROC(doc_store_direct_out_t,
 
 /* doc_update */
 MERCURY_GEN_PROC(doc_update_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
@@ -484,7 +374,6 @@ MERCURY_GEN_PROC(doc_update_out_t,
 
 /* doc_update (direct) */
 MERCURY_GEN_PROC(doc_update_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
@@ -495,7 +384,6 @@ MERCURY_GEN_PROC(doc_update_direct_out_t,
 
 /* doc_load */
 MERCURY_GEN_PROC(doc_load_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
@@ -509,7 +397,6 @@ MERCURY_GEN_PROC(doc_load_out_t,
 
 /* doc_load (direct) */
 MERCURY_GEN_PROC(doc_load_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
@@ -521,7 +408,6 @@ MERCURY_GEN_PROC(doc_load_direct_out_t,
 
 /* doc_fetch */
 MERCURY_GEN_PROC(doc_fetch_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint32_t)(batch_size))\
         ((hg_string_t)(coll_name))\
@@ -549,7 +435,6 @@ MERCURY_GEN_PROC(doc_fetch_direct_back_in_t,
 
 /* doc_length */
 MERCURY_GEN_PROC(doc_length_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids)))
@@ -559,7 +444,6 @@ MERCURY_GEN_PROC(doc_length_out_t,
 
 /* doc_list */
 MERCURY_GEN_PROC(doc_list_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((hg_string_t)(coll_name))\
         ((hg_bool_t)(packed))\
@@ -575,7 +459,6 @@ MERCURY_GEN_PROC(doc_list_out_t,
 
 /* doc_list (direct) */
 MERCURY_GEN_PROC(doc_list_direct_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint64_t)(count))\
         ((yk_id_t)(from_id))\
@@ -590,7 +473,6 @@ MERCURY_GEN_PROC(doc_list_direct_out_t,
 
 /* doc_iter */
 MERCURY_GEN_PROC(doc_iter_in_t,
-        ((yk_database_id_t)(db_id))\
         ((int32_t)(mode))\
         ((uint32_t)(batch_size))\
         ((hg_string_t)(coll_name))\
@@ -627,12 +509,6 @@ static inline hg_return_t hg_proc_yk_id_t(
         hg_proc_t proc, yk_id_t* id)
 {
     return hg_proc_uint64_t(proc, id);
-}
-
-static inline hg_return_t hg_proc_yk_database_id_t(
-        hg_proc_t proc, yk_database_id_t *id)
-{
-    return hg_proc_memcpy(proc, id, sizeof(*id));
 }
 
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)

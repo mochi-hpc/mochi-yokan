@@ -38,7 +38,6 @@ static yk_return_t yk_exists_direct(yk_database_handle_t dbh,
     out.flags.data = (char*)flags;
     out.flags.size = std::ceil(((double)count)/8.0);
 
-    in.db_id       = dbh->database_id;
     in.mode        = mode;
     in.keys.data   = (char*)keys;
     in.keys.size   = std::accumulate(ksizes, ksizes+count, (size_t)0);
@@ -101,7 +100,6 @@ extern "C" yk_return_t yk_exists_bulk(yk_database_handle_t dbh,
     exists_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.count  = count;
     in.bulk   = data;

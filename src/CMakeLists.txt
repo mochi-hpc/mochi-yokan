@@ -98,7 +98,6 @@ endif ()
 
 set (client-src-files
      client/client.cpp
-     client/find_by_name.cpp
      client/count.cpp
      client/put.cpp
      client/erase.cpp
@@ -123,9 +122,6 @@ set (client-src-files
      client/doc_list.cpp
      client/doc_iter.cpp)
 
-set (admin-src-files
-     admin/admin.c)
-
 set (bedrock-module-src-files
      bedrock/bedrock-module.c)
 
@@ -142,7 +138,6 @@ set (yokan-vers "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}")
 # and what to link against)
 add_library (yokan-headers INTERFACE)
 target_include_directories (yokan-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-target_link_libraries (yokan-headers INTERFACE PkgConfig::uuid)
 
 if (ENABLE_REMI)
   set (OPTIONAL_REMI remi)
@@ -152,9 +147,10 @@ endif ()
 
 # server library
 add_library (yokan-server ${server-src-files} ${backend-src-files})
+add_library (yokan::server ALIAS yokan-server)
 target_link_libraries (yokan-server
-    PUBLIC PkgConfig::margo PkgConfig::uuid ${OPTIONAL_REMI}
-    PRIVATE nlohmann_json ${DB_DEPENDENCIES} coverage_config)
+    PUBLIC PkgConfig::margo ${OPTIONAL_REMI}
+    PRIVATE nlohmann_json::nlohmann_json ${DB_DEPENDENCIES} coverage_config)
 target_compile_definitions (yokan-server PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-server PUBLIC $<INSTALL_INTERFACE:include>)
 target_include_directories (yokan-server BEFORE PUBLIC
@@ -167,9 +163,9 @@ set_target_properties (yokan-server
 
 # client library
 add_library (yokan-client ${client-src-files})
+add_library (yokan::client ALIAS yokan-client)
 target_link_libraries (yokan-client
     PUBLIC PkgConfig::margo
-    PUBLIC PkgConfig::uuid
     PRIVATE coverage_config)
 target_compile_definitions (yokan-client PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-client PUBLIC $<INSTALL_INTERFACE:include>)
@@ -181,28 +177,11 @@ set_target_properties (yokan-client
     PROPERTIES VERSION ${YOKAN_VERSION}
     SOVERSION ${YOKAN_VERSION_MAJOR})
 
-# admin library
-add_library (yokan-admin ${admin-src-files})
-target_link_libraries (yokan-admin
-    PUBLIC PkgConfig::margo
-    PUBLIC PkgConfig::uuid
-    PRIVATE coverage_config)
-target_compile_definitions (yokan-admin PRIVATE -DJSON_HAS_CPP_14)
-target_include_directories (yokan-admin PUBLIC $<INSTALL_INTERFACE:include>)
-target_include_directories (yokan-admin BEFORE PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>)
-target_include_directories (yokan-admin BEFORE PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
-set_target_properties (yokan-admin
-    PROPERTIES VERSION ${YOKAN_VERSION}
-    SOVERSION ${YOKAN_VERSION_MAJOR})
-
 if (${ENABLE_BEDROCK})
 # bedrock-module library
 add_library (yokan-bedrock-module ${bedrock-module-src-files})
 target_link_libraries (yokan-bedrock-module
     PUBLIC yokan-server
-    PUBLIC yokan-admin
     PUBLIC yokan-client
     PUBLIC bedrock-server
     PRIVATE coverage_config)
@@ -235,16 +214,14 @@ configure_package_config_file (yokan-config.cmake.in
 set (DEST_DIR "${CMAKE_INSTALL_PREFIX}")
 set (SERVER_PRIVATE_LIBS "-lyokan-server")
 set (CLIENT_PRIVATE_LIBS "-lyokan-client")
-set (ADMIN_PRIVATE_LIBS  "-lyokan-admin")
 configure_file ("yokan-server.pc.in" "yokan-server.pc" @ONLY)
 configure_file ("yokan-client.pc.in" "yokan-client.pc" @ONLY)
-configure_file ("yokan-admin.pc.in"  "yokan-admin.pc"  @ONLY)
 
 # configure config.h
 configure_file ("config.h.in" "config.h" @ONLY)
 
 # "make install" rules
-install (TARGETS yokan-server yokan-client yokan-admin
+install (TARGETS yokan-server yokan-client
          EXPORT yokan-targets
          ARCHIVE DESTINATION lib
          LIBRARY DESTINATION lib)
@@ -263,5 +240,4 @@ install (DIRECTORY ../include/yokan
          DESTINATION include)
 install (FILES "${CMAKE_CURRENT_BINARY_DIR}/yokan-server.pc"
                "${CMAKE_CURRENT_BINARY_DIR}/yokan-client.pc"
-               "${CMAKE_CURRENT_BINARY_DIR}/yokan-admin.pc"
          DESTINATION "lib/pkgconfig/")

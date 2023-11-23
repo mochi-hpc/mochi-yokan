@@ -78,8 +78,6 @@ endif ()
 
 # search for margo
 pkg_check_modules (margo REQUIRED IMPORTED_TARGET margo)
-# search for uuid
-pkg_check_modules (uuid REQUIRED IMPORTED_TARGET uuid)
 # search for tclap
 pkg_check_modules (tclap REQUIRED IMPORTED_TARGET tclap)
 
@@ -191,8 +189,6 @@ else ()
         message (FATAL_ERROR "Yokan needs either std::filesystem or std::experimental::filesystem")
     endif ()
 endif ()
-
-add_subdirectory (bin)
 
 if (${ENABLE_BENCHMARK})
   add_subdirectory (benchmark)

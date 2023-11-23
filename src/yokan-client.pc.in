@@ -7,6 +7,6 @@ Name: yokan-client
 Description: <insert description here>
 Version: @YOKAN_VERSION@
 
-Requires: margo uuid
+Requires: margo
 Libs: -L${libdir} @CLIENT_PRIVATE_LIBS@ -lstdc++
 Cflags: -I${includedir}

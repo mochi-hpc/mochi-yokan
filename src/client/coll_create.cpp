@@ -24,7 +24,6 @@ extern "C" yk_return_t yk_collection_create(yk_database_handle_t dbh,
     coll_create_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id     = dbh->database_id;
     in.mode      = mode;
     in.coll_name = (char*)name;
 

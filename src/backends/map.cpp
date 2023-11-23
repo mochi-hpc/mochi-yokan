@@ -72,7 +72,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     public:
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         cmp_type cmp = comparator::DefaultMemCmp;
         yk_allocator_init_fn key_alloc_init, val_alloc_init, node_alloc_init;
@@ -144,12 +144,12 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         } catch(...) {
             return Status::InvalidConf;
         }
-        *kvs = new MapDatabase(name, std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
+        *kvs = new MapDatabase(std::move(cfg), cmp, node_alloc, key_alloc, val_alloc);
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name, const std::string& config,
+            const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files, DatabaseInterface** kvs) {
         (void)migrationConfig;
@@ -163,7 +163,7 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
             ifs.close();
             remove(filename.c_str());
         };
-        auto status = create(name, config, kvs);
+        auto status = create(config, kvs);
         if(status != Status::OK) {
             remove_file();
             return status;
@@ -202,11 +202,6 @@ class MapDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
     // LCOV_EXCL_STOP
 
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
-    }
-    // LCOV_EXCL_STOP
     // LCOV_EXCL_START
     virtual std::string config() const override {
         return m_config.dump();
@@ -873,14 +868,12 @@ retry:
     using allocator = Allocator<std::pair<const key_type, value_type>>;
     using map_type = std::map<key_type, value_type, comparator, allocator>;
 
-    MapDatabase(const std::string& name,
-                json cfg,
+    MapDatabase(json cfg,
                 cmp_type cmp_fun,
                 const yk_allocator_t& node_allocator,
                 const yk_allocator_t& key_allocator,
                 const yk_allocator_t& val_allocator)
-    : m_name(name)
-    , m_config(std::move(cfg))
+    : m_config(std::move(cfg))
     , m_node_allocator(node_allocator)
     , m_key_allocator(key_allocator)
     , m_val_allocator(val_allocator)
@@ -893,7 +886,6 @@ retry:
     }
 
     map_type*          m_db;
-    std::string        m_name;
     json               m_config;
     ABT_rwlock         m_lock = ABT_RWLOCK_NULL;
     yk_allocator_t     m_node_allocator;

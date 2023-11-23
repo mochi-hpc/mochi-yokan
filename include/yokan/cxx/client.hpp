@@ -51,24 +51,12 @@ class Client {
 
     Database makeDatabaseHandle(
         hg_addr_t addr,
-        uint16_t provider_id,
-        yk_database_id_t database_id) const {
+        uint16_t provider_id) const {
         yk_database_handle_t db;
         auto err = yk_database_handle_create(
-            m_client, addr, provider_id, database_id, &db);
+            m_client, addr, provider_id, &db);
         YOKAN_CONVERT_AND_THROW(err);
         return Database(db, false);
-    }
-
-    Database findDatabaseByName(
-        hg_addr_t addr,
-        uint16_t provider_id,
-        const char* name) const {
-        yk_database_id_t id;
-        auto err = yk_database_find_by_name(
-            m_client, addr, provider_id, name, &id);
-        YOKAN_CONVERT_AND_THROW(err);
-        return makeDatabaseHandle(addr, provider_id, id);
     }
 
     auto handle() const {

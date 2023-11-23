@@ -24,8 +24,6 @@ typedef struct remi_client* remi_client_t; // define without including <remi-cli
 typedef struct remi_provider* remi_provider_t; // define without including <remi-server.h>
 
 struct yk_provider_args {
-    const char*     token;  // Security token
-    const char*     config; // JSON configuration
     ABT_pool        pool;   // Pool used to run RPCs
     yk_bulk_cache_t cache;  // cache implementation for bulk handles
     struct {
@@ -34,7 +32,7 @@ struct yk_provider_args {
     } remi; // REMI information (yokan needs to be built with ENABLE_REMI)
 };
 
-#define YOKAN_PROVIDER_ARGS_INIT { NULL, NULL, ABT_POOL_NULL, NULL, {NULL, NULL} }
+#define YOKAN_PROVIDER_ARGS_INIT { ABT_POOL_NULL, NULL, {NULL, NULL} }
 
 /**
  * @brief Creates a new YOKAN provider. If YOKAN_PROVIDER_IGNORE
@@ -43,6 +41,7 @@ struct yk_provider_args {
  *
  * @param[in] mid Margo instance
  * @param[in] provider_id provider id
+ * @param[in] config Configuration
  * @param[in] args argument structure
  * @param[out] provider provider
  *
@@ -51,6 +50,7 @@ struct yk_provider_args {
 yk_return_t yk_provider_register(
         margo_instance_id mid,
         uint16_t provider_id,
+        const char* config,
         const struct yk_provider_args* args,
         yk_provider_t* provider);
 

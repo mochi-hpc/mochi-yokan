@@ -6,7 +6,6 @@
 #ifndef __YOKAN_COMMON_H
 #define __YOKAN_COMMON_H
 
-#include <uuid.h>
 #include <stdint.h>
 #include <limits.h>
 #include <margo.h>
@@ -126,38 +125,6 @@ typedef enum yk_return_t {
 #define YOKAN_MODE_FILTER_VALUE 0b001000000000000
 #define YOKAN_MODE_LIB_FILTER   0b010000000000000
 #define YOKAN_MODE_NO_RDMA      0b100000000000000
-
-/**
- * @brief Identifier for a database.
- */
-typedef struct yk_database_id_t {
-    uuid_t uuid;
-} yk_database_id_t;
-
-/**
- * @brief Converts a yk_database_id_t into a string.
- *
- * @param id Id to convert
- * @param out[37] Resulting null-terminated string
- */
-static inline void yk_database_id_to_string(
-        yk_database_id_t id,
-        char out[37]) {
-    uuid_unparse(id.uuid, out);
-}
-
-/**
- * @brief Converts a string into a yk_database_id_t. The string
- * should be a 36-characters string + null terminator.
- *
- * @param in input string
- * @param id resulting id
- */
-static inline void yk_database_id_from_string(
-        const char* in,
-        yk_database_id_t* id) {
-    uuid_parse(in, id->uuid);
-}
 
 /**
  * @brief Record when working with collections.

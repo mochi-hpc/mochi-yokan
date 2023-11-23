@@ -19,10 +19,8 @@ PYBIND11_MODULE(pyyokan_server, m) {
     py::class_<yokan::Provider>(m, "Provider")
         .def(py::init<py_margo_instance_id,
                       uint16_t,
-                      const char*,
                       const char*>(),
              "mid"_a,
              "provider_id"_a,
-             "token"_a="",
-             "config"_a="{}");
+             "config"_a);
 }

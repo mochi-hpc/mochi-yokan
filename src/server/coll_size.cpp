@@ -33,8 +33,7 @@ void yk_coll_size_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     size_t size;

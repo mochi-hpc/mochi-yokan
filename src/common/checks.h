@@ -71,17 +71,6 @@
         } \
     } while(0)
 
-#define CHECK_DATABASE(__db__, __id__) \
-    do { \
-        if(!__db__) { \
-            char __db_id_str__[37]; \
-            yk_database_id_to_string(__id__, __db_id_str__); \
-            YOKAN_LOG_ERROR(mid, "Could not find database with id %s", __db_id_str__); \
-            out.ret = YOKAN_ERR_INVALID_DATABASE; \
-            return; \
-        } \
-    } while(0)
-
 #define CHECK_MODE_SUPPORTED(__db__, __mode__) \
     do { \
         if(!__db__->supportsMode(__mode__)) { \

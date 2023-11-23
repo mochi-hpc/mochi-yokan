@@ -33,7 +33,6 @@ static yk_return_t yk_erase_direct(yk_database_handle_t dbh,
     erase_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.ksizes.sizes = (size_t*)ksizes;
     in.ksizes.count = count;
@@ -88,7 +87,6 @@ extern "C" yk_return_t yk_erase_bulk(yk_database_handle_t dbh,
     erase_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.count  = count;
     in.bulk   = data;

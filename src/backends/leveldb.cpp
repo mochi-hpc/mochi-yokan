@@ -98,7 +98,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::Other;
     }
 
-    static Status create(const std::string& name, const std::string& config, DatabaseInterface** kvs) {
+    static Status create(const std::string& config, DatabaseInterface** kvs) {
         leveldb::Options options;
         json cfg;
         leveldb::Status status;
@@ -115,13 +115,12 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBDatabase(db, std::move(cfg), name);
+        *kvs = new LevelDBDatabase(db, std::move(cfg));
 
         return Status::OK;
     }
 
     static Status recover(
-            const std::string& name,
             const std::string& config,
             const std::string& migrationConfig,
             const std::list<std::string>& files,
@@ -147,7 +146,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(!status.ok())
             return convertStatus(status);
 
-        *kvs = new LevelDBDatabase(db, std::move(cfg), name);
+        *kvs = new LevelDBDatabase(db, std::move(cfg));
 
         return Status::OK;
     }
@@ -159,12 +158,6 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     // LCOV_EXCL_START
     virtual std::string type() const override {
         return "leveldb";
-    }
-    // LCOV_EXCL_STOP
-
-    // LCOV_EXCL_START
-    virtual std::string name() const override {
-        return m_name;
     }
     // LCOV_EXCL_STOP
 
@@ -708,10 +701,9 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
     private:
 
-    LevelDBDatabase(leveldb::DB* db, json&& cfg, const std::string& name)
+    LevelDBDatabase(leveldb::DB* db, json&& cfg)
     : m_db(db)
-    , m_config(std::move(cfg))
-    , m_name(name) {
+    , m_config(std::move(cfg)) {
         m_read_options.verify_checksums = m_config["read_options"]["verify_checksums"].get<bool>();
         m_read_options.fill_cache = m_config["read_options"]["fill_cache"].get<bool>();
         m_write_options.sync = m_config["write_options"]["sync"].get<bool>();
@@ -726,7 +718,6 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     leveldb::ReadOptions  m_read_options;
     leveldb::WriteOptions m_write_options;
     bool                  m_use_write_batch;
-    std::string           m_name;
 
     bool                  m_migrated = false;
     ABT_rwlock            m_migration_lock = ABT_RWLOCK_NULL;

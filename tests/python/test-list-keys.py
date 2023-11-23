@@ -9,7 +9,6 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-from pyyokan_admin import Admin
 from pyyokan_client import Client
 from pyyokan_server import Provider
 
@@ -22,17 +21,12 @@ class TestListKeys(unittest.TestCase):
         self.hg_addr = self.addr.get_internal_hg_addr()
         self.provider_id = 42
         self.provider = Provider(mid=self.mid,
-                                 provider_id=self.provider_id)
-        admin = Admin(mid=self.mid)
-        db_id = admin.open_database(
-            address=self.hg_addr,
-            provider_id=self.provider_id,
-            token='', type='map', config='{}')
+                                 provider_id=self.provider_id,
+                                 config='{"database":{"type":"map"}}')
         self.client = Client(mid=self.mid)
         self.db = self.client.make_database_handle(
             address=self.hg_addr,
-            provider_id=self.provider_id,
-            database_id=db_id)
+            provider_id=self.provider_id)
         self.reference = dict()
         self.prefix = 'matt'
         letters = string.ascii_letters

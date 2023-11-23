@@ -115,13 +115,6 @@ class DatabaseInterface {
     virtual std::string type() const = 0;
 
     /**
-     * @brief Get the name of the database.
-     *
-     * @return The name of the database.
-     */
-    virtual std::string name() const = 0;
-
-    /**
      * @brief Get the internal configuration as a JSON-formatted string.
      *
      * @return Backend configuration.
@@ -724,22 +717,20 @@ class DatabaseFactory {
      */
     static Status makeDatabase(
             const std::string& backendType,
-            const std::string& databaseName,
             const std::string& jsonConfig,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return make_fn[backendType](databaseName, jsonConfig, kvs);
+        return make_fn[backendType](jsonConfig, kvs);
     }
 
     static Status recoverDatabase(
             const std::string& backendType,
-            const std::string& databaseName,
             const std::string& dbConfig,
             const std::string& migrationConfig,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return recover_fn[backendType](databaseName, dbConfig, migrationConfig, files, kvs);
+        return recover_fn[backendType](dbConfig, migrationConfig, files, kvs);
     }
 
     /**
@@ -759,13 +750,11 @@ class DatabaseFactory {
                 std::string,
                 std::function<Status(
                         const std::string&,
-                        const std::string&,
                         DatabaseInterface**)>>
         make_fn; /*!< Map of factory functions for each backend type */
     static std::unordered_map<
                 std::string,
                 std::function<Status(
-                        const std::string&,
                         const std::string&,
                         const std::string&,
                         const std::list<std::string>&,
@@ -810,16 +799,15 @@ template <typename T> class __YOKANBackendRegistration {
 
     __YOKANBackendRegistration(const std::string &backend_name) {
         ::yokan::DatabaseFactory::make_fn[backend_name] =
-            [](const std::string& name, const std::string &config, ::yokan::DatabaseInterface** kvs) {
-                return T::create(name, config, kvs);
+            [](const std::string &config, ::yokan::DatabaseInterface** kvs) {
+                return T::create(config, kvs);
             };
         ::yokan::DatabaseFactory::recover_fn[backend_name] =
-            [](const std::string& name,
-               const std::string &database_config,
+            [](const std::string &database_config,
                const std::string& migration_config,
                const std::list<std::string>& files,
                ::yokan::DatabaseInterface** kvs) {
-                return call_recover<T>(has_recover<T>{}, name, database_config, migration_config, files, kvs);
+                return call_recover<T>(has_recover<T>{}, database_config, migration_config, files, kvs);
             };
     }
 };

@@ -8,7 +8,6 @@ spack:
   - cmake
   - pkg-config
   - mpi
-  - uuid
   - nlohmann-json
   - tclap
   - lua-sol2

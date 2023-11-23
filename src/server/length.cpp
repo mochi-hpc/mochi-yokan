@@ -43,8 +43,7 @@ void yk_length_ult(hg_handle_t h)
     }
     DEFER(margo_addr_free(mid, origin_addr));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yk_buffer_t buffer = provider->bulk_cache.get(
@@ -153,8 +152,7 @@ void yk_length_direct_ult(hg_handle_t h)
     out.sizes.sizes = vsizes_vec.data();
     out.sizes.count = vsizes_vec.size();
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto ksizes = yokan::BasicUserMem<size_t>{ in.sizes.sizes, count };

@@ -36,7 +36,6 @@ static yk_return_t yk_get_direct(yk_database_handle_t dbh,
     get_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id        = dbh->database_id;
     in.mode         = mode;
     in.vbufsize     = vbufsize;
     in.ksizes.sizes = (size_t*)ksizes;
@@ -104,7 +103,6 @@ extern "C" yk_return_t yk_get_bulk(yk_database_handle_t dbh,
     get_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id  = dbh->database_id;
     in.mode   = mode;
     in.count  = count;
     in.bulk   = data;

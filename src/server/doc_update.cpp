@@ -55,8 +55,7 @@ void yk_doc_update_ult(hg_handle_t h)
                                in.bulk, in.offset, buffer->bulk, 0, in.size);
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto ptr = buffer->data;
@@ -113,8 +112,7 @@ void yk_doc_update_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto sizes_umem = yokan::BasicUserMem<size_t>{

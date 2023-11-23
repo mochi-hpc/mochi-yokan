@@ -43,7 +43,6 @@ static yk_return_t yk_list_keyvals_direct(yk_database_handle_t dbh,
     list_keyvals_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id         = dbh->database_id;
     in.mode          = mode;
     in.count         = count;
     in.from_key.size = from_ksize;
@@ -125,7 +124,6 @@ extern "C" yk_return_t yk_list_keyvals_bulk(yk_database_handle_t dbh,
     list_keyvals_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.db_id         = dbh->database_id;
     in.mode          = mode;
     in.packed        = packed;
     in.count         = count;

@@ -38,8 +38,7 @@ void yk_iter_ult(hg_handle_t h)
     if(in.batch_size == 0)
         in.batch_size = in.count;
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     struct previous_op {
@@ -186,8 +185,7 @@ void yk_iter_direct_ult(hg_handle_t h)
     if(in.batch_size == 0)
         in.batch_size = in.count;
 
-    yk_database* database = find_database(provider, &in.db_id);
-    CHECK_DATABASE(database, in.db_id);
+    yk_database* database = provider->db;
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     struct previous_op {
