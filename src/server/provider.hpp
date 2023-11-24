@@ -11,7 +11,6 @@
 #include "yokan/bulk-cache.h"
 #include <nlohmann/json.hpp>
 #include <margo.h>
-#include <uuid.h>
 #include <unordered_map>
 #include <string>
 #include <cstring>
