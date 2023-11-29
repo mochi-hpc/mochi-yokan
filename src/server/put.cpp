@@ -45,6 +45,7 @@ void yk_put_ult(hg_handle_t h)
     DEFER(margo_addr_free(mid, origin_addr));
 
     yk_database* database = provider->db;
+    CHECK_DATABASE(database);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yk_buffer_t buffer = provider->bulk_cache.get(
@@ -127,6 +128,7 @@ void yk_put_direct_ult(hg_handle_t h)
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;
+    CHECK_DATABASE(database);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto ksizes = yokan::BasicUserMem<size_t>{

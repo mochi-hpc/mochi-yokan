@@ -56,6 +56,7 @@ void yk_doc_update_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_bulk_transfer);
 
     yk_database* database = provider->db;
+    CHECK_DATABASE(database);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto ptr = buffer->data;
@@ -113,6 +114,7 @@ void yk_doc_update_direct_ult(hg_handle_t h)
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;
+    CHECK_DATABASE(database);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     auto sizes_umem = yokan::BasicUserMem<size_t>{

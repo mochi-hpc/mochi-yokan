@@ -34,6 +34,7 @@ void yk_coll_exists_ult(hg_handle_t h)
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;
+    CHECK_DATABASE(database);
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     bool flag;

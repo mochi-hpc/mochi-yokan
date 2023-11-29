@@ -51,10 +51,11 @@ class Client {
 
     Database makeDatabaseHandle(
         hg_addr_t addr,
-        uint16_t provider_id) const {
+        uint16_t provider_id,
+        bool check = true) const {
         yk_database_handle_t db;
         auto err = yk_database_handle_create(
-            m_client, addr, provider_id, &db);
+            m_client, addr, provider_id, check, &db);
         YOKAN_CONVERT_AND_THROW(err);
         return Database(db, false);
     }

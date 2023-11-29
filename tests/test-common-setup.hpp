@@ -98,7 +98,7 @@ static void* kv_test_common_context_setup(const MunitParameter params[], void* u
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create a database handle
     ret = yk_database_handle_create(client,
-            addr, provider_id, &dbh);
+            addr, provider_id, true, &dbh);
     // create test context
     struct kv_test_context* context = new kv_test_context;
     munit_assert_not_null(context);

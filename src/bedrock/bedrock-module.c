@@ -71,7 +71,7 @@ static int yk_create_provider_handle(
 {
     yk_client_t c = (yk_client_t)client;
     yk_database_handle_t db;
-    yk_return_t ret = yk_database_handle_create(c, address, provider_id, &db);
+    yk_return_t ret = yk_database_handle_create(c, address, provider_id, true, &db);
     if(ret != YOKAN_SUCCESS) return ret;
     *ph = (bedrock_module_provider_handle_t)db;
     return BEDROCK_SUCCESS;

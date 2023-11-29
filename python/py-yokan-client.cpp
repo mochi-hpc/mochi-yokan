@@ -657,10 +657,11 @@ PYBIND11_MODULE(pyyokan_client, m) {
         .def("make_database_handle",
              [](const yokan::Client& client,
                 py_hg_addr_t addr,
-                uint16_t provider_id) {
-                return client.makeDatabaseHandle(addr, provider_id);
+                uint16_t provider_id,
+                bool check) {
+                return client.makeDatabaseHandle(addr, provider_id, check);
              },
-             "address"_a, "provider_id"_a);
+             "address"_a, "provider_id"_a, "check"_a=true);
 
     py::class_<yokan::Database>(m, "Database")
         // --------------------------------------------------------------

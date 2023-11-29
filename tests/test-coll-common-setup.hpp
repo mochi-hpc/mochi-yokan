@@ -91,7 +91,7 @@ static void* doc_test_common_context_setup(const MunitParameter params[], void* 
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create a database handle
     ret = yk_database_handle_create(client,
-            addr, provider_id, &dbh);
+            addr, provider_id, true, &dbh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // create test context
     struct doc_test_context* context = new doc_test_context;

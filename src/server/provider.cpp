@@ -41,19 +41,17 @@ yk_return_t yk_provider_register(
 
     YOKAN_LOG_TRACE(mid, "registering YOKAN provider with provider id %u", provider_id);
 
+    /* check if another provider with the same ID is already registered */
+    if(margo_provider_registered_identity(mid, provider_id)) {
+        YOKAN_LOG_ERROR(mid, "A provider with the same ID is already registered");
+        return YOKAN_ERR_INVALID_PROVIDER;
+    }
+
     flag = margo_is_listening(mid);
     if(flag == HG_FALSE) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(mid, "margo instance is not a server");
         return YOKAN_ERR_INVALID_ARGS;
-        // LCOV_EXCL_STOP
-    }
-
-    margo_provider_registered_name(mid, "yk_count", provider_id, &id, &flag);
-    if(flag == HG_TRUE) {
-        // LCOV_EXCL_START
-        YOKAN_LOG_ERROR(mid, "a provider with id %u is already registered", provider_id);
-        return YOKAN_ERR_INVALID_PROVIDER;
         // LCOV_EXCL_STOP
     }
 
@@ -71,15 +69,12 @@ yk_return_t yk_provider_register(
     }
 
     // checking databases field
-    if(not config.contains("database")) {
-        YOKAN_LOG_ERROR(mid, "\"database\" field missing in configuration");
-        return YOKAN_ERR_INVALID_CONFIG;
+    if(config.contains("database")) {
+        if(not config["database"].is_object()) {
+            YOKAN_LOG_ERROR(mid, "\"database\" field in configuration is not an object");
+            return YOKAN_ERR_INVALID_CONFIG;
+        }
     }
-    if(not config["database"].is_object()) {
-        YOKAN_LOG_ERROR(mid, "\"database\" field in configuration is not an object");
-        return YOKAN_ERR_INVALID_CONFIG;
-    }
-
     // checking buffer_cache field
     if(not config.contains("buffer_cache")) {
         config["buffer_cache"] = json::object();
@@ -102,8 +97,8 @@ yk_return_t yk_provider_register(
     }
     if(a.cache && (config["buffer_cache"]["type"] != "external")) {
         YOKAN_LOG_WARNING(mid, "External buffer_cache provided but type is "
-            "set to \"%s\" in configuration",
-            config["buffer_cache"]["type"].get_ref<const std::string&>().c_str());
+                "set to \"%s\" in configuration",
+                config["buffer_cache"]["type"].get_ref<const std::string&>().c_str());
         config["buffer_cache"] = json::object();
         config["buffer_cache"]["type"] = "external";
     }
@@ -455,6 +450,8 @@ yk_return_t yk_provider_register(
 
     margo_provider_push_finalize_callback(mid, p, &yk_finalize_provider, p);
 
+    margo_provider_register_identity(mid, provider_id, "yokan");
+
     if(provider)
         *provider = p;
     YOKAN_LOG_INFO(mid, "YOKAN provider registration done");
@@ -465,9 +462,12 @@ static void yk_finalize_provider(void* p)
 {
     yk_provider_t provider = (yk_provider_t)p;
     margo_instance_id mid = provider->mid;
-    provider->db->destroy();
-    delete provider->db;
+    if(provider->db) {
+        provider->db->destroy();
+        delete provider->db;
+    }
     YOKAN_LOG_TRACE(mid, "Finalizing YOKAN provider");
+    margo_provider_deregister_identity(provider->mid, provider->provider_id);
     margo_deregister(mid, provider->count_id);
     margo_deregister(mid, provider->exists_id);
     margo_deregister(mid, provider->exists_direct_id);
@@ -649,6 +649,8 @@ DEFINE_MARGO_RPC_HANDLER(yk_migrate_database_ult)
 static inline bool open_database_from_config(yk_provider_t provider)
 {
     auto& config = provider->config;
+    if(!config.contains("database"))
+        return true;
     auto& db = config["database"];
     std::string type;
     {

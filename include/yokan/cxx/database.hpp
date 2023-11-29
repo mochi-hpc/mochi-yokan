@@ -36,10 +36,11 @@ class Database {
 
     Database(yk_client_t client,
              hg_addr_t addr,
-             uint16_t provider_id)
+             uint16_t provider_id,
+             bool check = true)
     {
         auto err = yk_database_handle_create(client,
-            addr, provider_id, &m_db);
+            addr, provider_id, check, &m_db);
         YOKAN_CONVERT_AND_THROW(err);
     }
 

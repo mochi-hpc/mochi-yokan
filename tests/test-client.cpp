@@ -113,7 +113,7 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // test that we can create a database handle
     ret = yk_database_handle_create(client,
-            context->addr, provider_id, &rh);
+            context->addr, provider_id, true, &rh);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // test that we can increase the ref count
     ret = yk_database_handle_ref_incr(rh);
@@ -137,11 +137,11 @@ static MunitResult test_database(const MunitParameter params[], void* data)
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
     // test calls that should fail properly
     ret = yk_database_handle_create(YOKAN_CLIENT_NULL,
-            context->addr, provider_id, &rh);
+            context->addr, provider_id, true, &rh);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_database_handle_create(client,
-            HG_ADDR_NULL, provider_id, &rh);
-    munit_assert_int(ret, ==, YOKAN_ERR_FROM_MERCURY);
+            HG_ADDR_NULL, provider_id, true, &rh);
+    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_database_handle_ref_incr(YOKAN_DATABASE_HANDLE_NULL);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ARGS);
     ret = yk_database_handle_release(YOKAN_DATABASE_HANDLE_NULL);

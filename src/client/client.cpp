@@ -224,17 +224,28 @@ extern "C" yk_return_t yk_database_handle_create(
         yk_client_t client,
         hg_addr_t addr,
         uint16_t provider_id,
+        bool check,
         yk_database_handle_t* handle)
 {
-    if(client == YOKAN_CLIENT_NULL)
+    if(client == YOKAN_CLIENT_NULL || addr == HG_ADDR_NULL)
         return YOKAN_ERR_INVALID_ARGS;
+
+    hg_return_t ret;
+
+    if(check) {
+        char buffer[sizeof("yokan")];
+        size_t bufsize = sizeof("yokan");
+        ret = margo_provider_get_identity(client->mid, addr, provider_id, buffer, &bufsize);
+        if(ret != HG_SUCCESS || strcmp("yokan", buffer) != 0)
+            return YOKAN_ERR_INVALID_PROVIDER;
+    }
 
     yk_database_handle_t rh =
         (yk_database_handle_t)calloc(1, sizeof(*rh));
 
     if(!rh) return YOKAN_ERR_ALLOCATION;
 
-    hg_return_t ret = margo_addr_dup(client->mid, addr, &(rh->addr));
+    ret = margo_addr_dup(client->mid, addr, &(rh->addr));
     if(ret != HG_SUCCESS) {
         free(rh);
         return YOKAN_ERR_FROM_MERCURY;

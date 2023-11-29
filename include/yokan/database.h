@@ -38,7 +38,8 @@ typedef yk_return_t (*yk_keyvalue_callback_t)(void*, size_t, const void*, size_t
  * @param[in] client YOKAN client responsible for the database handle
  * @param[in] addr Mercury address of the provider
  * @param[in] provider_id id of the provider
- * @param[in] handle database handle
+ * @param[in] check Checks if the provider is valid
+ * @param[out] handle database handle
  *
  * @return YOKAN_SUCCESS or error code defined in common.h
  */
@@ -46,6 +47,7 @@ yk_return_t yk_database_handle_create(
         yk_client_t client,
         hg_addr_t addr,
         uint16_t provider_id,
+        bool check,
         yk_database_handle_t* handle);
 
 /**

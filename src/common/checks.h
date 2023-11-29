@@ -71,11 +71,20 @@
         } \
     } while(0)
 
+#define CHECK_DATABASE(__db__) \
+    do { \
+        if(!__db__) { \
+            YOKAN_LOG_ERROR(mid, "no database attached to this provider"); \
+            out.ret = YOKAN_ERR_INVALID_DATABASE; \
+            return; \
+        } \
+    } while(0)
+
 #define CHECK_MODE_SUPPORTED(__db__, __mode__) \
     do { \
         if(!__db__->supportsMode(__mode__)) { \
             out.ret = YOKAN_ERR_MODE; \
-            YOKAN_LOG_ERROR(mid, "Mode not supported by database"); \
+            YOKAN_LOG_ERROR(mid, "mode not supported by database"); \
             return; \
         } \
     } while(0)
