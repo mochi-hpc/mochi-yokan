@@ -6,6 +6,7 @@
 #ifndef __PROVIDER_H
 #define __PROVIDER_H
 
+#include "config.h"
 #include "yokan/server.h"
 #include "yokan/backend.hpp"
 #include "yokan/bulk-cache.h"
@@ -75,6 +76,7 @@ typedef struct yk_provider {
     hg_id_t doc_iter_direct_id;
     hg_id_t doc_iter_back_id;
     hg_id_t doc_iter_direct_back_id;
+    hg_id_t get_remi_provider_id;
 
     // REMI information
     struct {
@@ -162,4 +164,6 @@ void yk_doc_iter_ult(hg_handle_t h);
 DECLARE_MARGO_RPC_HANDLER(yk_doc_iter_direct_ult)
 void yk_doc_iter_direct_ult(hg_handle_t h);
 
+DECLARE_MARGO_RPC_HANDLER(yk_get_remi_provider_id_ult)
+void yk_get_remi_provider_id_ult(hg_handle_t h);
 #endif

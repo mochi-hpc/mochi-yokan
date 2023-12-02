@@ -6,6 +6,7 @@
 #ifndef __YOKAN_CHECKS_H
 #define __YOKAN_CHECKS_H
 
+#include "yokan/common.h"
 #include "logging.h"
 
 #define CHECK_HRET(__hret__, __fun__) \

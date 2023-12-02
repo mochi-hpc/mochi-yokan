@@ -6,8 +6,10 @@
 #ifndef __MIGRATION_H
 #define __MIGRATION_H
 #ifdef YOKAN_HAS_REMI
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <yokan/common.h>
+#include "../common/logging.h"
 #include "provider.hpp"
 #include <remi/remi-common.h>
 #include <remi/remi-client.h>
@@ -21,7 +23,13 @@ static inline int32_t before_migration_cb(remi_fileset_t fileset, void* uargs)
     // is available and there  isn't any database with the same name yet,
     // so we can do the migration safely.
 
-    (void)uargs;
+    yk_provider_t provider = (yk_provider_t)uargs;
+    if(provider->db) {
+        YOKAN_LOG_ERROR(provider->mid,
+            "Migration request rejected:"
+            " a database is already attached to this provider");
+        return YOKAN_ERR_INVALID_DATABASE;
+    }
 
     const char* type = nullptr;
     const char* db_config = nullptr;
@@ -60,6 +68,10 @@ static inline int32_t after_migration_cb(remi_fileset_t fileset, void* uargs)
     remi_fileset_get_metadata(fileset, "db_config", &db_config);
     remi_fileset_get_metadata(fileset, "migration_config", &migration_config);
 
+    std::cerr << "TYPE: " << type << std::endl;
+    std::cerr << "DB CONFIG: " << db_config << std::endl;
+    std::cerr << "MIG CONFIG: " << migration_config << std::endl;
+
     auto json_db_config = json::parse(db_config);
     auto json_mig_config = json::parse(migration_config);
 
@@ -86,9 +98,17 @@ static inline int32_t after_migration_cb(remi_fileset_t fileset, void* uargs)
     yk_database_t database;
     auto status = yokan::DatabaseFactory::recoverDatabase(
         type, db_config, migration_config, files, &database);
-    if(status != yokan::Status::OK) return (int32_t)status;
+    if(status != yokan::Status::OK) {
+        YOKAN_LOG_ERROR(provider->mid,
+            "Could not recover database: DatabaseFactory::recoverDatabase returned %d",
+            status);
+        return (int32_t)status;
+    }
 
     provider->db = database;
+    provider->config["database"] = json::object();
+    provider->config["database"]["type"] = type;
+    provider->config["database"]["config"] = json::parse(database->config());
 
     return 0;
 }

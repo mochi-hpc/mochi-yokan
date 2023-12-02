@@ -380,6 +380,7 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual void destroy() override {
+        if(!m_db) return;
         auto path = m_config["path"].get<std::string>();
         auto type = m_config["type"].get<std::string>();
         m_db->Close();

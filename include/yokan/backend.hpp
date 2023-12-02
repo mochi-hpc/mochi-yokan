@@ -777,7 +777,7 @@ template <typename T> class __YOKANBackendRegistration {
     template<typename ... U> using void_t = void;
 
     template<typename U> using recover_t =
-        decltype(U::recover("", "", "", {}, nullptr));
+        decltype(U::recover("", "", {}, nullptr));
 
     template<typename U, typename = void_t<>>
     struct has_recover : std::false_type {};

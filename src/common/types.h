@@ -503,6 +503,11 @@ MERCURY_GEN_PROC(doc_iter_direct_back_in_t,
 MERCURY_GEN_PROC(doc_iter_direct_back_out_t,
         ((int32_t)(ret)))
 
+/* get_remi_provider_id */
+MERCURY_GEN_PROC(get_remi_provider_id_out_t,
+        ((int32_t)(ret))\
+        ((uint16_t)(provider_id)))
+
 /* Extra hand-coded serialization functions */
 
 static inline hg_return_t hg_proc_yk_id_t(

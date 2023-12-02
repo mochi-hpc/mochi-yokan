@@ -65,6 +65,22 @@ yk_return_t yk_provider_destroy(
         yk_provider_t provider);
 
 /**
+ * @brief Migrates the database from the given provider to
+ * the target provider.
+ *
+ * @param provider
+ * @param dest_addr
+ * @param dest_provider_id
+ * @param options
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_provider_migrate_database(
+        yk_provider_t provider,
+        const char* dest_addr,
+        uint16_t dest_provider_id,
+        const struct yk_migration_options* options);
+/**
  * @brief Returns the internal configuration of the YOKAN
  * provider. The returned string must be free-ed by the caller.
  */

@@ -22,11 +22,10 @@ extern "C" {
     X(YOKAN_ERR_ALLOCATION, "Allocation error")                   \
     X(YOKAN_ERR_INVALID_MID, "Invalid margo instance")            \
     X(YOKAN_ERR_INVALID_ARGS, "Invalid argument")                 \
-    X(YOKAN_ERR_INVALID_PROVIDER, "Invalid provider id")          \
-    X(YOKAN_ERR_INVALID_DATABASE, "Invalid database id")          \
+    X(YOKAN_ERR_INVALID_PROVIDER, "Invalid provider")             \
+    X(YOKAN_ERR_INVALID_DATABASE, "Invalid database")             \
     X(YOKAN_ERR_INVALID_BACKEND, "Invalid backend type")          \
     X(YOKAN_ERR_INVALID_CONFIG, "Invalid configuration")          \
-    X(YOKAN_ERR_INVALID_TOKEN, "Invalid token")                   \
     X(YOKAN_ERR_INVALID_ID, "Invalid document id")                \
     X(YOKAN_ERR_INVALID_FILTER, "Invalid filter")                 \
     X(YOKAN_ERR_FROM_MERCURY, "Mercury error")                    \
