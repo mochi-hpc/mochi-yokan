@@ -124,7 +124,7 @@ set (client-src-files
      client/doc_iter.cpp)
 
 set (bedrock-module-src-files
-     bedrock/bedrock-module.c)
+     bedrock/bedrock-module.cpp)
 
 # load package helper for generating cmake CONFIG packages
 include (CMakePackageConfigHelpers)
@@ -185,6 +185,7 @@ target_link_libraries (yokan-bedrock-module
     PUBLIC yokan-server
     PUBLIC yokan-client
     PUBLIC bedrock-server
+    PRIVATE nlohmann_json::nlohmann_json
     PRIVATE coverage_config)
 target_compile_definitions (yokan-bedrock-module PRIVATE -DJSON_HAS_CPP_14)
 target_include_directories (yokan-bedrock-module PUBLIC $<INSTALL_INTERFACE:include>)
