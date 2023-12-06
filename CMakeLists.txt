@@ -201,7 +201,7 @@ endif ()
 
 # library version set here (e.g. for shared libs).
 set (YOKAN_VERSION_MAJOR 0)
-set (YOKAN_VERSION_MINOR 3)
+set (YOKAN_VERSION_MINOR 4)
 set (YOKAN_VERSION_PATCH 0)
 set (YOKAN_VERSION
      "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
