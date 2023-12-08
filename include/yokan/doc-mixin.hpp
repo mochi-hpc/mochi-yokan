@@ -180,11 +180,31 @@ class DocumentStoreMixin : public DB {
         CollectionMetadata metadata;
         auto status = _collGetMetadata(collection, name_len, &metadata);
         if(status != Status::OK) return status;
-        for(unsigned i=0; i < ids.size; i++) {
-            if(ids[i] >= metadata.next_id)
-                return Status::InvalidID;
+        if(mode & YOKAN_MODE_UPDATE_NEW) {
+            std::vector<std::uint8_t> existsBuffer(1 + sizes.size/8);
+            BitField existsBitfield{existsBuffer.data(), sizes.size};
+            status = exists(mode, keys, ksizes, existsBitfield);
+            if(status != Status::OK) return status;
+            size_t extraKeys = 0;
+            yk_id_t maxID = 0;
+            for(unsigned i=0; i < ids.size; i++) {
+                if(!existsBitfield[i]) extraKeys += 1;
+                maxID = std::max(maxID, ids[i]);
+            }
+            status = put(mode, keys, ksizes, documents, sizes);
+            if(status != Status::OK) return status;
+            metadata.size += extraKeys;
+            metadata.next_id = maxID + 1;
+            return _collPutMetadata(collection, name_len, &metadata);
+        } else {
+            for(unsigned i=0; i < ids.size; i++) {
+                if(ids[i] >= metadata.next_id)
+                    return Status::InvalidID;
+            }
+            // FIXME: we may be updating keys that have been previously deleted,
+            // leading the metadata to no longer be correct.
+            return put(mode, keys, ksizes, documents, sizes);
         }
-        return put(mode, keys, ksizes, documents, sizes);
     }
 
     Status docLoad(const char* collection,

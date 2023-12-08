@@ -122,6 +122,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_FILTER_VALUE // not actually used
                     |YOKAN_MODE_LIB_FILTER   // not actually used
                     |YOKAN_MODE_NO_RDMA
+                    |YOKAN_MODE_UPDATE_NEW
                     )
             );
     }

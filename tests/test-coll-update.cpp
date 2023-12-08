@@ -81,6 +81,24 @@ static MunitResult test_coll_update(const MunitParameter params[], void* data)
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ID);
 
+    /* tries to update an id outside of the collection with YOKAN_MODE_UPDATE_NEW */
+    ret = yk_doc_update(dbh, "abcd", context->mode | YOKAN_MODE_UPDATE_NEW,
+                        g_num_items+10, "something", 9);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    /* size should have increased by 1 and last_id should be g_num_items+10 */
+    size_t new_count;
+    ret = yk_collection_size(dbh, "abcd", context->mode, &new_count);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_ulong(new_count, ==, context->reference.size()+1);
+    /* size should have increased by 1 and last_id should be g_num_items+10 */
+    yk_id_t new_last_id;
+    ret = yk_collection_last_id(dbh, "abcd", context->mode, &new_last_id);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_ulong(new_last_id, ==, g_num_items+10);
+
     /* tries to update from an invalid collection */
     ret = yk_doc_update(dbh, "efgh", context->mode, 0, "something", 9);
     SKIP_IF_NOT_IMPLEMENTED(ret);
@@ -173,6 +191,26 @@ static MunitResult test_coll_update_multi(const MunitParameter params[], void* d
                               ids.data(), ptrs.data(), sizes.data());
     SKIP_IF_NOT_IMPLEMENTED(ret);
     munit_assert_int(ret, ==, YOKAN_ERR_INVALID_ID);
+
+    /* tries to update an id outside of the collection with YOKAN_MODE_UPDATE_NEW */
+    ids[0] = g_num_items+10;
+    ret = yk_doc_update_multi(dbh, "abcd", context->mode | YOKAN_MODE_UPDATE_NEW,
+                              ids.size(), ids.data(), ptrs.data(), sizes.data());
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    /* size should have increased by 1 and last_id should be g_num_items+10 */
+    size_t new_count;
+    ret = yk_collection_size(dbh, "abcd", context->mode, &new_count);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_ulong(new_count, ==, context->reference.size()+1);
+    /* size should have increased by 1 and last_id should be g_num_items+10 */
+    yk_id_t new_last_id;
+    ret = yk_collection_last_id(dbh, "abcd", context->mode, &new_last_id);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_ulong(new_last_id, ==, g_num_items+10);
+
 
     return MUNIT_OK;
 }
