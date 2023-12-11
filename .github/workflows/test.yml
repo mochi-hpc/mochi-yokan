@@ -36,7 +36,6 @@ jobs:
       run: |
         spack -e tests external find --not-buildable cmake
         spack -e tests external find --not-buildable perl
-        spack -e tests external find --not-buildable python
         spack -e tests external find --not-buildable mpich
         spack -e tests external find --not-buildable m4
         spack -e tests external find --not-buildable libtool
