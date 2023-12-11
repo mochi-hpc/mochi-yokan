@@ -43,3 +43,6 @@ spack:
       require: "@0.8.0:"
   mirrors:
     mochi-buildcache: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache
+  config:
+    install_tree:
+      padded_length: 256
