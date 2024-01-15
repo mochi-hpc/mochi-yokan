@@ -14,22 +14,32 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 
-struct doc_fetch_context {
+struct doc_fetch_context_base {
+    margo_instance_id             mid;
     size_t                        count;
     const yk_id_t*                ids;
-    yk_document_callback_t        cb;
     void*                         uargs;
     const yk_doc_fetch_options_t* options;
 };
 
-extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
-                                          const char* collection,
-                                          int32_t mode,
-                                          size_t count,
-                                          const yk_id_t* ids,
-                                          yk_document_callback_t cb,
-                                          void* uargs,
-                                          const yk_doc_fetch_options_t* options)
+struct doc_fetch_context {
+    doc_fetch_context_base base;
+    yk_document_callback_t cb;
+};
+
+struct doc_fetch_bulk_context {
+    doc_fetch_context_base      base;
+    yk_document_bulk_callback_t cb;
+};
+
+static yk_return_t doc_fetch_base(yk_database_handle_t dbh,
+                                  const char* collection,
+                                  int32_t mode,
+                                  size_t count,
+                                  const yk_id_t* ids,
+                                  void* cb,
+                                  void* uargs,
+                                  const yk_doc_fetch_options_t* options)
 {
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -49,12 +59,13 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
     doc_fetch_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    doc_fetch_context context;
-    context.count   = count;
-    context.ids     = ids;
-    context.cb      = cb;
-    context.uargs   = uargs;
-    context.options = options;
+    doc_fetch_bulk_context context;
+    context.base.mid     = dbh->client->mid;
+    context.base.count   = count;
+    context.base.ids     = ids;
+    context.base.uargs   = uargs;
+    context.base.options = options;
+    context.cb           = reinterpret_cast<decltype(context.cb)>(cb);
 
     in.mode       = mode;
     in.batch_size = options ? options->batch_size : 0;
@@ -80,6 +91,143 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
     return ret;
 }
 
+extern "C" yk_return_t yk_doc_fetch_bulk(yk_database_handle_t dbh,
+                                         const char* collection,
+                                         int32_t mode,
+                                         size_t count,
+                                         const yk_id_t* ids,
+                                         yk_document_bulk_callback_t cb,
+                                         void* uargs,
+                                         const yk_doc_fetch_options_t* options)
+{
+    return doc_fetch_base(dbh, collection, mode, count, ids, (void*)cb, uargs, options);
+}
+
+static yk_return_t invoke_callback_on_docs(
+        ABT_pool pool, size_t count, size_t start, const yk_id_t* ids,
+        const size_t* doc_sizes, const char* doc_data, yk_document_callback_t cb,
+        void* uargs)
+{
+    struct ult_args {
+        yk_document_callback_t cb;
+        void*                  uargs;
+        unsigned               index;
+        yk_id_t                id;
+        const void*            doc;
+        size_t                 doc_size;
+        yk_return_t            ret;
+    };
+
+    std::vector<ABT_thread> ults;
+    std::vector<ult_args>   args(count);
+
+    if(pool != ABT_POOL_NULL)
+        ults.resize(count);
+
+    auto ult = [](void* a) -> void {
+        auto arg = (ult_args*)a;
+        arg->ret = (arg->cb)(
+            arg->uargs, arg->index,
+            arg->id, arg->doc, arg->doc_size);
+    };
+
+    yk_return_t ret = YOKAN_SUCCESS;
+
+    size_t doc_offset = 0;
+    for(unsigned i = 0; i < count; ++i) {
+        args[i].cb       = cb;
+        args[i].uargs    = uargs;
+        args[i].index    = start + i;
+        args[i].id       = ids[i];
+        args[i].doc      = doc_data + doc_offset;
+        args[i].doc_size = doc_sizes[i];
+        if(pool == ABT_POOL_NULL) {
+            ult(&args[i]);
+            if(args[i].ret != YOKAN_SUCCESS) {
+                ret = args[i].ret;
+                break;
+            }
+        } else {
+            ABT_thread_create(pool, ult, &args[i], ABT_THREAD_ATTR_NULL, &ults[i]);
+        }
+        doc_offset += args[i].doc_size <= YOKAN_LAST_VALID_SIZE ? args[i].doc_size : 0;
+    }
+
+    if(pool != ABT_POOL_NULL) {
+        ABT_thread_join_many(ults.size(), ults.data());
+        ABT_thread_free_many(ults.size(), ults.data());
+    }
+
+    return ret;
+}
+
+static yk_return_t bulk_to_docs(
+    doc_fetch_context* context, size_t start, size_t count,
+    hg_bulk_t bulk, hg_addr_t addr, size_t size)
+{
+    auto mid     = context->base.mid;
+    auto hret    = HG_SUCCESS;
+
+    // create bulk for the documents
+    std::vector<size_t>     doc_sizes(count);
+    std::vector<char>       docs(size - count*sizeof(size_t));
+    std::array<void*,2>     docs_ptrs = { doc_sizes.data(), docs.data() };
+    std::array<hg_size_t,2> docs_sizes = { doc_sizes.size()*sizeof(size_t), docs.size() };
+    hg_bulk_t docs_bulk  = HG_BULK_NULL;
+    hret = margo_bulk_create(mid, 2, docs_ptrs.data(), docs_sizes.data(), HG_BULK_WRITE_ONLY, &docs_bulk);
+    if(hret != HG_SUCCESS) {
+        YOKAN_LOG_ERROR(mid, "margo_bulk_create returned %d", hret);
+        return YOKAN_ERR_FROM_MERCURY;
+    }
+    DEFER(margo_bulk_free(docs_bulk));
+
+    // pull the documents
+    hret = margo_bulk_transfer(mid, HG_BULK_PULL, addr, bulk, 0, docs_bulk, 0, size);
+    if(hret != HG_SUCCESS) {
+        YOKAN_LOG_ERROR(mid, "margo_bulk_transfer returned %d", hret);
+        return YOKAN_ERR_FROM_MERCURY;
+    }
+
+    auto opt = context->base.options;
+    ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
+                    opt->pool : ABT_POOL_NULL;
+
+    return invoke_callback_on_docs(
+            pool, count, start, context->base.ids, doc_sizes.data(),
+            docs.data(), context->cb, context->base.uargs);
+}
+
+extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
+                                          const char* collection,
+                                          int32_t mode,
+                                          size_t count,
+                                          const yk_id_t* ids,
+                                          yk_document_callback_t cb,
+                                          void* uargs,
+                                          const yk_doc_fetch_options_t* options)
+{
+    if(mode & YOKAN_MODE_NO_RDMA) {
+
+        return doc_fetch_base(
+            dbh, collection, mode, count,
+            ids, (void*)cb, uargs, options);
+
+    } else {
+
+        doc_fetch_context context;
+        context.base.mid     = dbh->client->mid;
+        context.base.count   = count;
+        context.base.ids     = ids;
+        context.base.uargs   = uargs;
+        context.base.options = options;
+        context.cb           = cb;
+
+        return doc_fetch_base(
+            dbh, collection, mode, count,
+            ids, (void*)bulk_to_docs, &context, options);
+    }
+}
+
 extern "C" yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
                                     const char* collection,
                                     int32_t mode,
@@ -92,7 +240,6 @@ extern "C" yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
 
 void yk_doc_fetch_back_ult(hg_handle_t h)
 {
-
     hg_return_t hret = HG_SUCCESS;
     doc_fetch_back_in_t in;
     doc_fetch_back_out_t out;
@@ -114,77 +261,49 @@ void yk_doc_fetch_back_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     DEFER(margo_free_input(h, &in));
 
-    doc_fetch_context* context = reinterpret_cast<doc_fetch_context*>(in.op_ref);
+    doc_fetch_bulk_context* context = reinterpret_cast<doc_fetch_bulk_context*>(in.op_ref);
 
-    if(context->count < in.count) {
+    if(context->base.count < in.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
 
-    // create bulk for the documents
-    std::vector<size_t>     doc_sizes(in.count);
-    std::vector<char>       docs(in.size - in.count*sizeof(size_t));
-    std::array<void*,2>     docs_ptrs = { doc_sizes.data(), docs.data() };
-    std::array<hg_size_t,2> docs_sizes = { doc_sizes.size()*sizeof(size_t), docs.size() };
-    hg_bulk_t docs_bulk  = HG_BULK_NULL;
-    hret = margo_bulk_create(mid, 2, docs_ptrs.data(), docs_sizes.data(), HG_BULK_WRITE_ONLY, &docs_bulk);
-    CHECK_HRET_OUT(hret, margo_bulk_create);
-    DEFER(margo_bulk_free(docs_bulk));
+    struct ult_args {
+        doc_fetch_bulk_context* context;
+        doc_fetch_back_in_t*    in;
+        doc_fetch_back_out_t*   out;
+        hg_addr_t               addr;
+    };
 
-    // pull the documents
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, info->addr, in.bulk, 0, docs_bulk, 0, in.size);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    auto ult_fn = [](void* a) -> void {
+        auto args = reinterpret_cast<ult_args*>(a);
+        args->out->ret = args->context->cb(
+            args->context->base.uargs,
+            args->in->start,
+            args->in->count,
+            args->in->bulk,
+            args->addr,
+            args->in->size);
+    };
 
-    const auto opt = context->options;
+    ult_args ult_args = {
+        context, &in, &out, info->addr
+    };
+
+    const auto opt = context->base.options;
     ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
                     opt->pool : ABT_POOL_NULL;
 
-    struct ult_args {
-        yk_document_callback_t cb;
-        void*                  uargs;
-        unsigned               index;
-        yk_id_t                id;
-        const void*            doc;
-        size_t                 doc_size;
-        yk_return_t            ret;
-    };
-
-    std::vector<ABT_thread> ults;
-    std::vector<ult_args>   args(in.count);
-
-    if(pool != ABT_POOL_NULL)
-        ults.resize(in.count);
-
-    auto ult = [](void* a) -> void {
-        auto arg = (ult_args*)a;
-        arg->ret = (arg->cb)(
-            arg->uargs, arg->index,
-            arg->id, arg->doc, arg->doc_size);
-    };
-
-    size_t doc_offset = 0;
-    for(unsigned i = 0; i < in.count; ++i) {
-        args[i].cb       = context->cb;
-        args[i].uargs    = context->uargs;
-        args[i].index    = in.start + i;
-        args[i].id       = context->ids[i];
-        args[i].doc      = docs.data() + doc_offset;
-        args[i].doc_size = doc_sizes[i];
-        if(pool == ABT_POOL_NULL) {
-            ult(&args[i]);
-            if(args[i].ret != YOKAN_SUCCESS) {
-                out.ret = args[i].ret;
-                break;
-            }
-        } else {
-            ABT_thread_create(pool, ult, &args[i], ABT_THREAD_ATTR_NULL, &ults[i]);
-        }
-        doc_offset += args[i].doc_size <= YOKAN_LAST_VALID_SIZE ? args[i].doc_size : 0;
-    }
-
-    if(pool != ABT_POOL_NULL) {
-        ABT_thread_join_many(ults.size(), ults.data());
-        ABT_thread_free_many(ults.size(), ults.data());
+    if(pool == ABT_POOL_NULL) {
+        ult_fn(static_cast<void*>(&ult_args));
+    } else {
+        ABT_thread ult = ABT_THREAD_NULL;
+        ABT_thread_create(
+            pool, ult_fn,
+            static_cast<void*>(&ult_args),
+            ABT_THREAD_ATTR_NULL, &ult);
+        ABT_thread_join(ult);
+        ABT_thread_free(&ult);
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_fetch_back_ult)
@@ -212,12 +331,12 @@ void yk_doc_fetch_direct_back_ult(hg_handle_t h)
 
     doc_fetch_context* context = reinterpret_cast<doc_fetch_context*>(in.op_ref);
 
-    if(context->count < in.doc_sizes.count) {
+    if(context->base.count < in.doc_sizes.count) {
         out.ret = YOKAN_ERR_OTHER; // should not be happening
         return;
     }
 
-    const auto opt = context->options;
+    const auto opt = context->base.options;
     ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
                     opt->pool : ABT_POOL_NULL;
 
@@ -247,9 +366,9 @@ void yk_doc_fetch_direct_back_ult(hg_handle_t h)
     size_t doc_offset = 0;
     for(unsigned i = 0; i < in.doc_sizes.count; ++i) {
         args[i].cb       = context->cb;
-        args[i].uargs    = context->uargs;
+        args[i].uargs    = context->base.uargs;
         args[i].index    = in.start + i;
-        args[i].id       = context->ids[i];
+        args[i].id       = context->base.ids[i];
         args[i].doc      = ((const char*)in.docs.data) + doc_offset;
         args[i].doc_size = in.doc_sizes.sizes[i];
         if(pool == ABT_POOL_NULL) {
