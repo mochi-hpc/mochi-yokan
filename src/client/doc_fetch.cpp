@@ -193,7 +193,7 @@ static yk_return_t bulk_to_docs(
                     opt->pool : ABT_POOL_NULL;
 
     return invoke_callback_on_docs(
-            pool, count, start, context->base.ids, doc_sizes.data(),
+            pool, count, start, context->base.ids + start, doc_sizes.data(),
             docs.data(), context->cb, context->base.uargs);
 }
 
@@ -340,52 +340,10 @@ void yk_doc_fetch_direct_back_ult(hg_handle_t h)
     ABT_pool pool = (opt && opt->pool && opt->pool != ABT_POOL_NULL) ?
                     opt->pool : ABT_POOL_NULL;
 
-    struct ult_args {
-        yk_document_callback_t cb;
-        void*                  uargs;
-        unsigned               index;
-        yk_id_t                id;
-        const void*            doc;
-        size_t                 doc_size;
-        yk_return_t            ret;
-    };
-
-    std::vector<ABT_thread> ults;
-    std::vector<ult_args>   args(in.doc_sizes.count);
-
-    if(pool != ABT_POOL_NULL)
-        ults.resize(in.doc_sizes.count);
-
-    auto ult = [](void* a) -> void {
-        auto arg = (ult_args*)a;
-        arg->ret = (arg->cb)(
-            arg->uargs, arg->index,
-            arg->id, arg->doc, arg->doc_size);
-    };
-
-    size_t doc_offset = 0;
-    for(unsigned i = 0; i < in.doc_sizes.count; ++i) {
-        args[i].cb       = context->cb;
-        args[i].uargs    = context->base.uargs;
-        args[i].index    = in.start + i;
-        args[i].id       = context->base.ids[i];
-        args[i].doc      = ((const char*)in.docs.data) + doc_offset;
-        args[i].doc_size = in.doc_sizes.sizes[i];
-        if(pool == ABT_POOL_NULL) {
-            ult(&args[i]);
-            if(args[i].ret != YOKAN_SUCCESS) {
-                out.ret = args[i].ret;
-                break;
-            }
-        } else {
-            ABT_thread_create(pool, ult, &args[i], ABT_THREAD_ATTR_NULL, &ults[i]);
-        }
-        doc_offset += args[i].doc_size <= YOKAN_LAST_VALID_SIZE ? args[i].doc_size : 0;
-    }
-
-    if(pool != ABT_POOL_NULL) {
-        ABT_thread_join_many(ults.size(), ults.data());
-        ABT_thread_free_many(ults.size(), ults.data());
-    }
+    out.ret = invoke_callback_on_docs(
+        pool, in.doc_sizes.count,
+        in.start, context->base.ids + in.start,
+        in.doc_sizes.sizes, in.docs.data, context->cb,
+        context->base.uargs);
 }
 DEFINE_MARGO_RPC_HANDLER(yk_doc_fetch_direct_back_ult)
