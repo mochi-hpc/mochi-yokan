@@ -130,10 +130,11 @@ void yk_doc_iter_ult(hg_handle_t h)
 
     auto doc_iter_func = [&](yk_id_t id, const yokan::UserMem& doc) -> yokan::Status {
         //  filtered_docsize is an upper-bound here
-        auto filtered_docsize = filter->docSizeFrom(doc.data, doc.size);
+        auto filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
         auto current_size = docs.size();
         docs.resize(current_size + filtered_docsize);
         filtered_docsize = filter->docCopy(
+            in.coll_name,
             docs.data() + current_size,
             filtered_docsize, doc.data, doc.size);
         ids.push_back(id);
@@ -263,10 +264,10 @@ void yk_doc_iter_direct_ult(hg_handle_t h)
 
     auto doc_iter_func = [&](yk_id_t id, const yokan::UserMem& doc) -> yokan::Status {
         // filtered_docsize is an upper-bound here
-        auto filtered_docsize = filter->docSizeFrom(doc.data, doc.size);
+        auto filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
         auto current_size = docs.size();
         docs.resize(current_size + filtered_docsize);
-        filtered_docsize = filter->docCopy(docs.data() + current_size, filtered_docsize, doc.data, doc.size);
+        filtered_docsize = filter->docCopy(in.coll_name, docs.data() + current_size, filtered_docsize, doc.data, doc.size);
         ids.push_back(id);
         docsizes.push_back(filtered_docsize);
         // filtered_docsize  may have changed

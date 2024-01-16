@@ -395,10 +395,10 @@ class DocumentStoreMixin : public DB {
             while((max == 0 || i < max) && id < metadata.next_id) {
                 auto key = _keyFromId(collection, name_len, id);
                 auto ksize = key.size();
-                auto kv_func   = [&func, &filter, &i, name_len](const UserMem& key, const UserMem& val) -> Status {
+                auto kv_func   = [&func, &filter, &i, &collection, name_len](const UserMem& key, const UserMem& val) -> Status {
                     if(val.size == YOKAN_KEY_NOT_FOUND) return Status::OK;
                     yk_id_t id = _idFromKey(name_len, key.data);
-                    if(!filter->check(id, val.data, val.size)) return Status::OK;
+                    if(!filter->check(collection, id, val.data, val.size)) return Status::OK;
                     else {
                         ++i;
                         return func(id, val);

@@ -69,20 +69,23 @@ struct CustomDocFilter : public yokan::DocFilter {
         (void)data;
     }
 
-    bool check(yk_id_t id, const void* doc, size_t docsize) const override {
+    bool check(const char* coll, yk_id_t id, const void* doc, size_t docsize) const override {
+        (void)coll;
         (void)doc;
         (void)docsize;
         return id % 2 == 0;
     }
 
-    size_t docSizeFrom(const void* val, size_t vsize) const override {
+    size_t docSizeFrom(const char* coll, const void* val, size_t vsize) const override {
+        (void)coll;
         (void)val;
         return vsize;
     }
 
-    size_t docCopy(
+    size_t docCopy(const char* coll,
           void* dst, size_t max_dst_size,
           const void* val, size_t vsize) const override {
+        (void)coll;
         if(vsize > max_dst_size) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, val, vsize);
         return vsize;
