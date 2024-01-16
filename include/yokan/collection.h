@@ -20,6 +20,7 @@ extern "C" {
  * @brief Type of callback used by the fetch and iter functions.
  *
  * @param void* User-provided arguments.
+ * @param size_t Iteration index.
  * @param yk_id_t Record id
  * @param const void* Document data.
  * @param size_t Size of the document.
@@ -27,6 +28,23 @@ extern "C" {
  * @return YK_SUCCESS or other error code.
  */
 typedef yk_return_t (*yk_document_callback_t)(void*, size_t, yk_id_t, const void*, size_t);
+
+/**
+ * @brief Type of callback used by the fetch_bulk and iter_bulk functions.
+ * For fetch_bulk, the bulk handle will expose the count size_t document sizes
+ * followed by the actual documents. For iter_bulk, it will contain the count yk_id_t
+ * document IDs, then the sizes, then the documents.
+ *
+ * @param void* User-provided arguments.
+ * @param size_t Start iteration index.
+ * @param size_t Number of documents in the bulk.
+ * @param hg_bulk_t Bulk containing the documents.
+ * @param hg_addr_t Address the bulk originates from.
+ * @param size_t Total size of the memory exposed by the bulk handle.
+ *
+ * @return YK_SUCCESS or other error code.
+ */
+typedef yk_return_t (*yk_document_bulk_callback_t)(void*, size_t, size_t, hg_bulk_t, hg_addr_t, size_t);
 
 /**
  * @brief Create a collection in the specified database.
@@ -359,6 +377,35 @@ yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
                                const yk_doc_fetch_options_t* options);
 
 /**
+ * @brief Fetch documents from the collection, calling a function
+ * on the bulk handle containing the documents. This function will not pull
+ * the documents from the received bulk handle, leaving the caller an
+ * opportunity to forward it to another process.
+ *
+ * The bulk handle received will contain count*size_t document sizes,
+ * followed by the actual documents.
+ *
+ * @param[in] dbh Database handle
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] count Number of ids
+ * @param[in] ids Record ids
+ * @param[in] cb Callback to call on the document
+ * @param[in] uargs Arguments for the callback
+ * @param[in] options Extra options
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_fetch_bulk(yk_database_handle_t dbh,
+                              const char* collection,
+                              int32_t mode,
+                              size_t count,
+                              const yk_id_t* ids,
+                              yk_document_bulk_callback_t cb,
+                              void* uargs,
+                              const yk_doc_fetch_options_t* options);
+
+/**
  * @brief Get the size of a document from the collection.
  *
  * @param[in] dbh Database handle
@@ -649,6 +696,34 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
                         yk_document_callback_t cb,
                         void* uargs,
                         const yk_doc_iter_options_t* options);
+
+/**
+ * @brief Iterate through up to max documents starting at start_id,
+ * calling the callback on the bulk handle holding the documents.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] start_id Starting document id
+ * @param[in] filter Filter content
+ * @param[in] filter_size Filter size
+ * @param[in] max Maximum number of documents to return
+ * @param[in] cb Callback to call on the bulk
+ * @param[in] uargs Arguments for the callback
+ * @param[in] options Options
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_iter_bulk(yk_database_handle_t dbh,
+                             const char* collection,
+                             int32_t mode,
+                             yk_id_t start_id,
+                             const void* filter,
+                             size_t filter_size,
+                             size_t max,
+                             yk_document_bulk_callback_t cb,
+                             void* uargs,
+                             const yk_doc_iter_options_t* options);
 
 
 #ifdef __cplusplus
