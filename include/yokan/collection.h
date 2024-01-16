@@ -697,6 +697,34 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
                         void* uargs,
                         const yk_doc_iter_options_t* options);
 
+/**
+ * @brief Iterate through up to max documents starting at start_id,
+ * calling the callback on the bulk handle holding the documents.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] collection Collection
+ * @param[in] mode Mode
+ * @param[in] start_id Starting document id
+ * @param[in] filter Filter content
+ * @param[in] filter_size Filter size
+ * @param[in] max Maximum number of documents to return
+ * @param[in] cb Callback to call on the bulk
+ * @param[in] uargs Arguments for the callback
+ * @param[in] options Options
+ *
+ * @return YOKAN_SUCCESS or error code defined in common.h
+ */
+yk_return_t yk_doc_iter_bulk(yk_database_handle_t dbh,
+                             const char* collection,
+                             int32_t mode,
+                             yk_id_t start_id,
+                             const void* filter,
+                             size_t filter_size,
+                             size_t max,
+                             yk_document_bulk_callback_t cb,
+                             void* uargs,
+                             const yk_doc_iter_options_t* options);
+
 
 #ifdef __cplusplus
 }

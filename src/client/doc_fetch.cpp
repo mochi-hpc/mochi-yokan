@@ -100,6 +100,8 @@ extern "C" yk_return_t yk_doc_fetch_bulk(yk_database_handle_t dbh,
                                          void* uargs,
                                          const yk_doc_fetch_options_t* options)
 {
+    if(mode & YOKAN_MODE_NO_RDMA)
+        return YOKAN_ERR_MODE;
     return doc_fetch_base(dbh, collection, mode, count, ids, (void*)cb, uargs, options);
 }
 
