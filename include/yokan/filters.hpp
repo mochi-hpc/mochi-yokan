@@ -121,7 +121,9 @@ class DocFilter {
     /**
      * @brief Checks whether the document passes the filter.
      */
-    virtual bool check(yk_id_t id, const void* doc, size_t docsize) const  = 0;
+    virtual bool check(
+        const char* collection,
+        yk_id_t id, const void* doc, size_t docsize) const  = 0;
 
     /**
      * @brief Compute the new document size from the provided document
@@ -130,6 +132,7 @@ class DocFilter {
      * (i.e. you can assume that check has already been called and returned true).
      */
     virtual size_t docSizeFrom(
+        const char* collection,
         const void* val, size_t vsize) const = 0;
 
     /**
@@ -139,6 +142,7 @@ class DocFilter {
      * This function should return the size actually copied.
      */
     virtual size_t docCopy(
+        const char* collection,
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
 };

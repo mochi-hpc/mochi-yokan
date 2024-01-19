@@ -200,21 +200,25 @@ struct DefaultDocFilter : public DocFilter {
 
     DefaultDocFilter() = default;
 
-    bool check(yk_id_t id, const void* val, size_t vsize) const override {
+    bool check(const char* collection, yk_id_t id, const void* val, size_t vsize) const override {
+        (void)collection;
         (void)id;
         (void)val;
         (void)vsize;
         return true;
     }
 
-    size_t docSizeFrom(const void* val, size_t vsize) const override {
+    size_t docSizeFrom(const char* collection, const void* val, size_t vsize) const override {
+        (void)collection;
         (void)val;
         return vsize;
     }
 
     size_t docCopy(
+          const char* collection,
           void* dst, size_t max_dst_size,
           const void* doc, size_t docsize) const override {
+        (void)collection;
         if (max_dst_size < docsize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, doc, docsize);
         return docsize;
@@ -236,7 +240,8 @@ struct LuaDocFilter : public DocFilter {
         m_lua.require("cjson", luaopen_cjson);
     }
 
-    bool check(yk_id_t id, const void* val, size_t vsize) const override {
+    bool check(const char* collection, yk_id_t id, const void* val, size_t vsize) const override {
+        m_lua["__collection__"] = std::string{collection};
         m_lua["__id__"] = id;
         m_lua["__doc__"] = std::string_view(static_cast<const char*>(val), vsize);
         auto result = m_lua.do_string(std::string_view{ m_code.data, m_code.size });
@@ -244,14 +249,17 @@ struct LuaDocFilter : public DocFilter {
         return static_cast<bool>(result);
     }
 
-    size_t docSizeFrom(const void* val, size_t vsize) const override {
+    size_t docSizeFrom(const char* collection, const void* val, size_t vsize) const override {
+        (void)collection;
         (void)val;
         return vsize;
     }
 
     size_t docCopy(
+          const char* collection,
           void* dst, size_t max_dst_size,
           const void* doc, size_t docsize) const override {
+        (void)collection;
         if (max_dst_size < docsize) return YOKAN_SIZE_TOO_SMALL;
         std::memcpy(dst, doc, docsize);
         return docsize;
@@ -261,13 +269,15 @@ struct LuaDocFilter : public DocFilter {
 
 struct CollectionFilterWrapper : public KeyPrefixFilter  {
 
+    std::string                m_coll_name;
     std::shared_ptr<DocFilter> m_doc_filter;
     size_t                     m_key_offset;
 
     CollectionFilterWrapper(const char* coll_name,
             std::shared_ptr<DocFilter> doc_filter)
     : KeyPrefixFilter(YOKAN_MODE_NO_PREFIX, UserMem{ const_cast<char*>(coll_name), strlen(coll_name)+1})
-    , m_doc_filter(std::move(doc_filter)) {
+    , m_coll_name{coll_name}
+    , m_doc_filter{std::move(doc_filter)} {
         m_key_offset = m_prefix.size;
     }
 
@@ -287,16 +297,16 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
         yk_id_t id;
         std::memcpy(&id, (const char*)key + m_key_offset, sizeof(id));
         id = _ensureBigEndian(id);
-        return m_doc_filter->check(id, val, vsize);
+        return m_doc_filter->check(m_coll_name.c_str(), id, val, vsize);
     }
 
     size_t valSizeFrom(const void* val, size_t vsize) const override {
-        return m_doc_filter->docSizeFrom(val, vsize);
+        return m_doc_filter->docSizeFrom(m_coll_name.c_str(), val, vsize);
     }
 
     size_t valCopy(void* dst, size_t max_dst_size,
                    const void* val, size_t vsize) const override {
-        return m_doc_filter->docCopy(dst, max_dst_size, val, vsize);
+        return m_doc_filter->docCopy(m_coll_name.c_str(), dst, max_dst_size, val, vsize);
     }
 
     static yk_id_t _ensureBigEndian(yk_id_t id) {
