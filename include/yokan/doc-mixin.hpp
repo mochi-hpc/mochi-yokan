@@ -181,7 +181,7 @@ class DocumentStoreMixin : public DB {
         auto status = _collGetMetadata(collection, name_len, &metadata);
         if(status != Status::OK) return status;
         if(mode & YOKAN_MODE_UPDATE_NEW) {
-            std::vector<std::uint8_t> existsBuffer(1 + sizes.size/8);
+            std::vector<uint8_t> existsBuffer(1 + sizes.size/8);
             BitField existsBitfield{existsBuffer.data(), sizes.size};
             status = exists(mode, keys, ksizes, existsBitfield);
             if(status != Status::OK) return status;
