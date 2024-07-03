@@ -66,7 +66,7 @@ find_package (nlohmann_json REQUIRED)
 find_package (PkgConfig REQUIRED)
 
 if (${ENABLE_BEDROCK})
-    find_package (bedrock REQUIRED)
+    find_package (bedrock-module-api REQUIRED)
 endif ()
 
 if (${ENABLE_REMI})

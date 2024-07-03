@@ -93,7 +93,7 @@ if (ENABLE_UNQLITE)
 endif ()
 
 if (ENABLE_LUA)
-    list (APPEND DB_DEPENDENCIES sol2::sol2 ${LUA_LIBRARIES})
+    list (APPEND DB_DEPENDENCIES ${SOL2_LIBRARIES} ${LUA_LIBRARIES})
     include_directories (${LUA_INCLUDE_DIRS})
 endif ()
 
@@ -184,7 +184,7 @@ add_library (yokan-bedrock-module ${bedrock-module-src-files})
 target_link_libraries (yokan-bedrock-module
     PUBLIC yokan-server
     PUBLIC yokan-client
-    PUBLIC bedrock-server
+    PUBLIC bedrock::module-api
     PRIVATE nlohmann_json::nlohmann_json
     PRIVATE coverage_config)
 target_compile_definitions (yokan-bedrock-module PRIVATE -DJSON_HAS_CPP_14)

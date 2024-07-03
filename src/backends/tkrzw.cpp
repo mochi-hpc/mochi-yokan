@@ -51,6 +51,8 @@ static Status convertStatus(const tkrzw::Status& status) {
             return Status::Other;
         case tkrzw::Status::BROKEN_DATA_ERROR:
             return Status::Corruption;
+        case tkrzw::Status::NETWORK_ERROR:
+            return Status::Other;
         case tkrzw::Status::APPLICATION_ERROR:
             return Status::Other;
     }
@@ -189,7 +191,6 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             SET_TUNABLE(params, num_buckets, cfg, int32_t);
             SET_TUNABLE(params, fbp_capacity, cfg, int32_t);
             SET_TUNABLE(params, min_read_size, cfg, int32_t);
-            params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
             params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
             return params;
     }
@@ -235,7 +236,6 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             SET_TUNABLE(params, max_cached_pages, cfg, int32_t);
             auto key_comparator_name = cfg["key_comparator"].get<std::string>();
             // TODO add support for key_comparator argument
-            params.lock_mem_buckets = cfg["lock_mem_buckets"].get<bool>() ? 1 : -1;
             params.cache_buckets = cfg["cache_buckets"].get<bool>() ? 1 : -1;
             return params;
     }
