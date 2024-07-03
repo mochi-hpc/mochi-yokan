@@ -29,14 +29,10 @@ static Status convertStatus(const tkrzw::Status& status) {
     switch(status.GetCode()) {
         case tkrzw::Status::SUCCESS:
             return Status::OK;
-        case tkrzw::Status::UNKNOWN_ERROR:
-            return Status::Other;
         case tkrzw::Status::SYSTEM_ERROR:
             return Status::System;
         case tkrzw::Status::NOT_IMPLEMENTED_ERROR:
             return Status::NotSupported;
-        case tkrzw::Status::PRECONDITION_ERROR:
-            return Status::Other;
         case tkrzw::Status::INVALID_ARGUMENT_ERROR:
             return Status::InvalidArg;
         case tkrzw::Status::CANCELED_ERROR:
@@ -45,15 +41,9 @@ static Status convertStatus(const tkrzw::Status& status) {
             return Status::NotFound;
         case tkrzw::Status::PERMISSION_ERROR:
             return Status::Permission;
-        case tkrzw::Status::INFEASIBLE_ERROR:
-            return Status::Other;
-        case tkrzw::Status::DUPLICATION_ERROR:
-            return Status::Other;
         case tkrzw::Status::BROKEN_DATA_ERROR:
             return Status::Corruption;
-        case tkrzw::Status::NETWORK_ERROR:
-            return Status::Other;
-        case tkrzw::Status::APPLICATION_ERROR:
+        default:
             return Status::Other;
     }
     return Status::OK;
