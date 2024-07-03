@@ -4,6 +4,13 @@ cmake_minimum_required (VERSION 3.15)
 project (yokan C CXX)
 enable_testing ()
 
+# library version set here (e.g. for shared libs).
+set (YOKAN_VERSION_MAJOR 0)
+set (YOKAN_VERSION_MINOR 5)
+set (YOKAN_VERSION_PATCH 0)
+set (YOKAN_VERSION
+     "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
+
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
      "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -198,13 +205,6 @@ if (${ENABLE_YCSB})
   find_package (ycsb-cpp-interface CONFIG REQUIRED)
   add_subdirectory (ycsb)
 endif ()
-
-# library version set here (e.g. for shared libs).
-set (YOKAN_VERSION_MAJOR 0)
-set (YOKAN_VERSION_MINOR 4)
-set (YOKAN_VERSION_PATCH 2)
-set (YOKAN_VERSION
-     "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}.${YOKAN_VERSION_PATCH}")
 
 add_subdirectory (src)
 if (${ENABLE_TESTS})
