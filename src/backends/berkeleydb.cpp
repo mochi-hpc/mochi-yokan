@@ -83,14 +83,14 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                 return Status::InvalidConf;
             }
             CHECK_TYPE_AND_SET_DEFAULT(cfg, "create_if_missing", boolean, true);
-            CHECK_TYPE_AND_SET_DEFAULT(cfg, "home", string, ".");
-            CHECK_TYPE_AND_SET_DEFAULT(cfg, "file", string, "");
+            CHECK_TYPE_AND_SET_DEFAULT(cfg, "home", string, "");
+            CHECK_TYPE_AND_SET_DEFAULT(cfg, "path", string, "");
             CHECK_TYPE_AND_SET_DEFAULT(cfg, "name", string, "");
 
         } catch(...) {
             return Status::InvalidConf;
         }
-        auto db_file = cfg["file"].get<std::string>();
+        auto db_path = cfg["path"].get<std::string>();
         auto db_name = cfg["name"].get<std::string>();
         auto db_home = cfg["home"].get<std::string>();
         if(!db_home.empty()) db_home += "/yokan";
@@ -112,14 +112,18 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(!db_home.empty()) {
             std::error_code ec;
             fs::create_directories(db_home, ec);
+        } else if(!db_path.empty()) {
+            auto path = db_path.substr(0, db_path.find_last_of('/'));
+            std::error_code ec;
+            fs::create_directories(path, ec);
         }
 
         auto db_env = new DbEnv(DB_CXX_NO_EXCEPTIONS);
-        int status = db_env->open(db_home.c_str(), db_env_flags, 0);
+        int status = db_env->open(db_home.empty() ? nullptr : db_home.c_str(), db_env_flags, 0);
         if(status != 0)
             return convertStatus(status);
         auto db = new Db(db_env, 0);
-        status = db->open(nullptr, db_file.empty() ? nullptr : db_file.c_str(),
+        status = db->open(nullptr, db_path.empty() ? nullptr : db_path.c_str(),
                           db_name.empty() ? nullptr : db_name.c_str(),
                           db_type, db_flags, 0);
         if(status != 0) {
@@ -175,13 +179,13 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     }
 
     virtual void destroy() override {
-        auto db_file = m_config["file"].get<std::string>();
+        auto db_path = m_config["path"].get<std::string>();
         auto db_home = m_config["home"].get<std::string>();
         auto db_name = m_config["name"].get<std::string>();
         if(!db_home.empty()) db_home += "/yokan";
 
         m_db->close(0);
-        m_db->remove(db_file.empty() ? nullptr : db_file.c_str(),
+        m_db->remove(db_path.empty() ? nullptr : db_path.c_str(),
                      db_name.empty() ? nullptr : db_name.c_str(), 0);
         delete m_db;
         m_db = nullptr;
@@ -191,7 +195,8 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         m_db_env = nullptr;
 
         std::error_code ec;
-        fs::remove_all(db_home, ec);
+        if(!db_home.empty()) fs::remove_all(db_home, ec);
+        else fs::remove_all(db_path, ec);
         // TODO log error if necessary
     }
 

@@ -50,8 +50,7 @@ static const char* backend_configs[] = {
     " \"create_if_missing\":true}",
 #endif
 #ifdef YOKAN_HAS_BERKELEYDB
-    "{\"home\":\"/tmp/berkeleydb-test\","
-    " \"file\":\"my-bdb\","
+    "{\"path\":\"/tmp/berkeleydb-test/my-bdb\","
     " \"disable_doc_mixin_lock\":true,"
     " \"create_if_missing\":true,"
     " \"type\":\"btree\"}",
