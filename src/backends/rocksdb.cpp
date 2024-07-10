@@ -149,8 +149,8 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;                                   \
         } } while(0)
 
-        SET_AND_COMPLETE(cfg, create_if_missing, false);
-        SET_AND_COMPLETE(cfg, create_missing_column_families, false);
+        SET_AND_COMPLETE(cfg, create_if_missing, true);
+        SET_AND_COMPLETE(cfg, create_missing_column_families, true);
         SET_AND_COMPLETE(cfg, error_if_exists, false);
         SET_AND_COMPLETE(cfg, paranoid_checks, false);
         SET_AND_COMPLETE(cfg, track_and_verify_wals_in_manifest, false);

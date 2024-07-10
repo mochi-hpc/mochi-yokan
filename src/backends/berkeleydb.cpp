@@ -73,7 +73,9 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
-            if(!cfg.contains("type") || !cfg["type"].is_string())
+            if(!cfg.contains("type"))
+                cfg["type"] = "btree";
+            if(!cfg["type"].is_string())
                 return Status::InvalidConf;
             if(cfg["type"].get<std::string>() == "btree") {
                 db_type = DB_BTREE;

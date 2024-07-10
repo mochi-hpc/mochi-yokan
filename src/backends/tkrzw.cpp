@@ -87,7 +87,9 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
-            if(!cfg.contains("type") || !cfg["type"].is_string())
+            if(!cfg.contains("type"))
+                cfg["type"] = "tree";
+            if(!cfg["type"].is_string())
                 return Status::InvalidConf;
 
             auto type = cfg["type"].get<std::string>();

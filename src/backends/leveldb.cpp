@@ -59,7 +59,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;                                   \
         } } while(0)
 
-        SET_AND_COMPLETE(cfg, create_if_missing, false);
+        SET_AND_COMPLETE(cfg, create_if_missing, true);
         SET_AND_COMPLETE(cfg, error_if_exists, false);
         SET_AND_COMPLETE(cfg, paranoid_checks, false);
         SET_AND_COMPLETE(cfg, write_buffer_size, (size_t)(4*1024*1024));
