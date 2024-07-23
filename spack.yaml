@@ -20,6 +20,7 @@ spack:
   - ycsb-cpp-interface ^ycsb@master
   - rocksdb+rtti
   - mochi-remi
+  - py-configspace
   concretizer:
     unify: true
     reuse: true

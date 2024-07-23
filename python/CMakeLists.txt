@@ -19,3 +19,6 @@ install (TARGETS pyyokan_common pyyokan_client pyyokan_server
          EXPORT yokan-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
          LIBRARY DESTINATION lib/python${PY_VERSION}/site-packages)
+
+install (DIRECTORY mochi/bedrock
+         DESTINATION lib/python${PY_VERSION}/site-packages/mochi)
