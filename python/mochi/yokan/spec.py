@@ -53,7 +53,9 @@ class YokanProviderSpec(ProviderSpec):
               need_persistence: bool = True,
               **kwargs):
         from ConfigSpace import ConfigurationSpace, InCondition, Categorical
+        from .backends import available_backends
         db_backends = [b for b in YokanProviderSpec._backends if \
+            (b.name in available_backends) and \
             ((not need_sorted_db) or b.is_sorted) and \
             ((not need_values) or b.has_values) and \
             ((not need_persistence) or b.is_persistent) and \

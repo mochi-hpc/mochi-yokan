@@ -15,6 +15,15 @@ pybind11_strip (pyyokan_server)
 
 set (PY_VERSION ${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR})
 
+list (TRANSFORM YOKAN_BACKEND_LIST PREPEND "'" OUTPUT_VARIABLE YOKAN_BACKEND_QUOTED_LIST)
+list (TRANSFORM YOKAN_BACKEND_QUOTED_LIST APPEND "'" OUTPUT_VARIABLE YOKAN_BACKEND_QUOTED_LIST)
+list (JOIN YOKAN_BACKEND_QUOTED_LIST "," YOKAN_BACKEND_PYTHON_LIST)
+
+configure_file (mochi/_yokan_backends.py.in mochi/_yokan_backends.py @ONLY)
+
+install (FILES ${CMAKE_CURRENT_BUILD_DIR}/mochi/_yokan_backends.py
+         DESTINATION lib/python${PY_VERSION}/site-packages/mochi)
+
 install (TARGETS pyyokan_common pyyokan_client pyyokan_server
          EXPORT yokan-targets
          ARCHIVE DESTINATION lib/python${PY_VERSION}/site-packages
