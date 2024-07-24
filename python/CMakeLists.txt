@@ -21,7 +21,7 @@ list (JOIN YOKAN_BACKEND_QUOTED_LIST "," YOKAN_BACKEND_PYTHON_LIST)
 
 configure_file (mochi/_yokan_backends.py.in mochi/_yokan_backends.py @ONLY)
 
-install (FILES ${CMAKE_CURRENT_BUILD_DIR}/mochi/_yokan_backends.py
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/mochi/_yokan_backends.py
          DESTINATION lib/python${PY_VERSION}/site-packages/mochi)
 
 install (TARGETS pyyokan_common pyyokan_client pyyokan_server
