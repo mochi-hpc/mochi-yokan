@@ -87,5 +87,4 @@ class YokanProviderSpec(ProviderSpec):
         kwargs['dependency_resolver'] = None
 
         provider_cs = ProviderSpec.space(type='yokan', **kwargs)
-        print(provider_cs)
         return provider_cs
