@@ -4,30 +4,35 @@
 
 import unittest
 from .spec import YokanProviderSpec
-from mochi.bedrock.spec import PoolSpec
+from mochi.bedrock.spec import ProcSpec
 
 class TestConfigSpace(unittest.TestCase):
 
     def test_yokan_config_space(self):
-        from ConfigSpace import ConfigurationSpace
 
-        pools = [PoolSpec(name='p1'), PoolSpec(name='p2')]
+        max_num_pools = 3
 
         ycs = YokanProviderSpec.space(
-            max_num_pools=4,
+            max_num_pools=max_num_pools,
             paths=["/tmp", "/scratch"],
             need_values=False, need_persistence=False,
             tags=['my_tag'])
-        print(ycs)
-        cs = ConfigurationSpace()
-        cs.add_configuration_space(prefix='abc', delimiter='.',
-                                   configuration_space=ycs)
-        config = cs.sample_configuration()
+
+        provider_space_factories = [
+            {
+                "family": "databases",
+                "space": ycs,
+                "count": (1,3)
+            }
+        ]
+
+        space = ProcSpec.space(num_pools=(1, max_num_pools), num_xstreams=(2, 5),
+                               provider_space_factories=provider_space_factories).freeze()
+        print(space)
+        config = space.sample_configuration()
         print(config)
-        spec = YokanProviderSpec.from_config(
-            name='my_provider', provider_id=42, pools=pools,
-            config=config, prefix='abc.')
-        print(spec)
+        spec = ProcSpec.from_config(address='na+sm', config=config)
+        print(spec.to_json(indent=4))
 
 
 if __name__ == "__main__":

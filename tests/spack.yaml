@@ -43,7 +43,7 @@ spack:
     mochi-bedrock:
       require: "@0.8.0:"
     py-configspace:
-      require: "@1.1.1:"
+      require: "@1.1.4:"
   mirrors:
     mochi-buildcache:
       url: oci://ghcr.io/mochi-hpc/mochi-spack-buildcache

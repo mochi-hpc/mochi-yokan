@@ -52,7 +52,7 @@ class YokanProviderSpec(ProviderSpec):
               need_values: bool = True,
               need_persistence: bool = True,
               **kwargs):
-        from ConfigSpace import ConfigurationSpace, InCondition, Categorical
+        from mochi.bedrock.config_space import ConfigurationSpace, InCondition, Categorical
         from .backends import available_backends
         db_backends = [b for b in YokanProviderSpec._backends if \
             (b.name in available_backends) and \
@@ -87,4 +87,5 @@ class YokanProviderSpec(ProviderSpec):
         kwargs['dependency_resolver'] = None
 
         provider_cs = ProviderSpec.space(type='yokan', **kwargs)
+        print(provider_cs)
         return provider_cs
