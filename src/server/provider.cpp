@@ -458,7 +458,7 @@ yk_return_t yk_provider_register(
 
     if(provider)
         *provider = p;
-    YOKAN_LOG_INFO(mid, "YOKAN provider registration done");
+    YOKAN_LOG_TRACE(mid, "YOKAN provider registration done");
     return YOKAN_SUCCESS;
 }
 
@@ -514,7 +514,7 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_iter_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
     delete provider;
-    YOKAN_LOG_INFO(mid, "YOKAN provider successfuly finalized");
+    YOKAN_LOG_TRACE(mid, "YOKAN provider successfuly finalized");
 }
 
 yk_return_t yk_provider_destroy(
