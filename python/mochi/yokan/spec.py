@@ -74,12 +74,13 @@ class YokanProviderSpec(ProviderSpec):
                 parent_hyperparameter={'parent': config_cs['type'], 'value': b.name})
 
         def provider_config_resolver(config: 'Configuration', prefix: str) -> dict:
-            result = {}
-            result['type'] = config[f'{prefix}type']
-            t = result['type']
+            database = {}
+            database['type'] = config[f'{prefix}type']
+            database['config'] = {}
+            t = database['type']
             if f'{prefix}{t}.path' in config:
-                result['path'] = config[f'{prefix}{t}.path']
-            return result
+                database['config']['path'] = config[f'{prefix}{t}.path']
+            return {'database': database}
 
         kwargs['provider_config_space'] = config_cs
         kwargs['provider_config_resolver'] = provider_config_resolver
