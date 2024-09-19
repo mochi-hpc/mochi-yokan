@@ -17,8 +17,8 @@ set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
 set (CMAKE_CXX_STANDARD 14)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wall -Wpedantic")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra -Wall -Wpedantic")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wall")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra -Wall")
 
 add_library (coverage_config INTERFACE)
 
