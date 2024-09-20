@@ -19,7 +19,7 @@ spack:
   - mochi-bedrock-module-api
   - ycsb-cpp-interface ^ycsb@master
   - rocksdb+rtti
-  - mochi-remi
+  - mochi-remi+bedrock
   - py-configspace
   - mochi-bedrock+space
   concretizer:
@@ -35,7 +35,7 @@ spack:
     mochi-thallium:
       require: "@0.12.0:"
     mochi-remi:
-      require: "@0.4.0:"
+      require: "@0.5.0:"
     py-configspace:
       require: "@1.1.4:"
     mochi-bedrock-module-api:
