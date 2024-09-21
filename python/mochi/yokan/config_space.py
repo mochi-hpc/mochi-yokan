@@ -104,4 +104,4 @@ class YokanSpaceBuilder(ProviderConfigSpaceBuilder):
             "pool" : int(config[prefix + "pool"])
         }
         return ProviderSpec(name=name, type="yokan", provider_id=provider_id,
-                            tags=["tag1", "tag2"], config=cfg, dependencies=dep)
+                            tags=self.tags, config=cfg, dependencies=dep)
