@@ -27,6 +27,7 @@ spack:
   - mochi-remi+bedrock
   - py-configspace
   - mochi-bedrock+space
+  - py-coverage
   concretizer:
     unify: true
     reuse: true
