@@ -94,10 +94,12 @@ class YokanSpaceBuilder(ProviderConfigSpaceBuilder):
         path_key = prefix + "path"
         db_type = config[prefix + "type"]
         cfg = {
-            "type" : db_type.name
+            "database": {
+                "type" : db_type.name
+            }
         }
         if path_key in config:
-            cfg["config"] = {
+            cfg["database"]["config"] = {
                 "path": config[path_key]
             }
         dep = {
