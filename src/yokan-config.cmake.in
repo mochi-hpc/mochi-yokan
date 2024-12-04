@@ -66,5 +66,7 @@ endif()
 
 include ("${CMAKE_CURRENT_LIST_DIR}/yokan-targets.cmake")
 
+if (NOT TARGET yokan::client)
 add_library (yokan::client ALIAS yokan-client)
 add_library (yokan::server ALIAS yokan-server)
+endif ()
