@@ -21,12 +21,6 @@ from mochi.bedrock.spec import (
         CS,
         Config,
         ProviderSpec)
-from mochi.bedrock.config_space import (
-        CategoricalChoice,
-        ConfigurationSpace,
-        InCondition,
-        Categorical,
-        CategoricalOrConst)
 
 
 @dataclass(frozen=True)
@@ -75,6 +69,12 @@ class YokanSpaceBuilder(ProviderConfigSpaceBuilder):
         self.tags = tags
 
     def set_provider_hyperparameters(self, configuration_space: CS) -> None:
+        from mochi.bedrock.config_space import (
+            CategoricalChoice,
+            InCondition,
+            Categorical,
+            CategoricalOrConst)
+
         # add a pool dependency
         num_pools = configuration_space["margo.argobots.num_pools"]
         configuration_space.add(CategoricalChoice("pool", num_options=num_pools))
