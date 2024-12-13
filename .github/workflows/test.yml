@@ -23,6 +23,11 @@ jobs:
       with:
         ref: develop
 
+    - name: Set install root for Spack
+      run: |
+        spack -e tests config add config:install_tree:root:/opt/spack
+        spack -e tests config add view:/opt/spack
+
     - name: Add mochi-spack-packages
       run: |
         git clone https://github.com/mochi-hpc/mochi-spack-packages
