@@ -18,10 +18,23 @@
 #include <yokan/usermem.hpp>
 #include <yokan/filters.hpp>
 #include <yokan/migration.hpp>
+#include <yokan/bulk-cache.h>
 
 template <typename T> class __YOKANBackendRegistration;
 
 namespace yokan {
+
+/**
+ * @brief a BulkRef references a remote bulk handles that the function
+ * has to consider from the specified offset. The size is the size from
+ * that offset.
+ */
+struct BulkRef {
+    hg_bulk_t bulk;
+    size_t    offset;
+    size_t    size;
+    hg_addr_t address;
+};
 
 /**
  * @brief The BitField class is used for the "exists" operations
@@ -98,6 +111,9 @@ constexpr auto BufTooSmall = YOKAN_SIZE_TOO_SMALL;
  */
 class DatabaseInterface {
 
+    yk_bulk_cache_t m_bulk_cache = nullptr;
+    void*           m_bulk_cache_data = nullptr;
+
     public:
 
     DatabaseInterface() = default;
@@ -106,6 +122,19 @@ class DatabaseInterface {
     DatabaseInterface(DatabaseInterface&&) = default;
     DatabaseInterface& operator=(const DatabaseInterface&) = default;
     DatabaseInterface& operator=(DatabaseInterface&&) = default;
+
+    void setBulkCache(yk_bulk_cache_t cache, void* data) {
+        m_bulk_cache      = cache;
+        m_bulk_cache_data = data;
+    }
+
+    yk_buffer_t getBuffer(size_t size, hg_uint8_t mode) {
+        return m_bulk_cache->get(m_bulk_cache_data, size, mode);
+    }
+
+    void releaseBuffer(yk_buffer_t buffer) {
+        m_bulk_cache->release(m_bulk_cache_data, buffer);
+    }
 
     /**
      * @brief Get the name of the backend (e.g. "map").
@@ -187,6 +216,26 @@ class DatabaseInterface {
     }
 
     /**
+     * @brief Bulk-level "exists" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/write, with the following layout:
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * the keys, followed by enough space for a bitfield that will be written
+     * back to the client's memory.
+     *
+     * The default implementation of this function will call into the above
+     * exists method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status exists(int32_t mode, size_t count,
+                          const BulkRef& remote_bulk) const;
+
+    /**
      * @brief Get the size of values associated with the keys. The keys are packed
      * into a single buffer. ksizes provides a pointer to the memory holding the
      * key sizes. vsizes provides a pointer to the memory where the value sizes need
@@ -210,6 +259,28 @@ class DatabaseInterface {
         (void)vsizes;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "length" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/write, with the following layout:
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * the keys, followed by count*sizeof(size_t) for a value sizes that will
+     * be written back to the client's memory.
+     *
+     * The default implementation of this function will call into the above
+     * length method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status length(int32_t mode, size_t count,
+                          const BulkRef& remote) const;
+#endif
 
     /**
      * @brief Put multiple key/value pairs into the database.
@@ -237,6 +308,28 @@ class DatabaseInterface {
         (void)vsizes;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "put" method. The remote_bulk corresponds
+     * to a client buffer exposed for reading, with the following layout:
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * count*sizeof(size_t) bytes for the value sizes, followed by the keys,
+     * then the values.
+     *
+     * The default implementation of this function will call into the above
+     * put method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status put(int32_t mode, size_t count,
+                       const BulkRef& remote) const;
+#endif
 
     /**
      * @brief Get values associated of keys.
@@ -273,6 +366,28 @@ class DatabaseInterface {
         (void)vsizes;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "get" method. The remote_bulk corresponds
+     * to a client buffer exposed for reading, with the following layout:
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * count*sizeof(size_t) bytes for the value sizes, followed by the keys,
+     * then space for the values.
+     *
+     * The default implementation of this function will call into the above
+     * put method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status get(int32_t mode, size_t count,
+                       const BulkRef& remote) const;
+#endif
 
     using FetchCallback = std::function<Status(const UserMem& key, const UserMem& val)>;
 
@@ -319,6 +434,27 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+#if 0
+    /**
+     * @brief Bulk-level "erase" method. The remote_bulk corresponds
+     * to a client buffer exposed for reads, with the following layout:
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * the keys.
+     *
+     * The default implementation of this function will call into the above
+     * erase method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status erase(int32_t mode, size_t count,
+                          const BulkRef& remote) const;
+#endif
+
     /**
      * @brief This version of listKeys uses a single contiguous buffer
      * to hold all the keys. Their size is stored in the keySizes user-allocated
@@ -350,6 +486,32 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+#if 0
+    /**
+     * @brief Bulk-level "listKeys" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/writes, with the following layout
+     * the first count*sizeof(size_t) bytes are the key sizes, followed by
+     * space for the keys.
+     *
+     * The default implementation of this function will call into the above
+     * listKeys method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param mode Mode.
+     * @param count Max number of keys.
+     * @param packed Whether data is packed.
+     * @param fromKey Starting key.
+     * @param filter Key filter.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status listKeys(int32_t mode, size_t count, bool packed,
+                            const UserMem& fromKey,
+                            const std::shared_ptr<KeyValueFilter>& filter,
+                            const BulkRef& remote) const;
+#endif
+
     /**
      * @brief Same as listKeys but also returns the values.
      */
@@ -370,6 +532,32 @@ class DatabaseInterface {
         (void)valSizes;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "listKeyValues" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/writes, with the following layout
+     * the first count*sizeof(size_t) bytes are the key sizes, then count*sizeof(size_t)
+     * for the value sizes, followed by space for the keys.
+     *
+     * The default implementation of this function will call into the above
+     * listKeyValues method and do the RDMA operations around it through an
+     * intermediate buffer.
+     *
+     * @param mode Mode.
+     * @param count Max number of keys.
+     * @param packed Whether data is packed.
+     * @param fromKey Starting key.
+     * @param filter Filter.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status listKeyValues(int32_t mode, size_t count, bool packed,
+                                 const UserMem& fromKey,
+                                 const std::shared_ptr<KeyValueFilter>& filter,
+                                 const BulkRef& remote) const;
+#endif
 
     using IterCallback = std::function<Status(const UserMem& key, const UserMem& val)>;
 
@@ -521,6 +709,32 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+#if 0
+    /**
+     * @brief Bulk-level "doc_store" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/write, with the following layout:
+     * the first count*sizeof(yk_size_t) bytes are the document sizes, followed by
+     * the documents.
+     *
+     * The default implementation of this function will call into the above
+     * docStore method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param collection Collection name.
+     * @param mode Mode.
+     * @param count Number of documents.
+     * @param remote_bulk Bulk handle.
+     * @param ids Buffer to store resulting document ids (the size of the buffer
+     *            also gives the number of documents to store).
+     *
+     * @return Status.
+     */
+    virtual Status docStore(const char* collection,
+                            int32_t mode,
+                            const BulkRef& remote,
+                            BasicUserMem<yk_id_t>& ids) const;
+#endif
+
     /**
      * @brief Update multiple documents in the database.
      *
@@ -544,6 +758,30 @@ class DatabaseInterface {
         (void)ids;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "doc_update" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/write, with the following layout:
+     * the first count*sizeof(size_t) bytes store the document sizes, followed by
+     * the documents.
+     *
+     * The default implementation of this function will call into the above
+     * docUpdate method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param collection Collection name.
+     * @param mode Mode.
+     * @param ids Buffer containing document ids.
+     * @param count Number of keys.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status docUpdate(const char* collection,
+                             int32_t mode, const BasicUserMem<yk_id_t>& ids,
+                             const BulkRef& remote) const;
+#endif
 
     /**
      * @brief Load documents associated of ids.
@@ -574,6 +812,30 @@ class DatabaseInterface {
         return Status::NotSupported;
     }
 
+#if 0
+    /**
+     * @brief Bulk-level "doc_load" method. The remote_bulk corresponds
+     * to a client buffer exposed for read/write, with the following layout:
+     * the first count*sizeof(size_t) bytes store the document sizes, followed by
+     * space for the documents.
+     *
+     * The default implementation of this function will call into the above
+     * docLoad method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param collection Name of the collection.
+     * @param mode Mode.
+     * @param packed whether data is packed.
+     * @param ids Buffer containing document ids.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status docLoad(const char* collection,
+                           int32_t mode, bool packed, const BasicUserMem<yk_id_t>& ids,
+                           const BulkRef& remote) const;
+#endif
+
     using DocFetchCallback = std::function<Status(yk_id_t, const UserMem& doc)>;
 
     /**
@@ -599,7 +861,6 @@ class DatabaseInterface {
         (void)func;
         return Status::NotSupported;
     }
-
 
     /**
      * @brief Erase a set of documents.
@@ -649,6 +910,35 @@ class DatabaseInterface {
         (void)doc_sizes;
         return Status::NotSupported;
     }
+
+#if 0
+    /**
+     * @brief Bulk-level "doc_list" method. The remote_bulk corresponds
+     * to a client buffer exposed for reads and writes, with the following layout:
+     * count*sizeof(size_t) bytes are the document sizes, count*sizeof(yk_id_t) are
+     * for the resulting document IDs, and the rest of the buffer is for the documents.
+     *
+     * The default implementation of this function will call into the above
+     * docList method and do the RDMA operations around it through an intermediate
+     * buffer.
+     *
+     * @param collection Collection name.
+     * @param mode Mode.
+     * @param packed Whether data is packed in the document buffer.
+     * @param from_id Starting document id.
+     * @param filter Filter.
+     * @param count Number of documents.
+     * @param remote_bulk Bulk handle.
+     *
+     * @return Status.
+     */
+    virtual Status docList(const char* collection,
+                           int32_t mode, bool packed,
+                           yk_id_t from_id,
+                           const std::shared_ptr<DocFilter>& filter,
+                           size_t count,
+                           const BulkRef& remote) const;
+#endif
 
     using DocIterCallback = std::function<Status(yk_id_t, const UserMem&)>;
 

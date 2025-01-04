@@ -182,6 +182,8 @@ yk_return_t yk_provider_register(
         return YOKAN_ERR_INVALID_CONFIG;
     }
 
+    p->db->setBulkCache(&p->bulk_cache, p->bulk_cache_data);
+
     /* Client RPCs */
 
     id = MARGO_REGISTER_PROVIDER(mid, "yk_count",
