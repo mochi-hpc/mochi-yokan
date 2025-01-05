@@ -52,6 +52,7 @@ extern "C" {
     X(YOKAN_ERR_READONLY, "Read-only buffer")                     \
     X(YOKAN_ERR_MIGRATED, "Database has migrated")                \
     X(YOKAN_ERR_MID_NOT_LISTENING, "Margo instance not listening")\
+    X(YOKAN_STOP_ITERATION, "Stop iteration")                     \
     X(YOKAN_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,

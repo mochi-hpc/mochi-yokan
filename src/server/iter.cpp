@@ -153,6 +153,9 @@ void yk_iter_ult(hg_handle_t h)
     out.ret = static_cast<yk_return_t>(
             database->iter(in.mode, in.count, from_key, filter, in.no_values, iter_func));
 
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
+
     auto ret = send_batch();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;
     ret = wait_for_previous_rpc();
@@ -290,6 +293,9 @@ void yk_iter_direct_ult(hg_handle_t h)
 
     out.ret = static_cast<yk_return_t>(
             database->iter(in.mode, in.count, from_key, filter, in.no_values, iter_func));
+
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
 
     auto ret = send_batch();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;

@@ -174,6 +174,9 @@ void yk_doc_fetch_ult(hg_handle_t h)
         }
     }
 
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
+
 finish:
     auto ret = wait_for_previous_rpc();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;

@@ -145,6 +145,28 @@ class DocFilter {
         const char* collection,
         void* dst, size_t max_dst_size,
         const void* val, size_t vsize) const = 0;
+
+    /**
+     * @brief Some filters may be able to tell Yokan that no more
+     * documents will be accepted after a certain document.
+     * In such a case, the filter can implement the
+     * shouldStop function to optimize iterations. Note that this
+     * function will be called only if check returns false.
+     *
+     * @param collection Collection name
+     * @param doc Document
+     * @param size Document size
+     *
+     * @return whether iteration can stop after this key.
+     */
+    virtual bool shouldStop(
+        const char* collection,
+        const void* doc, size_t size) const {
+        (void)collection;
+        (void)doc;
+        (void)size;
+        return false;
+    }
 };
 
 /**

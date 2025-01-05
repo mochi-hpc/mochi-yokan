@@ -449,28 +449,81 @@ class ArrayDatabase : public DatabaseInterface {
             BasicUserMem<yk_id_t>& ids,
             UserMem& documents,
             BasicUserMem<size_t>& doc_sizes) const override {
-        (void)collection;
-        (void)mode;
-        (void)filter;
-        (void)from_id;
-        (void)packed;
-        (void)ids;
-        (void)documents;
-        (void)doc_sizes;
-        return Status::Aborted;
+
+        size_t offset = 0;
+        size_t i = 0;
+        DocIterCallback callback = [&](yk_id_t id, const UserMem& doc) mutable {
+            if(packed) {
+                if(offset + doc.size > documents.size) return Status::StopIteration;
+                std::memcpy(documents.data + offset, doc.data, doc.size);
+                offset += doc.size;
+            } else {
+                if(doc.size > doc_sizes[i]) {
+                    doc_sizes[i] = YOKAN_SIZE_TOO_SMALL;
+                    i++;
+                    return Status::OK;
+                }
+                std::memcpy(documents.data + offset, doc.data, doc.size);
+                offset += doc_sizes[i];
+            }
+            ids[i] = id;
+            doc_sizes[i] = doc.size;
+            i++;
+            return Status::OK;
+        };
+
+        auto status = docIter(collection, mode, ids.size, from_id, filter, callback);
+
+        for(; i < ids.size; ++i) {
+            ids[i] = YOKAN_NO_MORE_DOCS;
+            doc_sizes[i] = YOKAN_NO_MORE_DOCS;
+        }
+
+        return status;
     }
 
     virtual Status docIter(const char* collection,
             int32_t mode, uint64_t max, yk_id_t from_id,
             const std::shared_ptr<DocFilter>& filter,
             const DocIterCallback& func) const override {
-        (void)collection;
-        (void)max;
         (void)mode;
-        (void)from_id;
-        (void)filter;
-        (void)func;
-        return Status::Aborted;
+
+        ScopedReadLock db_lock(m_lock);
+        auto p = m_collections.find(collection);
+        if(p == m_collections.end())
+            return Status::NotFound;
+        auto& coll = p->second;
+
+        ScopedReadLock coll_lock(coll.m_lock);
+        yk_id_t id = from_id;
+        size_t i = 0;
+        std::vector<char> doc_buffer;
+        while(i < max && id < coll.m_sizes.size()) {
+            if(coll.m_sizes[id] == YOKAN_KEY_NOT_FOUND) {
+                ++id;
+                continue;
+            }
+            auto doc_size = coll.m_sizes[id];
+            auto doc_offset = coll.m_offsets[id];
+            auto doc_ptr = coll.m_data.data() + doc_offset;
+            if(!filter->check(collection, id, doc_ptr, doc_size)) {
+                if(filter->shouldStop(collection, doc_ptr, doc_size))
+                    break;
+                ++id;
+                continue;
+            }
+            auto filtered_size = filter->docSizeFrom(collection, doc_ptr, doc_size);
+            doc_buffer.resize(filtered_size);
+            filtered_size = filter->docCopy(
+                collection, doc_buffer.data(), filtered_size, doc_ptr, doc_size);
+            auto status = func(id, UserMem{doc_buffer.data(), filtered_size});
+            if(status != Status::OK)
+                return status;
+            ++id;
+            ++i;
+        }
+
+        return Status::OK;
     }
 
     void destroy() override {

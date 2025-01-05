@@ -199,6 +199,9 @@ void yk_fetch_ult(hg_handle_t h)
         keys_offset += total_batch_ksize;
     }
 
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
+
 finish:
     auto ret = wait_for_previous_rpc();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;
@@ -341,6 +344,9 @@ void yk_fetch_direct_ult(hg_handle_t h)
 
         keys_offset += total_batch_ksize;
     }
+
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
 
 finish:
     auto ret = wait_for_previous_rpc();
