@@ -149,6 +149,8 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         size_t ksize = strlen(key);
         size_t vsize = strlen(value) * stores_values;
         ret = yk_put(dbh1, 0, key, ksize, value, vsize);
+        if(ret == YOKAN_ERR_OP_UNSUPPORTED) // for array backend
+            ret = YOKAN_SUCCESS;
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
     }
 
@@ -196,6 +198,8 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
         size_t ksize = strlen(key);
         size_t vsize = 16 * stores_values;
         ret = yk_get(dbh2, 0, key, ksize, value, &vsize);
+        if(ret == YOKAN_ERR_OP_UNSUPPORTED)
+            continue;
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
         if(stores_values) {
             munit_assert_int(vsize, ==, strlen(expected));

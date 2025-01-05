@@ -3,6 +3,7 @@
 #include <iostream>
 
 static const char* available_backends[] = {
+    "array",
     "map",
     "unordered_map",
     "set",
@@ -35,6 +36,7 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
+    "{}",
     "{\"disable_doc_mixin_lock\":true}",
     "{\"disable_doc_mixin_lock\":true}",
     "{\"disable_doc_mixin_lock\":true}",
