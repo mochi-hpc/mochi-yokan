@@ -625,7 +625,6 @@ class ArrayDatabase : public DatabaseInterface {
     std::unordered_map<std::string, Collection> m_collections;
     json                                        m_config;
     ABT_rwlock                                  m_lock = ABT_RWLOCK_NULL;
-    mutable KeyWatcher                          m_watcher;
     std::atomic<bool>                           m_migrated{false};
 };
 
