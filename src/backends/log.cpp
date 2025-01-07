@@ -438,61 +438,18 @@ class LogDatabase : public DatabaseInterface {
     static Status recover(
             const std::string& config,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files, DatabaseInterface** kvs) {
-#if 0
-        (void)migrationConfig;
-        if(files.size() != 1) return Status::InvalidArg;
-        auto filename = files.front();
-        std::ifstream ifs(filename.c_str(), std::ios::binary);
-        if(!ifs.good()) {
-            return Status::IOError;
-        }
-        auto remove_file = [&ifs,&filename]() {
-            ifs.close();
-            remove(filename.c_str());
-        };
-        auto status = create(config, kvs);
-        if(status != Status::OK) {
-            remove_file();
-            return status;
-        }
-        auto db = dynamic_cast<LogDatabase*>(*kvs);
 
-        // get the number of collections
-        size_t num_collections;
-        ifs.read(reinterpret_cast<char*>(&num_collections), sizeof(num_collections));
-        for(size_t i = 0; i < num_collections; ++i) {
-            // read the size of the collection name
-            size_t name_size;
-            ifs.read(reinterpret_cast<char*>(&name_size), sizeof(name_size));
-            // read the name of the collection
-            std::string name;
-            name.resize(name_size);
-            ifs.read(const_cast<char*>(name.data()), name_size);
-            // read the number of documents
-            size_t coll_size;
-            ifs.read(reinterpret_cast<char*>(&coll_size), sizeof(coll_size));
-            // create collection
-            auto p = db->m_collections.emplace(name, db->m_lock != ABT_RWLOCK_NULL);
-            auto& coll = p.first->second;
-            size_t doc_offset = 0;
-            // read the documents
-            for(size_t j = 0; j < coll_size; ++j) {
-                // read document size
-                size_t doc_size;
-                ifs.read(reinterpret_cast<char*>(&doc_size), sizeof(doc_size));
-                coll.m_sizes.push_back(doc_size);
-                coll.m_offsets.push_back(doc_offset);
-                if(doc_size == YOKAN_KEY_NOT_FOUND)
-                    continue;
-                // read the document
-                coll.m_data.resize(doc_offset + doc_size);
-                ifs.read(coll.m_data.data() + doc_offset, doc_size);
-                doc_offset += doc_size;
-            }
-        }
-        remove_file();
-#endif
+        (void)migrationConfig;
+        (void)files;
+
+        json cfg = json::parse(config);
+        std::string path = root.substr(0, root.find_last_of('/'));
+        cfg["path"] = path;
+
+        *kvs = new LogDatabase(cfg);
+
         return Status::OK;
     }
 
@@ -856,77 +813,39 @@ class LogDatabase : public DatabaseInterface {
         fs::remove_all(m_path);
     }
 
-#if 0
     struct LogMigrationHandle : public MigrationHandle {
 
-        LogDatabase&  m_db;
+        LogDatabase&    m_db;
         ScopedWriteLock m_db_lock;
-        std::string     m_filename;
-        int             m_fd;
-        FILE*           m_file;
         bool            m_cancel = false;
 
         LogMigrationHandle(LogDatabase& db)
         : m_db(db)
-        , m_db_lock(db.m_lock) {
-            // create temporary file name
-            char template_filename[] = "/tmp/yokan-array-snapshot-XXXXXX";
-            m_fd = mkstemp(template_filename);
-            m_filename = template_filename;
-            // create temporary file
-            std::ofstream ofs(m_filename.c_str(), std::ofstream::out | std::ofstream::binary);
-            // write the number of collections
-            size_t num_collections = m_db.m_collections.size();
-            ofs.write(reinterpret_cast<const char*>(&num_collections), sizeof(num_collections));
-            // write the collections
-            for(auto& p : m_db.m_collections) {
-                auto& name = p.first;
-                auto& collection = p.second;
-                // write the size of the collection name
-                size_t name_size = name.size();
-                ofs.write(reinterpret_cast<const char*>(&name_size), sizeof(name_size));
-                // write the collection name
-                ofs.write(name.c_str(), name.size());
-                // write the collection size
-                size_t coll_size = collection.m_sizes.size();
-                ofs.write(reinterpret_cast<const char*>(&coll_size), sizeof(coll_size));
-                // write the content of the collection
-                for(size_t i = 0; i < coll_size; ++i) {
-                    auto doc_size   = collection.m_sizes[i];
-                    auto doc_offset = collection.m_offsets[i];
-                    ofs.write(reinterpret_cast<const char*>(&doc_size), sizeof(doc_size));
-                    if(doc_size == YOKAN_KEY_NOT_FOUND) continue;
-                    auto doc = collection.m_data.data() + doc_offset;
-                    ofs.write(doc, doc_size);
-                }
-            }
-        }
+        , m_db_lock(db.m_lock) {}
 
         ~LogMigrationHandle() {
-            close(m_fd);
-            remove(m_filename.c_str());
             if(!m_cancel) {
+                m_db_lock.unlock();
+                m_db.destroy();
+                m_db_lock.lock();
                 m_db.m_migrated = true;
-                m_db.m_collections.clear();
             }
         }
 
         std::string getRoot() const override {
-            return "/tmp";
+            return m_db.m_path;
         }
 
         std::list<std::string> getFiles() const override {
-            return {m_filename.substr(5)}; // remove /tmp/ from the name
+            return {"/"};
         }
 
         void cancel() override {
             m_cancel = true;
         }
     };
-#endif
 
     Status startMigration(std::unique_ptr<MigrationHandle>& mh) override {
-#if 0
         if(m_migrated) return Status::Migrated;
         try {
             mh.reset(new LogMigrationHandle(*this));
@@ -934,8 +853,6 @@ class LogDatabase : public DatabaseInterface {
             return Status::IOError;
         }
         return Status::OK;
-#endif
-        return Status::Aborted;
     }
 
     ~LogDatabase() {
@@ -952,16 +869,29 @@ class LogDatabase : public DatabaseInterface {
             ABT_rwlock_create(&m_lock);
         m_path = m_config["path"].get<std::string>();
         m_chunk_size = m_config["chunk_size"].get<size_t>();
-        // TODO initialize m_collections by looking in the directory
+        // lookup existing collections
+        for (auto const& entry : std::filesystem::directory_iterator{m_path}) {
+            if(!entry.is_regular_file())
+                continue;
+            auto filename = entry.path().string();
+            if(filename.size() <= 5)
+                continue;
+            if(filename.substr(filename.size()-5) != ".meta")
+                continue;
+            auto name = filename.substr(filename.find_last_of('/')+1);
+            name = name.substr(0, name.size()-5);
+            auto coll = std::make_shared<Collection>(name, m_path, m_chunk_size /*, m_lock != ABT_RWLOCK_NULL */);
+            m_collections.emplace(name, coll);
+        }
     }
 
     std::unordered_map<std::string,
         std::shared_ptr<Collection>> m_collections;
-    json                                        m_config;
-    ABT_rwlock                                  m_lock = ABT_RWLOCK_NULL;
-    std::string                                 m_path;
-    size_t                                      m_chunk_size;
-    std::atomic<bool>                           m_migrated{false};
+    json                             m_config;
+    ABT_rwlock                       m_lock = ABT_RWLOCK_NULL;
+    std::string                      m_path;
+    size_t                           m_chunk_size;
+    std::atomic<bool>                m_migrated{false};
 };
 
 }

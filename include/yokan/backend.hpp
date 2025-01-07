@@ -728,10 +728,11 @@ class DatabaseFactory {
             const std::string& backendType,
             const std::string& dbConfig,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return recover_fn[backendType](dbConfig, migrationConfig, files, kvs);
+        return recover_fn[backendType](dbConfig, migrationConfig, root, files, kvs);
     }
 
     /**
@@ -756,9 +757,10 @@ class DatabaseFactory {
     static std::unordered_map<
                 std::string,
                 std::function<Status(
-                        const std::string&,
-                        const std::string&,
-                        const std::list<std::string>&,
+                        const std::string&, /* config */
+                        const std::string&, /* migration config */
+                        const std::string&, /* root */
+                        const std::list<std::string>&, /* file names (without root) */
                         DatabaseInterface**)>>
         recover_fn; /*!< Map of factory functions for each backend type */
 };
@@ -778,7 +780,7 @@ template <typename T> class __YOKANBackendRegistration {
     template<typename ... U> using void_t = void;
 
     template<typename U> using recover_t =
-        decltype(U::recover("", "", {}, nullptr));
+        decltype(U::recover("", "", "", {}, nullptr));
 
     template<typename U, typename = void_t<>>
     struct has_recover : std::false_type {};
@@ -806,9 +808,10 @@ template <typename T> class __YOKANBackendRegistration {
         ::yokan::DatabaseFactory::recover_fn[backend_name] =
             [](const std::string &database_config,
                const std::string& migration_config,
+               const std::string& root,
                const std::list<std::string>& files,
                ::yokan::DatabaseInterface** kvs) {
-                return call_recover<T>(has_recover<T>{}, database_config, migration_config, files, kvs);
+                return call_recover<T>(has_recover<T>{}, database_config, migration_config, root, files, kvs);
             };
     }
 };

@@ -137,6 +137,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
     static Status recover(
             const std::string& config,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         json cfg;
@@ -156,7 +157,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         else return Status::InvalidConf;
 
         if(files.empty()) return Status::IOError;
-        auto path = files.front();
+        auto path = root + "/" + files.front();
         cfg["path"] = path;
 
         auto use_lock = cfg["use_abt_lock"].get<bool>();

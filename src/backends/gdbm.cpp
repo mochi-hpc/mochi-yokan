@@ -59,6 +59,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
     static Status recover(
             const std::string& config,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         json cfg;
@@ -68,7 +69,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         (void)migrationConfig;
         if(files.empty()) return Status::IOError;
 
-        path = files.front();
+        path = root + "/" + files.front();
 
         try {
             cfg = json::parse(config);

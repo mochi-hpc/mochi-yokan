@@ -11,6 +11,7 @@
 #include <yokan/server.h>
 #include <yokan/client.h>
 #include <yokan/database.h>
+#include <yokan/collection.h>
 #include <remi/remi-client.h>
 #include <remi/remi-server.h>
 #include "available-backends.h"
@@ -128,6 +129,11 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     struct test_context* context = (struct test_context*)data;
     yk_return_t ret;
 
+    const char* backend = munit_parameters_get(params, "backend");
+    bool stores_kv = !(strcmp(backend, "log") == 0 || strcmp(backend, "array") == 0);
+    bool stores_values = (strcmp(context->backend, "set") != 0)
+        && (strcmp(context->backend, "unordered_set") != 0);
+
     // get a handle to the database in provider 1
     yk_database_handle_t dbh1;
     ret = yk_database_handle_create(
@@ -136,22 +142,40 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
             &dbh1);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    int stores_values = (strcmp(context->backend, "set") != 0)
-                     && (strcmp(context->backend, "unordered_set") != 0);
-    stores_values = stores_values ? 1 : 0;
+    if(stores_kv) {
 
-    // write some values to it
-    for(int i = 0; i < 10; i++) {
-        char key[16];
-        char value[16];
-        sprintf(key, "key%05d", i);
-        sprintf(value, "value%05d", i);
-        size_t ksize = strlen(key);
-        size_t vsize = strlen(value) * stores_values;
-        ret = yk_put(dbh1, 0, key, ksize, value, vsize);
-        if(ret == YOKAN_ERR_OP_UNSUPPORTED) // for array backend
-            ret = YOKAN_SUCCESS;
+        // write some values to it
+        for(int i = 0; i < 10; i++) {
+            char key[16];
+            char value[16];
+            sprintf(key, "key%05d", i);
+            sprintf(value, "value%05d", i);
+            size_t ksize = strlen(key);
+            size_t vsize = strlen(value) * (stores_values ? 1 : 0);
+            ret = yk_put(dbh1, 0, key, ksize, value, vsize);
+            if(ret == YOKAN_ERR_OP_UNSUPPORTED) // for array and log backends
+                ret = YOKAN_SUCCESS;
+            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        }
+
+    }
+
+    if(stores_values) {
+
+        // create a collection
+        ret = yk_collection_create(dbh1, "my_collection", 0);
         munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+        // add some documents in the collection
+        for(int i = 0; i < 10; i++) {
+            char doc[16];
+            sprintf(doc, "doc%05d", i);
+            size_t dsize = strlen(doc);
+            yk_id_t id;
+            ret = yk_doc_store(dbh1, "my_collection", 0, doc, dsize, &id);
+            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+        }
+
     }
 
     char new_root[128];
@@ -171,9 +195,17 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
     }
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    // trying to access the database from provider 1 should get us an error
-    ret = yk_put(dbh1, 0, "abc", 3, "def", 3 * stores_values);
-    munit_assert_int(ret, ==, YOKAN_ERR_INVALID_DATABASE);
+    if(stores_kv) {
+        // trying to access the database from provider 1 should get us an error
+        ret = yk_put(dbh1, 0, "abc", 3, "def", 3 * (stores_values ? 1 : 0));
+        munit_assert_int(ret, ==, YOKAN_ERR_INVALID_DATABASE);
+    }
+
+    if(stores_values) {
+        // trying to create a collection from provider 1 should get us an error
+        ret = yk_collection_create(dbh1, "my_collection_2", 0);
+        munit_assert_int(ret, ==, YOKAN_ERR_INVALID_DATABASE);
+    }
 
     // release handle
     ret = yk_database_handle_release(dbh1);
@@ -187,23 +219,44 @@ static MunitResult test_migration(const MunitParameter params[], void* data)
             &dbh2);
     munit_assert_int(ret, ==, YOKAN_SUCCESS);
 
-    // check that we can read the values from the migrated database
-    for(int i = 0; i < 10; i++) {
-        char key[16];
-        char value[16];
-        char expected[16];
-        sprintf(key, "key%05d", i);
-        sprintf(expected, "value%05d", i);
-        memset(value, 0, 16);
-        size_t ksize = strlen(key);
-        size_t vsize = 16 * stores_values;
-        ret = yk_get(dbh2, 0, key, ksize, value, &vsize);
-        if(ret == YOKAN_ERR_OP_UNSUPPORTED)
-            continue;
-        munit_assert_int(ret, ==, YOKAN_SUCCESS);
-        if(stores_values) {
-            munit_assert_int(vsize, ==, strlen(expected));
-            munit_assert_string_equal(value, expected);
+    if(stores_kv) {
+
+        // check that we can read the values from the migrated database
+        for(int i = 0; i < 10; i++) {
+            char key[16];
+            char value[16];
+            char expected[16];
+            sprintf(key, "key%05d", i);
+            sprintf(expected, "value%05d", i);
+            memset(value, 0, 16);
+            size_t ksize = strlen(key);
+            size_t vsize = 16 * stores_values;
+            ret = yk_get(dbh2, 0, key, ksize, value, &vsize);
+            if(ret == YOKAN_ERR_OP_UNSUPPORTED)
+                continue;
+            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+            if(stores_values) {
+                munit_assert_int(vsize, ==, strlen(expected));
+                munit_assert_string_equal(value, expected);
+            }
+        }
+    }
+
+    if(stores_values) {
+        // check that we can read the documents from the migrated database
+        for(int i = 0; i < 10; i++) {
+            char doc[16];
+            char expected[16];
+            sprintf(expected, "doc%05d", i);
+            memset(doc, 0, 16);
+            size_t dsize = 16;
+            ret = yk_doc_load(dbh2, "my_collection", 0, i, doc, &dsize);
+            if(ret == YOKAN_ERR_OP_UNSUPPORTED)
+                continue;
+            munit_assert_int(ret, ==, YOKAN_SUCCESS);
+            munit_assert_int(dsize, ==, strlen(expected));
+            doc[dsize] = '\0';
+            munit_assert_string_equal(doc, expected);
         }
     }
 
