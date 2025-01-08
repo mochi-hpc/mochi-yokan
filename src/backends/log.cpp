@@ -381,18 +381,63 @@ class LogDatabase : public DatabaseInterface {
         }
 
         [[nodiscard]] Status appendMulti(
-                size_t count, const void* data, const size_t* sizes,
+                size_t count, const char* data, const size_t* sizes,
                 yk_id_t* ids) {
-            //ScopedWriteLock lock{m_lock};
-            // TODO optimize this function to make it update the metadata only when
-            // all the documents have been stored
-            size_t offset = 0;
             for(size_t i = 0; i < count; ++i) {
-                auto status = append((const char*)data + offset, sizes[i], ids + i);
-                if(status != Status::OK) return status;
-                offset += sizes[i];
+                if(sizes[i] > m_chunk_size)
+                    return Status::SizeError;
             }
-            return Status::OK;
+
+            ScopedWriteLock lock{m_lock};
+            size_t doc_offset = 0;
+            uint64_t next_offset;
+            auto status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
+            // first 8 bytes of a chunk represent the next available offset - 8
+            if(next_offset == 0) next_offset = 8;
+            if(status != Status::OK) return status;
+
+            size_t first_meta_offset = 0;
+            size_t meta_size_to_flush = 0;
+
+            for(size_t i = 0; i < count; ++i) {
+
+                auto last_chunk_id = m_header->last_chunk_id;
+                // check if we need to create a new chunk
+                if(sizes[i] > m_chunk_size - next_offset) {
+                    // flush the previous chunk
+                    (void)m_last_chunk->flush(0, next_offset);
+                    last_chunk_id = m_header->last_chunk_id += 1;
+                    m_last_chunk = std::make_shared<Chunk>(
+                            m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
+                            m_chunk_size);
+                    next_offset  = 8;
+                }
+                // write the data
+                status = m_last_chunk->write(next_offset, data + doc_offset, sizes[i], false);
+                if(status != Status::OK) break;
+                auto new_next_offset = next_offset + sizes[i];
+                // write the new offset
+                status = m_last_chunk->write(0, &new_next_offset, sizeof(new_next_offset), false);
+                if(status != Status::OK) break;
+                // write the metadata for the entry
+                EntryMetadata entry{last_chunk_id, next_offset, sizes[i], sizes[i]};
+                size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*m_header->next_id;
+                if(first_meta_offset == 0) first_meta_offset = meta_offset;
+                status = m_meta->write(meta_offset, &entry, sizeof(entry), false);
+                if(status != Status::OK) return status;
+                meta_size_to_flush += sizeof(EntryMetadata);
+                // set the ID of the document
+                ids[i] = m_header->next_id;
+                // update the header of the metadata file
+                m_header->next_id += 1;
+                m_header->coll_size += 1;
+                next_offset = new_next_offset;
+                doc_offset += sizes[i];
+            }
+            (void)m_last_chunk->flush(0, next_offset);
+            (void)m_meta->flush(first_meta_offset, meta_size_to_flush);
+            flushHeader();
+            return status;
         }
 
         [[nodiscard]] Status read(size_t id, void* buffer, size_t* size) {
