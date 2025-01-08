@@ -226,7 +226,8 @@ class LogDatabase : public DatabaseInterface {
 
         Collection(const std::string& name,
                    const std::string& path_prefix,
-                   size_t chunk_size)
+                   size_t chunk_size,
+                   bool use_lock)
         : m_name{name}
         , m_path_prefix{path_prefix}
         , m_chunk_size{chunk_size} {
@@ -242,11 +243,19 @@ class LogDatabase : public DatabaseInterface {
             m_last_chunk = std::make_shared<Chunk>(
                     m_path_prefix + "/" + name + "." + std::to_string(last_chunk_id),
                     chunk_size);
+            if(use_lock)
+                ABT_rwlock_create(&m_lock);
+        }
+
+        ~Collection() {
+            if(m_lock != ABT_RWLOCK_NULL)
+                ABT_rwlock_free(&m_lock);
         }
 
         [[nodiscard]] Status append(const void* data, size_t size, yk_id_t* id) {
             if(size > m_chunk_size)
                 return Status::SizeError;
+            ScopedWriteLock lock{m_lock};
             uint64_t next_offset;
             auto status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
             if(status != Status::OK) return status;
@@ -283,9 +292,9 @@ class LogDatabase : public DatabaseInterface {
         }
 
         [[nodiscard]] Status update(yk_id_t id, const void* data, size_t size) {
-            if(size > m_chunk_size) {
+            if(size > m_chunk_size)
                 return Status::SizeError;
-            }
+            ScopedWriteLock lock{m_lock};
             // read the current metadata for the entry
             EntryMetadata entry;
             auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
@@ -350,6 +359,7 @@ class LogDatabase : public DatabaseInterface {
         [[nodiscard]] Status erase(uint64_t id) {
             if(id >= m_header->next_id)
                 return Status::InvalidID;
+            ScopedWriteLock lock{m_lock};
             // read the metadata entry
             EntryMetadata entry;
             Status status;
@@ -373,6 +383,7 @@ class LogDatabase : public DatabaseInterface {
         [[nodiscard]] Status appendMulti(
                 size_t count, const void* data, const size_t* sizes,
                 yk_id_t* ids) {
+            //ScopedWriteLock lock{m_lock};
             // TODO optimize this function to make it update the metadata only when
             // all the documents have been stored
             size_t offset = 0;
@@ -386,6 +397,7 @@ class LogDatabase : public DatabaseInterface {
 
         [[nodiscard]] Status read(size_t id, void* buffer, size_t* size) {
             size_t buf_size = *size;
+            ScopedReadLock lock{m_lock};
             if(id >= m_header->next_id)
                 return Status::InvalidID;
             EntryMetadata entry;
@@ -412,6 +424,7 @@ class LogDatabase : public DatabaseInterface {
         }
 
         [[nodiscard]] Status fetch(size_t entryNumber, DocFetchCallback cb) {
+            ScopedReadLock lock{m_lock};
             if(entryNumber >= m_header->next_id)
                 return cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
             EntryMetadata entry;
@@ -435,6 +448,7 @@ class LogDatabase : public DatabaseInterface {
         }
 
         [[nodiscard]] Status entrySize(size_t entryNumber, size_t* size) {
+            ScopedReadLock lock{m_lock};
             if(entryNumber >= m_header->next_id)
                 return Status::NotFound;
             EntryMetadata entry;
@@ -446,10 +460,12 @@ class LogDatabase : public DatabaseInterface {
         }
 
         [[nodiscard]] auto last_id() const {
+            ScopedReadLock lock{m_lock};
             return m_header->next_id-1;
         }
 
         [[nodiscard]] auto size() const {
+            ScopedReadLock lock{m_lock};
             return m_header->coll_size;
         }
 
@@ -461,6 +477,7 @@ class LogDatabase : public DatabaseInterface {
         std::shared_ptr<MetaFile> m_meta;
         std::shared_ptr<Chunk>    m_last_chunk;
         MetadataHeader*           m_header = nullptr;
+        ABT_rwlock                m_lock = ABT_RWLOCK_NULL;
 
         Status flushHeader() {
             return m_meta->flush(0, sizeof(*m_header));
@@ -573,8 +590,8 @@ class LogDatabase : public DatabaseInterface {
         ScopedWriteLock lock(m_lock);
         if(m_collections.count(name))
             return Status::KeyExists;
-        // TODO add support for lock
-        auto coll = std::make_shared<Collection>(name, m_path, m_chunk_size /*, m_lock != ABT_RWLOCK_NULL */);
+        auto coll = std::make_shared<Collection>(
+            name, m_path, m_chunk_size , m_lock != ABT_RWLOCK_NULL);
         m_collections.emplace(name, coll);
         return Status::OK;
     }
@@ -593,7 +610,7 @@ class LogDatabase : public DatabaseInterface {
 
     Status collExists(int32_t mode, const char* name, bool* flag) const override {
         (void)mode;
-        ScopedWriteLock lock(m_lock);
+        ScopedReadLock lock(m_lock);
         *flag = m_collections.count(name) != 0;
         return Status::OK;
     }
@@ -669,8 +686,6 @@ class LogDatabase : public DatabaseInterface {
             return Status::NotFound;
         auto coll = p->second;
 
-        //ScopedWriteLock coll_lock(coll.m_lock);
-
         if(!(mode & YOKAN_MODE_UPDATE_NEW)) {
             for(size_t i = 0; i < ids.size; ++i) {
                 if(ids[i] > coll->last_id())
@@ -730,9 +745,6 @@ class LogDatabase : public DatabaseInterface {
         auto coll = p->second;
 
         Status status;
-        /*
-        ScopedReadLock coll_lock(coll.m_lock);
-        */
         const auto count = ids.size;
         char* doc_ptr = documents.data;
 
@@ -795,10 +807,6 @@ class LogDatabase : public DatabaseInterface {
             return Status::NotFound;
         auto coll = p->second;
 
-        /*
-        ScopedReadLock coll_lock(coll.m_lock);
-        */
-
         for(size_t i = 0; i < ids.size; ++i) {
             const auto id = ids[i];
             (void)coll->fetch(id, func);
@@ -815,9 +823,6 @@ class LogDatabase : public DatabaseInterface {
         if(p == m_collections.end())
             return Status::NotFound;
         auto coll = p->second;
-        /*
-        ScopedReadLock coll_lock(coll.m_lock);
-        */
         for(size_t i = 0; i < ids.size; ++i)
             (void)coll->erase(ids[i]);
         return Status::OK;
@@ -876,7 +881,6 @@ class LogDatabase : public DatabaseInterface {
             return Status::NotFound;
         auto coll = p->second;
 
-        /* ScopedReadLock coll_lock(coll.m_lock); */
         yk_id_t id = from_id;
         size_t i = 0;
         std::vector<char> doc_buffer;
@@ -990,7 +994,8 @@ class LogDatabase : public DatabaseInterface {
                 continue;
             auto name = filename.substr(filename.find_last_of('/')+1);
             name = name.substr(0, name.size()-5);
-            auto coll = std::make_shared<Collection>(name, m_path, m_chunk_size /*, m_lock != ABT_RWLOCK_NULL */);
+            auto coll = std::make_shared<Collection>(
+                name, m_path, m_chunk_size, m_lock != ABT_RWLOCK_NULL);
             m_collections.emplace(name, coll);
         }
     }
