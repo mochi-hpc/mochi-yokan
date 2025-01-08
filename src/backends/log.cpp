@@ -411,24 +411,39 @@ class LogDatabase : public DatabaseInterface {
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
-            if(!(cfg.contains("path") && cfg["path"].is_string())) {
+            if(!(cfg.contains("path") && cfg["path"].is_string()))
                 return Status::InvalidConf;
-            }
-            if(cfg.contains("chunk_size") && !cfg["chunk_size"].is_number_unsigned()) {
+            if(cfg.contains("chunk_size") && !cfg["chunk_size"].is_number_unsigned())
                 return Status::InvalidConf;
-            }
-            // check use_lock
-            auto use_lock = cfg.value("use_lock", true);
-            cfg["use_lock"] = use_lock;
+            if(cfg.contains("create_if_missing") && !cfg["create_if_missing"].is_boolean())
+                return Status::InvalidConf;
+            if(cfg.contains("error_if_exists") && !cfg["error_if_exists"].is_boolean())
+                return Status::InvalidConf;
+            if(cfg.contains("use_lock") && !cfg["use_lock"].is_boolean())
+                return Status::InvalidConf;
+
             auto chunk_size = cfg.value("chunk_size", 10*1024*1024);
             cfg["chunk_size"] = chunk_size;
+            auto create_if_missing = cfg.value("create_if_missing", true);
+            cfg["create_if_missing"] = create_if_missing;
+            auto error_if_exists = cfg.value("error_if_exists", false);
+            cfg["error_if_exists"] = error_if_exists;
+            auto use_lock = cfg.value("use_lock", true);
+            cfg["use_lock"] = use_lock;
         } catch(...) {
             return Status::InvalidConf;
         }
 
         auto path = cfg["path"].get<std::string>();
         std::error_code ec;
-        fs::create_directories(path, ec);
+        if(fs::is_directory(path, ec)) {
+            if(cfg["error_if_exists"].get<bool>())
+                return Status::Permission;
+        } else {
+            if(!cfg["create_if_missing"].get<bool>())
+                return Status::Permission;
+            fs::create_directories(path, ec);
+        }
 
         *kvs = new LogDatabase(std::move(cfg));
 
@@ -447,6 +462,8 @@ class LogDatabase : public DatabaseInterface {
         json cfg = json::parse(config);
         std::string path = root.substr(0, root.find_last_of('/'));
         cfg["path"] = path;
+        cfg["create_if_missing"] = false;
+        cfg["error_if_exists"] = false;
 
         *kvs = new LogDatabase(cfg);
 
