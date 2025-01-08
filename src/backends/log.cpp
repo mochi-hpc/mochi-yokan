@@ -10,6 +10,7 @@
 #include "../common/linker.hpp"
 #include "../common/allocator.hpp"
 #include "../common/modes.hpp"
+#include "../common/logging.h"
 #include "util/key-copy.hpp"
 #include <nlohmann/json.hpp>
 #include <unistd.h>
@@ -47,12 +48,16 @@ class LogDatabase : public DatabaseInterface {
 
     class MemoryMappedFile {
 
-        int syncMemory(void *addr, size_t size) {
-            // Get the system's page size
-            long page_size = sysconf(_SC_PAGESIZE);
-            if (page_size == -1) {
-                perror("sysconf failed");
-                return -1;
+        [[nodiscard]] Status syncMemory(void *addr, size_t size) {
+            static long page_size = 0;
+            if(page_size == 0) {
+                // Get the system's page size
+                page_size = sysconf(_SC_PAGESIZE);
+                if (page_size == -1) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                            "sysconf(_SC_PAGESIZE) failed: %s", strerror(errno));
+                    return Status::IOError;
+                }
             }
 
             // Calculate the start of the page-aligned address
@@ -68,51 +73,68 @@ class LogDatabase : public DatabaseInterface {
 
             // Call msync on the page-aligned address and adjusted size
             if (msync((void *)page_start, aligned_size, MS_SYNC) == -1) {
-                perror("msync failed");
-                return -1;
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "msync failed: %s", strerror(errno));
+                return Status::IOError;
             }
 
-            return 0;
+            return Status::OK;
         }
 
-        void openFile() {
+        [[nodiscard]] Status openFile() {
             // Open or create the file
             m_fd = open(m_filename.c_str(), O_RDWR | O_CREAT, 0644);
             if (m_fd < 0) {
-                throw std::runtime_error("Failed to open chunk file: " + m_filename);
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "Failed to open file %s: %s",
+                        m_filename.c_str(), strerror(errno));
+                return Status::IOError;
             }
 
             // Get size of the file
             auto size = lseek(m_fd, 0L, SEEK_END);
             if(size < 0) {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "lseek failed for file %s: %s",
+                        m_filename.c_str(), strerror(errno));
                 close(m_fd);
-                throw std::runtime_error("Failed to lseek in file: " + m_filename);
+                return Status::IOError;
             }
             lseek(m_fd, 0L, SEEK_SET);
 
             // Resize the file to the chunk size if needed
             if ((size_t)size < m_size) {
                 if(ftruncate(m_fd, m_size) < 0) {
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                            "Failed to resize file %s: %s",
+                            m_filename.c_str(), strerror(errno));
                     close(m_fd);
-                    throw std::runtime_error("Failed to resize chunk file: " + m_filename);
+                    return Status::IOError;
                 }
             }
 
             // Memory-map the file
             m_data = mmap(nullptr, m_size, PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0);
             if (m_data == MAP_FAILED) {
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "Failed to mmap file %s: %s",
+                        m_filename.c_str(), strerror(errno));
                 close(m_fd);
-                throw std::runtime_error("Failed to mmap chunk file: " + m_filename);
+                return Status::IOError;
             }
+
+            return Status::OK;
         }
 
         public:
 
         MemoryMappedFile(const std::string& filename, size_t size)
-            : m_filename(filename)
-              , m_size(size) {
-                  openFile();
-              }
+        : m_filename(filename)
+        , m_size(size) {
+            auto status = openFile();
+            if(status != Status::OK)
+                throw status;
+        }
 
         ~MemoryMappedFile() {
             if (m_data) munmap(m_data, m_size);
@@ -125,51 +147,49 @@ class LogDatabase : public DatabaseInterface {
         MemoryMappedFile(MemoryMappedFile&&) = delete;
         MemoryMappedFile& operator=(MemoryMappedFile&&) = delete;
 
-        void write(size_t offset, const void* buffer, size_t size) {
-            if (offset + size > m_size) {
-                throw std::runtime_error("Write exceeds chunk size");
-            }
+        [[nodiscard]] Status write(size_t offset, const void* buffer, size_t size, bool do_flush = true) {
+            if (offset + size > m_size)
+                return Status::SizeError;
             std::memcpy(static_cast<char*>(m_data) + offset, buffer, size);
+            if(do_flush) return flush(offset, size);
+            return Status::OK;
         }
 
-        void read(size_t offset, void* buffer, size_t size) const {
-            if (offset + size > m_size) {
-                throw std::runtime_error("Read exceeds chunk size");
-            }
+        [[nodiscard]] Status read(size_t offset, void* buffer, size_t size) const {
+            if (offset + size > m_size)
+                return Status::SizeError;
             std::memcpy(buffer, static_cast<const char*>(m_data) + offset, size);
+            return Status::OK;
         }
 
         template<typename Function>
-        void fetch(size_t offset, size_t size, Function&& func) {
-            if (offset + size > m_size) {
-                throw std::runtime_error("Fetch exceeds chunk size");
-            }
-            func(UserMem{static_cast<char*>(m_data) + offset, size});
+        [[nodiscard]] Status fetch(size_t offset, size_t size, Function&& func) {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            return func(UserMem{static_cast<char*>(m_data) + offset, size});
         }
 
-        void flush(size_t offset, size_t size) {
-            if (offset + size > m_size) {
-                throw std::runtime_error("Flush exceeds chunk size");
-            }
-            if (size == 0) return;
-            if (syncMemory(static_cast<char*>(m_data) + offset, size) != 0) {
-                throw std::runtime_error(
-                    "Failed to sync data (" + std::to_string(offset) + ", "
-                    + std::to_string(size) + ") to disk for file  "
-                    + m_filename + ": " + strerror(errno));
-            }
+        [[nodiscard]] Status flush(size_t offset, size_t size) {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            if (size == 0) return Status::OK;
+            return syncMemory(static_cast<char*>(m_data) + offset, size);
         }
 
-        void extend(size_t new_size) {
-            if(new_size <= m_size) return;
+        [[nodiscard]] Status extend(size_t new_size) {
+            if (new_size <= m_size) return Status::OK;
             if (m_data) munmap(m_data, m_size);
             if (m_fd >= 0) close(m_fd);
             m_size = new_size;
-            openFile();
+            return openFile();
         }
 
-        size_t size() const {
+        [[nodiscard]] size_t size() const {
             return m_size;
+        }
+
+        [[nodiscard]] void* base() const {
+            return m_data;
         }
 
         private:
@@ -186,10 +206,21 @@ class LogDatabase : public DatabaseInterface {
     class Collection {
 
         struct EntryMetadata {
-            uint64_t chunk  = 0;
-            uint64_t offset = 0;
-            uint64_t size   = 0;
+            uint64_t chunk     = 0;
+            uint64_t offset    = 0;
+            uint64_t size      = 0;
+            uint64_t allocated = 0;
         };
+
+        struct MetadataHeader {
+            uint64_t coll_size     = 0;
+            uint64_t next_id       = 0;
+            uint64_t last_chunk_id = 0;
+            uint64_t chunk_size    = 0;
+        };
+
+        static_assert(sizeof(EntryMetadata) == sizeof(MetadataHeader),
+                      "EntryMetadata and MetadataHeader should have the same size");
 
         public:
 
@@ -199,169 +230,198 @@ class LogDatabase : public DatabaseInterface {
         : m_name{name}
         , m_path_prefix{path_prefix}
         , m_chunk_size{chunk_size} {
+            // open the metadata file of the collection
             m_meta = std::make_shared<MetaFile>(
                     m_path_prefix + "/" + name + ".meta",
                     3*8*4096);
-
-            m_meta->read(0, &m_coll_size, sizeof(m_coll_size));
-            m_meta->read(8, &m_next_id, sizeof(m_next_id));
-            m_meta->read(16, &m_last_chunk_id, sizeof(m_last_chunk_id));
-
+            // associate the header
+            m_header = static_cast<MetadataHeader*>(m_meta->base());
+            m_header->chunk_size = chunk_size;
+            // open the last chunk
+            auto last_chunk_id = m_header->last_chunk_id;
             m_last_chunk = std::make_shared<Chunk>(
-                    m_path_prefix + "/" + name + "." + std::to_string(m_last_chunk_id),
+                    m_path_prefix + "/" + name + "." + std::to_string(last_chunk_id),
                     chunk_size);
         }
 
-        uint64_t append(const void* data, size_t size) {
+        [[nodiscard]] Status append(const void* data, size_t size, yk_id_t* id) {
             if(size > m_chunk_size)
-                throw std::runtime_error{
-                    "Trying to append a document with a size larger than the chunk size"};
-            uint64_t offset;
-            m_last_chunk->read(0, &offset, sizeof(offset));
-            if(size > m_chunk_size - offset) {
-                m_last_chunk_id += 1;
+                return Status::SizeError;
+            uint64_t next_offset;
+            auto status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
+            if(status != Status::OK) return status;
+            auto last_chunk_id = m_header->last_chunk_id;
+            if(size > m_chunk_size - next_offset) {
+                last_chunk_id = m_header->last_chunk_id += 1;
                 m_last_chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(m_last_chunk_id),
+                        m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
                         m_chunk_size);
-                offset = 0;
+                // first 8 bytes of a chunk represent the next available offset - 8
+                next_offset = 8;
             }
-            // first 8 bytes of a chunk represent the next available offset - 8
-            if(offset == 0)
-                offset = 8;
+            if(next_offset == 0) // happens when opening the very fist chunk
+                next_offset = 8;
             // write the data
-            m_last_chunk->write(offset, data, size);
-            m_last_chunk->flush(offset, size);
-            auto new_offset = offset + size;
+            status = m_last_chunk->write(next_offset, data, size);
+            if(status != Status::OK) return status;
+            auto new_next_offset = next_offset + size;
             // write the new offset
-            m_last_chunk->write(0, &new_offset, sizeof(new_offset));
-            m_last_chunk->flush(0, sizeof(new_offset));
+            status = m_last_chunk->write(0, &new_next_offset, sizeof(new_next_offset));
+            if(status != Status::OK) return status;
             // write the metadata for the entry
-            EntryMetadata entry{m_last_chunk_id, offset, size};
-            size_t meta_offset = 24 + sizeof(EntryMetadata)*m_next_id;
-            m_meta->write(meta_offset, &entry, sizeof(entry));
-            m_meta->flush(meta_offset, sizeof(entry));
+            EntryMetadata entry{last_chunk_id, next_offset, size, size};
+            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*m_header->next_id;
+            status = m_meta->write(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
             // update the header of the metadata file
-            m_next_id += 1;
-            m_coll_size += 1;
-            m_meta->write(0, &m_coll_size, sizeof(m_coll_size));
-            m_meta->write(8, &m_next_id, sizeof(m_next_id));
-            m_meta->write(16, &m_last_chunk_id, sizeof(m_last_chunk_id));
-            m_meta->flush(0, 24);
+            m_header->next_id += 1;
+            m_header->coll_size += 1;
+            flushHeader();
             // return the ID of the document
-            return m_next_id - 1;
+            *id = m_header->next_id - 1;
+            return Status::OK;
         }
 
-        void update(yk_id_t id, const void* data, size_t size) {
-            if(size > m_chunk_size)
-                throw std::runtime_error{
-                    "Trying to append a document with a size larger than the chunk size"};
-            uint64_t offset;
-            m_last_chunk->read(0, &offset, sizeof(offset));
-            if(size > m_chunk_size - offset) {
-                m_last_chunk_id += 1;
-                m_last_chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(m_last_chunk_id),
-                        m_chunk_size);
-                offset = 0;
+        [[nodiscard]] Status update(yk_id_t id, const void* data, size_t size) {
+            if(size > m_chunk_size) {
+                return Status::SizeError;
             }
-            // first 8 bytes of a chunk represent the next available offset - 8
-            if(offset == 0)
-                offset = 8;
             // read the current metadata for the entry
             EntryMetadata entry;
-            auto meta_offset = 24 + sizeof(EntryMetadata)*id;
-            m_meta->read(meta_offset, &entry, sizeof(entry));
-            bool incr_coll_size = entry.size == YOKAN_KEY_NOT_FOUND;
+            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
+            auto status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
+
+            auto chunk = m_last_chunk;
+            if(size <= entry.allocated) {
+                // new entry is smaller than the allocated space, we can update in place
+                if(entry.chunk != m_header->last_chunk_id) {
+                    // not updating in the last chunk, we need to load the chunk
+                    chunk = std::make_shared<Chunk>(
+                        m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
+                        m_chunk_size);
+                }
+                // update in place
+                status = chunk->write(entry.offset, data, size);
+                if(status != Status::OK) return status;
+                // update the entry
+                entry.size = size;
+                status = m_meta->write(meta_offset, &entry, sizeof(entry));
+                return status;
+            }
+
+            // new entry is larger than what was previously allocated,
+            // we need to append to the chunk
+
+            // first 8 bytes of a chunk represent the next offset
+            uint64_t next_offset;
+            status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
+            if(status != Status::OK) return status;
+            if(size > m_chunk_size - next_offset) {
+                m_header->last_chunk_id += 1;
+                m_last_chunk = std::make_shared<Chunk>(
+                        m_path_prefix + "/" + m_name + "." + std::to_string(m_header->last_chunk_id),
+                        m_chunk_size);
+                chunk = m_last_chunk;
+                next_offset = 8; // first 8 bytes of a chunk represent the next offset
+            }
+            if(next_offset == 0) // happens when opening the very fist chunk
+                next_offset = 8;
+
+            bool incr_coll_size = entry.size == YOKAN_KEY_NOT_FOUND; // previous entry was erased
             // write the new data
-            m_last_chunk->write(offset, data, size);
-            m_last_chunk->flush(offset, size);
-            auto new_offset = offset + size;
+            status = chunk->write(next_offset, data, size);
+            if(status != Status::OK) return status;
+            auto new_next_offset = next_offset + size;
             // write the new offset
-            m_last_chunk->write(0, &new_offset, sizeof(new_offset));
-            m_last_chunk->flush(0, sizeof(new_offset));
+            status = chunk->write(0, &new_next_offset, sizeof(new_next_offset));
+            if(status != Status::OK) return status;
             // write the metadata for the entry
-            entry.chunk  = m_last_chunk_id;
-            entry.offset = offset;
-            entry.size   = size;
-            m_meta->write(meta_offset, &entry, sizeof(entry));
-            m_meta->flush(meta_offset, sizeof(entry));
+            entry = EntryMetadata{m_header->last_chunk_id, next_offset, size, size};
+            status = m_meta->write(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
             // update the header of the metadata file
             if(incr_coll_size)
-                m_coll_size += 1;
-            m_meta->write(0, &m_coll_size, sizeof(m_coll_size));
-            m_meta->write(16, &m_last_chunk_id, sizeof(m_last_chunk_id));
-            m_meta->flush(0, 24);
+                m_header->coll_size += 1;
+            flushHeader();
+            return Status::OK;
         }
 
-        Status erase(uint64_t id) {
-            if(id >= m_next_id)
+        [[nodiscard]] Status erase(uint64_t id) {
+            if(id >= m_header->next_id)
                 return Status::InvalidID;
             // read the metadata entry
             EntryMetadata entry;
-            size_t meta_offset = 24 + sizeof(EntryMetadata)*id;
-            m_meta->read(meta_offset, &entry, sizeof(entry));
+            Status status;
+            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
+            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
             if(entry.size == YOKAN_KEY_NOT_FOUND)
                 return Status::OK;
             // update and write the metadata for the entry
             entry.chunk  = YOKAN_KEY_NOT_FOUND;
             entry.size   = YOKAN_KEY_NOT_FOUND;
             entry.offset = YOKAN_KEY_NOT_FOUND;
-            m_meta->write(meta_offset, &entry, sizeof(entry));
-            m_meta->flush(meta_offset, sizeof(entry));
+            status = m_meta->write(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
             // update the header of the metadata file
-            m_coll_size -= 1;
-            m_meta->write(0, &m_coll_size, sizeof(m_coll_size));
-            m_meta->flush(0, 8);
+            m_header->coll_size -= 1;
+            flushHeader();
             return Status::OK;
         }
 
-        uint64_t appendMulti(size_t count, const void* data, const size_t* sizes) {
+        [[nodiscard]] Status appendMulti(
+                size_t count, const void* data, const size_t* sizes,
+                yk_id_t* ids) {
             // TODO optimize this function to make it update the metadata only when
             // all the documents have been stored
-            uint64_t first_id = m_next_id;
             size_t offset = 0;
             for(size_t i = 0; i < count; ++i) {
-                append((const char*)data + offset, sizes[i]);
+                auto status = append((const char*)data + offset, sizes[i], ids + i);
+                if(status != Status::OK) return status;
                 offset += sizes[i];
             }
-            return first_id;
+            return Status::OK;
         }
 
-        size_t read(size_t id, void* buffer, size_t size) {
-            if(id >= m_next_id)
-                return YOKAN_KEY_NOT_FOUND;
+        [[nodiscard]] Status read(size_t id, void* buffer, size_t* size) {
+            size_t buf_size = *size;
+            if(id >= m_header->next_id)
+                return Status::InvalidID;
             EntryMetadata entry;
-            size_t meta_offset = 24 + sizeof(EntryMetadata)*id;
-            m_meta->read(meta_offset, &entry, sizeof(entry));
+            Status status;
+            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
+            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
             if(entry.size == YOKAN_KEY_NOT_FOUND)
-                return YOKAN_KEY_NOT_FOUND;
-            if(size < entry.size)
-                return YOKAN_SIZE_TOO_SMALL;
+                return Status::NotFound;
+            if(buf_size < entry.size)
+                return Status::SizeError;
             std::shared_ptr<Chunk> chunk;
-            if(entry.chunk == m_last_chunk_id) {
+            if(entry.chunk == m_header->last_chunk_id) {
                 chunk = m_last_chunk;
             } else {
                 chunk = std::make_shared<Chunk>(
                         m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
                         m_chunk_size);
             }
-            chunk->read(entry.offset, buffer, entry.size);
-            return entry.size;
+            status = chunk->read(entry.offset, buffer, entry.size);
+            if(status != Status::OK) return status;
+            *size = entry.size;
+            return Status::OK;
         }
 
-        void fetch(size_t entryNumber, DocFetchCallback cb) {
-            if(entryNumber >= m_next_id) {
-                cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
-                return;
-            }
+        [[nodiscard]] Status fetch(size_t entryNumber, DocFetchCallback cb) {
+            if(entryNumber >= m_header->next_id)
+                return cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
             EntryMetadata entry;
-            m_meta->read(24 + sizeof(EntryMetadata)*entryNumber, &entry, sizeof(entry));
-            if(entry.size == YOKAN_KEY_NOT_FOUND) {
-                cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
-                return;
-            }
+            Status status;
+            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*entryNumber;
+            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            if(status == Status::NotFound || entry.size == YOKAN_KEY_NOT_FOUND)
+                return cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
             std::shared_ptr<Chunk> chunk;
-            if(entry.chunk == m_last_chunk_id) {
+            if(entry.chunk == m_header->last_chunk_id) {
                 chunk = m_last_chunk;
             } else {
                 chunk = std::make_shared<Chunk>(
@@ -369,25 +429,28 @@ class LogDatabase : public DatabaseInterface {
                         m_chunk_size);
             }
             auto func = [entryNumber, &cb](const UserMem& doc) {
-                cb(entryNumber, doc);
+                return cb(entryNumber, doc);
             };
-            chunk->fetch(entry.offset, entry.size, func);
+            return chunk->fetch(entry.offset, entry.size, func);
         }
 
-        size_t entrySize(size_t entryNumber) {
-            if(entryNumber >= m_next_id)
-                return YOKAN_KEY_NOT_FOUND;
+        [[nodiscard]] Status entrySize(size_t entryNumber, size_t* size) {
+            if(entryNumber >= m_header->next_id)
+                return Status::NotFound;
             EntryMetadata entry;
-            m_meta->read(24 + sizeof(EntryMetadata)*entryNumber, &entry, sizeof(entry));
-            return entry.size;
+            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*entryNumber;
+            auto status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            if(status != Status::OK) return status;
+            *size = entry.size;
+            return status;
         }
 
-        auto last_id() const {
-            return m_next_id-1;
+        [[nodiscard]] auto last_id() const {
+            return m_header->next_id-1;
         }
 
-        auto size() const {
-            return m_coll_size;
+        [[nodiscard]] auto size() const {
+            return m_header->coll_size;
         }
 
         private:
@@ -397,10 +460,11 @@ class LogDatabase : public DatabaseInterface {
         size_t                    m_chunk_size;
         std::shared_ptr<MetaFile> m_meta;
         std::shared_ptr<Chunk>    m_last_chunk;
+        MetadataHeader*           m_header = nullptr;
 
-        uint64_t m_coll_size     = 0;
-        uint64_t m_next_id       = 0;
-        uint64_t m_last_chunk_id = 0;
+        Status flushHeader() {
+            return m_meta->flush(0, sizeof(*m_header));
+        }
     };
 
     public:
@@ -571,7 +635,11 @@ class LogDatabase : public DatabaseInterface {
         }
         auto coll = p->second;
         for(size_t i = 0; i < ids.size; ++i) {
-            sizes[i] = coll->entrySize(ids[i]);
+            auto status = coll->entrySize(ids[i], &sizes[i]);
+            if(status == Status::NotFound)
+                sizes[i] = YOKAN_KEY_NOT_FOUND;
+            else if(status != Status::OK)
+                return status;
         }
         return Status::OK;
     }
@@ -587,11 +655,7 @@ class LogDatabase : public DatabaseInterface {
         if(p == m_collections.end())
             return Status::NotFound;
         auto coll = p->second;
-        auto first_id = coll->appendMulti(ids.size, documents.data, sizes.data);
-        for(size_t i = 0; i < ids.size; ++i) {
-            ids[i] = first_id + i;
-        }
-        return Status::OK;
+        return coll->appendMulti(ids.size, documents.data, sizes.data, ids.data);
     }
 
     Status docUpdate(const char* collection,
@@ -617,18 +681,29 @@ class LogDatabase : public DatabaseInterface {
         const auto count = ids.size;
         const char* doc_ptr = documents.data;
 
+        Status status;
+
         for(size_t i = 0; i < count; ++i) {
             const auto id = ids[i];
             const auto doc_size = sizes[i];
 
-            if(id > coll->last_id()) {
-                while(id != coll->last_id()) {
-                    auto x = coll->append(nullptr, 0);
-                    coll->erase(x);
+            if(id > coll->last_id() + 1) {
+                while(id != coll->last_id() + 1) {
+                    yk_id_t x;
+                    status = coll->append(nullptr, 0, &x);
+                    if(status != Status::OK) return status;
+                    status = coll->erase(x);
+                    if(status != Status::OK) return status;
                 }
             }
 
-            coll->update(id, doc_ptr, doc_size);
+            if(id == coll->last_id() + 1) {
+                yk_id_t x;
+                status = coll->append(doc_ptr, doc_size, &x);
+            } else {
+                status = coll->update(id, doc_ptr, doc_size);
+            }
+            if(status != Status::OK) return status;
 
             doc_ptr += doc_size;
         }
@@ -654,6 +729,7 @@ class LogDatabase : public DatabaseInterface {
             return Status::NotFound;
         auto coll = p->second;
 
+        Status status;
         /*
         ScopedReadLock coll_lock(coll.m_lock);
         */
@@ -665,14 +741,21 @@ class LogDatabase : public DatabaseInterface {
             size_t remaining = documents.size;
             for(size_t i = 0; i < count; ++i) {
                 const auto id = ids[i];
-                sizes[i] = coll->read(id, doc_ptr, remaining);
-                if(sizes[i] == YOKAN_SIZE_TOO_SMALL) {
+                size_t s = remaining;
+                status = coll->read(id, doc_ptr, &s);
+                if(status == Status::SizeError) {
                     for(; i < count; ++i) {
                         sizes[i] = YOKAN_SIZE_TOO_SMALL;
                     }
                     continue;
+                } else if(status == Status::NotFound || status == Status::InvalidID) {
+                    sizes[i] = YOKAN_KEY_NOT_FOUND;
+                    continue;
+                } else if(status != Status::OK) {
+                    return status;
                 }
-                if(sizes[i] <= YOKAN_LAST_VALID_SIZE) {
+                sizes[i] = s;
+                if(s <= YOKAN_LAST_VALID_SIZE) {
                     doc_ptr += sizes[i];
                     remaining -= sizes[i];
                 }
@@ -683,7 +766,17 @@ class LogDatabase : public DatabaseInterface {
             for(size_t i = 0; i < count; ++i) {
                 const auto id = ids[i];
                 const size_t buf_size = sizes[i];
-                sizes[i] = coll->read(id, doc_ptr, buf_size);
+                size_t s = buf_size;
+                status = coll->read(id, doc_ptr, &s);
+                if(status == Status::OK)
+                    sizes[i] = s;
+                else if(status == Status::InvalidID || status == Status::NotFound)
+                    sizes[i] = YOKAN_KEY_NOT_FOUND;
+                else if(status == Status::SizeError)
+                    sizes[i] = YOKAN_SIZE_TOO_SMALL;
+                else
+                    return status;
+
                 doc_ptr += buf_size;
             }
         }
@@ -708,7 +801,7 @@ class LogDatabase : public DatabaseInterface {
 
         for(size_t i = 0; i < ids.size; ++i) {
             const auto id = ids[i];
-            coll->fetch(id, func);
+            (void)coll->fetch(id, func);
         }
         return Status::OK;
     }
@@ -726,7 +819,7 @@ class LogDatabase : public DatabaseInterface {
         ScopedReadLock coll_lock(coll.m_lock);
         */
         for(size_t i = 0; i < ids.size; ++i)
-            coll->erase(ids[i]);
+            (void)coll->erase(ids[i]);
         return Status::OK;
     }
 
@@ -817,7 +910,7 @@ class LogDatabase : public DatabaseInterface {
         };
 
         while(i < max && id <= coll->last_id()) {
-            coll->fetch(id, fetch_cb);
+            (void)coll->fetch(id, fetch_cb);
             if(status != Status::OK) break;
         }
 
