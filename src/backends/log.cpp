@@ -222,6 +222,21 @@ class LogDatabase : public DatabaseInterface {
         static_assert(sizeof(EntryMetadata) == sizeof(MetadataHeader),
                       "EntryMetadata and MetadataHeader should have the same size");
 
+        auto writeEntryMetadata(yk_id_t id, const EntryMetadata& entry, bool do_flush=true) {
+            auto offset = sizeof(MetadataHeader) + id*sizeof(EntryMetadata);
+            return m_meta->write(offset, &entry, sizeof(entry), do_flush);
+        }
+
+        auto readEntryMetadata(yk_id_t id, EntryMetadata& entry) {
+            auto offset = sizeof(MetadataHeader) + id*sizeof(EntryMetadata);
+            return m_meta->read(offset, &entry, sizeof(entry));
+        }
+
+        auto flushEntryMetadata(yk_id_t first_id, size_t count) {
+            auto offset = sizeof(MetadataHeader) + first_id*sizeof(EntryMetadata);
+            return m_meta->flush(offset, sizeof(EntryMetadata)*count);
+        }
+
         public:
 
         Collection(const std::string& name,
@@ -252,15 +267,14 @@ class LogDatabase : public DatabaseInterface {
                 ABT_rwlock_free(&m_lock);
         }
 
-        [[nodiscard]] Status erase(uint64_t id) {
+        [[nodiscard]] Status erase(yk_id_t id) {
             if(id >= m_header->next_id)
                 return Status::InvalidID;
             ScopedWriteLock lock{m_lock};
             // read the metadata entry
             EntryMetadata entry;
             Status status;
-            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
-            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            status = readEntryMetadata(id, entry);
             if(status != Status::OK) return status;
             if(entry.size == YOKAN_KEY_NOT_FOUND)
                 return Status::OK;
@@ -268,7 +282,7 @@ class LogDatabase : public DatabaseInterface {
             entry.chunk  = YOKAN_KEY_NOT_FOUND;
             entry.size   = YOKAN_KEY_NOT_FOUND;
             entry.offset = YOKAN_KEY_NOT_FOUND;
-            status = m_meta->write(meta_offset, &entry, sizeof(entry));
+            status = writeEntryMetadata(id, entry);
             if(status != Status::OK) return status;
             // update the header of the metadata file
             m_header->coll_size -= 1;
@@ -292,11 +306,11 @@ class LogDatabase : public DatabaseInterface {
             if(next_offset == 0) next_offset = 8;
             if(status != Status::OK) return status;
 
-            size_t first_meta_offset = 0;
-            size_t meta_size_to_flush = 0;
+            size_t first_id = m_header->next_id;
 
             for(size_t i = 0; i < count; ++i) {
 
+                ids[i] = m_header->next_id;
                 auto last_chunk_id = m_header->last_chunk_id;
                 // check if we need to create a new chunk
                 if(sizes[i] > m_chunk_size - next_offset) {
@@ -317,13 +331,8 @@ class LogDatabase : public DatabaseInterface {
                 if(status != Status::OK) break;
                 // write the metadata for the entry
                 EntryMetadata entry{last_chunk_id, next_offset, sizes[i], sizes[i]};
-                size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*m_header->next_id;
-                if(first_meta_offset == 0) first_meta_offset = meta_offset;
-                status = m_meta->write(meta_offset, &entry, sizeof(entry), false);
-                if(status != Status::OK) return status;
-                meta_size_to_flush += sizeof(EntryMetadata);
-                // set the ID of the document
-                ids[i] = m_header->next_id;
+                status = writeEntryMetadata(ids[i], entry, false);
+                if(status != Status::OK) break;
                 // update the header of the metadata file
                 m_header->next_id += 1;
                 m_header->coll_size += 1;
@@ -331,7 +340,7 @@ class LogDatabase : public DatabaseInterface {
                 doc_offset += sizes[i];
             }
             (void)m_last_chunk->flush(0, next_offset);
-            (void)m_meta->flush(first_meta_offset, meta_size_to_flush);
+            (void)flushEntryMetadata(first_id, m_header->next_id - first_id);
             flushHeader();
             return status;
         }
@@ -356,23 +365,18 @@ class LogDatabase : public DatabaseInterface {
 
             // create empty entries if IDs are greater or equal to next_id,
             // as if the documents existed but had been erased (from chunk last_id)
-            size_t min_meta_offset = std::numeric_limits<size_t>::max();
-            size_t max_meta_offset = 0;
+            const auto next_id = m_header->next_id;
             for(yk_id_t id = m_header->next_id; id <= max_id; ++id) {
                 auto entry = EntryMetadata{
                     m_header->last_chunk_id,
                     YOKAN_KEY_NOT_FOUND,
                     YOKAN_KEY_NOT_FOUND, 0};
-                auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
-                min_meta_offset = std::min(min_meta_offset, meta_offset);
-                max_meta_offset = std::max(max_meta_offset, meta_offset + sizeof(EntryMetadata));
-                status = m_meta->write(meta_offset, &entry, sizeof(entry), false);
+                status = writeEntryMetadata(id, entry, false);
                 if(status != Status::OK) return status;
                 m_header->next_id += 1;
             }
-            if(min_meta_offset != std::numeric_limits<size_t>::max()) {
-                (void)m_meta->flush(min_meta_offset, max_meta_offset - min_meta_offset);
-            }
+            if(next_id != m_header->next_id)
+                (void)flushEntryMetadata(next_id, (m_header->next_id - next_id));
 
             std::vector<EntryMetadata> entries(count);
             std::shared_ptr<Chunk> chunk;
@@ -380,8 +384,7 @@ class LogDatabase : public DatabaseInterface {
             // we will first handle all the entries that can overwrite existing allocated entries
             size_t doc_offset = 0;
             for(size_t i = 0; i < count; ++i) {
-                auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*ids[i];
-                status = m_meta->read(meta_offset, &entries[i], sizeof(entries[i]));
+                status = readEntryMetadata(ids[i], entries[i]);
                 if(status != Status::OK)
                     return status;
                 if(sizes[i] > entries[i].allocated) {
@@ -407,7 +410,7 @@ class LogDatabase : public DatabaseInterface {
                 // update the entry's metadata if the size has changed
                 if(entries[i].size != sizes[i]) {
                     entries[i].size = sizes[i];
-                    status = m_meta->write(meta_offset, &entries[i], sizeof(entries[i]), false);
+                    status = writeEntryMetadata(ids[i], entries[i], false);
                     if(status != Status::OK) return status;
                 }
                 doc_offset += sizes[i];
@@ -455,8 +458,7 @@ class LogDatabase : public DatabaseInterface {
                 if(status != Status::OK) break;
                 // write the metadata for the entry
                 entries[i] = EntryMetadata{last_chunk_id, next_offset, sizes[i], sizes[i]};
-                size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*ids[i];
-                status = m_meta->write(meta_offset, &entries[i], sizeof(entries[i]), false);
+                status = writeEntryMetadata(ids[i], entries[i]);
                 if(status != Status::OK) return status;
                 // update the header of the metadata file
                 if(coll_size_incr)
@@ -466,10 +468,7 @@ class LogDatabase : public DatabaseInterface {
             }
 
             // flush the metadata entries
-            min_meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*min_id;
-            max_meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*(max_id+1);
-            status = m_meta->flush(min_meta_offset, max_meta_offset - min_meta_offset);
-
+            status = flushEntryMetadata(min_id, max_id - min_id + 1);
             flushHeader();
             return status;
         }
@@ -482,8 +481,7 @@ class LogDatabase : public DatabaseInterface {
                 return Status::InvalidID;
             EntryMetadata entry;
             Status status;
-            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
-            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            status = readEntryMetadata(id, entry);
             if(status != Status::OK) return status;
             if(entry.size == YOKAN_KEY_NOT_FOUND)
                 return Status::NotFound;
@@ -503,16 +501,14 @@ class LogDatabase : public DatabaseInterface {
             return Status::OK;
         }
 
-        [[nodiscard]] Status fetch(size_t entryNumber, DocFetchCallback cb) {
+        [[nodiscard]] Status fetch(size_t id, DocFetchCallback cb) {
             ScopedReadLock lock{m_lock};
-            if(entryNumber >= m_header->next_id)
-                return cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
+            if(id >= m_header->next_id)
+                return cb(id, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
             EntryMetadata entry;
-            Status status;
-            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*entryNumber;
-            status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            auto status = readEntryMetadata(id, entry);
             if(status == Status::NotFound || entry.size == YOKAN_KEY_NOT_FOUND)
-                return cb(entryNumber, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
+                return cb(id, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
             std::shared_ptr<Chunk> chunk;
             if(entry.chunk == m_header->last_chunk_id) {
                 chunk = m_last_chunk;
@@ -521,19 +517,18 @@ class LogDatabase : public DatabaseInterface {
                         m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
                         m_chunk_size);
             }
-            auto func = [entryNumber, &cb](const UserMem& doc) {
-                return cb(entryNumber, doc);
+            auto func = [id, &cb](const UserMem& doc) {
+                return cb(id, doc);
             };
             return chunk->fetch(entry.offset, entry.size, func);
         }
 
-        [[nodiscard]] Status entrySize(size_t entryNumber, size_t* size) {
+        [[nodiscard]] Status entrySize(size_t id, size_t* size) {
             ScopedReadLock lock{m_lock};
-            if(entryNumber >= m_header->next_id)
+            if(id >= m_header->next_id)
                 return Status::NotFound;
             EntryMetadata entry;
-            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*entryNumber;
-            auto status = m_meta->read(meta_offset, &entry, sizeof(entry));
+            auto status = readEntryMetadata(id, entry);
             if(status != Status::OK) return status;
             *size = entry.size;
             return status;
