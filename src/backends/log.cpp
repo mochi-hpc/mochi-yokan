@@ -224,6 +224,11 @@ class LogDatabase : public DatabaseInterface {
 
         auto writeEntryMetadata(yk_id_t id, const EntryMetadata& entry, bool do_flush=true) {
             auto offset = sizeof(MetadataHeader) + id*sizeof(EntryMetadata);
+            auto meta_size = m_meta->size();
+            if(offset + sizeof(MetadataHeader) > meta_size) {
+                auto status = m_meta->extend(2*meta_size);
+                if(status != Status::OK) return status;
+            }
             return m_meta->write(offset, &entry, sizeof(entry), do_flush);
         }
 
@@ -235,6 +240,10 @@ class LogDatabase : public DatabaseInterface {
         auto flushEntryMetadata(yk_id_t first_id, size_t count) {
             auto offset = sizeof(MetadataHeader) + first_id*sizeof(EntryMetadata);
             return m_meta->flush(offset, sizeof(EntryMetadata)*count);
+        }
+
+        auto flushHeader() {
+            return m_meta->flush(0, sizeof(*m_header));
         }
 
         public:
@@ -258,13 +267,15 @@ class LogDatabase : public DatabaseInterface {
             m_last_chunk = std::make_shared<Chunk>(
                     m_path_prefix + "/" + name + "." + std::to_string(last_chunk_id),
                     chunk_size);
-            if(use_lock)
+            if(use_lock) {
                 ABT_rwlock_create(&m_lock);
+            }
         }
 
         ~Collection() {
-            if(m_lock != ABT_RWLOCK_NULL)
+            if(m_lock != ABT_RWLOCK_NULL) {
                 ABT_rwlock_free(&m_lock);
+            }
         }
 
         [[nodiscard]] Status erase(yk_id_t id) {
@@ -554,9 +565,6 @@ class LogDatabase : public DatabaseInterface {
         MetadataHeader*           m_header = nullptr;
         ABT_rwlock                m_lock = ABT_RWLOCK_NULL;
 
-        Status flushHeader() {
-            return m_meta->flush(0, sizeof(*m_header));
-        }
     };
 
     public:
