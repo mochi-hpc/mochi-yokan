@@ -440,6 +440,145 @@ class LogDatabase : public DatabaseInterface {
             return status;
         }
 
+        [[nodiscard]] Status updateMulti(
+                size_t count, const yk_id_t* ids, const char* data, const size_t* sizes) {
+            for(size_t i = 0; i < count; ++i) {
+                if(sizes[i] > m_chunk_size)
+                    return Status::SizeError;
+            }
+            ScopedWriteLock lock{m_lock};
+
+            Status status = Status::OK;
+
+            // first, find the maximum ID
+            yk_id_t min_id = ids[0];
+            yk_id_t max_id = ids[0];
+            for(size_t i = 1; i < count; ++i) {
+                max_id = std::max(max_id, ids[i]);
+                min_id = std::min(min_id, ids[i]);
+            }
+
+            // create empty entries if IDs are greater or equal to next_id,
+            // as if the documents existed but had been erased (from chunk last_id)
+            size_t min_meta_offset = std::numeric_limits<size_t>::max();
+            size_t max_meta_offset = 0;
+            for(yk_id_t id = m_header->next_id; id <= max_id; ++id) {
+                auto entry = EntryMetadata{
+                    m_header->last_chunk_id,
+                    YOKAN_KEY_NOT_FOUND,
+                    YOKAN_KEY_NOT_FOUND, 0};
+                auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
+                min_meta_offset = std::min(min_meta_offset, meta_offset);
+                max_meta_offset = std::max(max_meta_offset, meta_offset + sizeof(EntryMetadata));
+                status = m_meta->write(meta_offset, &entry, sizeof(entry), false);
+                if(status != Status::OK) return status;
+                m_header->next_id += 1;
+            }
+            if(min_meta_offset != std::numeric_limits<size_t>::max()) {
+                (void)m_meta->flush(min_meta_offset, max_meta_offset - min_meta_offset);
+            }
+
+            std::vector<EntryMetadata> entries(count);
+            std::shared_ptr<Chunk> chunk;
+
+            // we will first handle all the entries that can overwrite existing allocated entries
+            size_t doc_offset = 0;
+            for(size_t i = 0; i < count; ++i) {
+                auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*ids[i];
+                status = m_meta->read(meta_offset, &entries[i], sizeof(entries[i]));
+                if(status != Status::OK)
+                    return status;
+                if(sizes[i] > entries[i].allocated) {
+                    // skip this entry, it will need to be appended
+                    doc_offset += sizes[i];
+                    continue;
+                }
+                // here we know we can overwrite an already allocated entry
+                if(sizes[i] != 0) {
+                    if(entries[i].chunk != m_header->last_chunk_id) {
+                        chunk = std::make_shared<Chunk>(
+                                m_path_prefix + "/" + m_name + "." + std::to_string(entries[i].chunk),
+                                m_chunk_size);
+                    } else {
+                        chunk = m_last_chunk;
+                    }
+                    // update in place (we don't prevent flushing, not the best but it's the
+                    // cost for the user to be able to override existing entries)
+                    status = chunk->write(entries[i].offset, data + doc_offset, sizes[i]);
+                    if(status != Status::OK) return status;
+                }
+                bool coll_size_incr = entries[i].size == YOKAN_KEY_NOT_FOUND;
+                // update the entry's metadata if the size has changed
+                if(entries[i].size != sizes[i]) {
+                    entries[i].size = sizes[i];
+                    status = m_meta->write(meta_offset, &entries[i], sizeof(entries[i]), false);
+                    if(status != Status::OK) return status;
+                }
+                doc_offset += sizes[i];
+                if(coll_size_incr)
+                    m_header->coll_size += 1;
+            }
+
+            // now we are left with the entries that couldn't replace their old entries,
+            // we need to append these new entries. We are re-using the entries vector
+            // populated in the previous step.
+
+            // get next_offset
+            uint64_t next_offset;
+            status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
+            // first 8 bytes of a chunk represent the next available offset - 8
+            if(next_offset == 0) next_offset = 8;
+            if(status != Status::OK) return status;
+
+            doc_offset = 0;
+            for(size_t i = 0; i < count; ++i) {
+                if(sizes[i] <= entries[i].allocated) {
+                    doc_offset += sizes[i];
+                    continue;
+                }
+                // here we know the entry is one that needs to be appended.
+
+                auto last_chunk_id = m_header->last_chunk_id;
+                // check if we need to create a new chunk
+                if(sizes[i] > m_chunk_size - next_offset) {
+                    // flush the previous chunk
+                    (void)m_last_chunk->flush(0, next_offset);
+                    last_chunk_id = m_header->last_chunk_id += 1;
+                    m_last_chunk = std::make_shared<Chunk>(
+                            m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
+                            m_chunk_size);
+                    next_offset  = 8;
+                }
+                bool coll_size_incr = entries[i].size == YOKAN_KEY_NOT_FOUND;
+                // write the data
+                status = m_last_chunk->write(next_offset, data + doc_offset, sizes[i], false);
+                if(status != Status::OK) break;
+                auto new_next_offset = next_offset + sizes[i];
+                // write the new offset
+                status = m_last_chunk->write(0, &new_next_offset, sizeof(new_next_offset), false);
+                if(status != Status::OK) break;
+                // write the metadata for the entry
+                entries[i] = EntryMetadata{last_chunk_id, next_offset, sizes[i], sizes[i]};
+                size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*ids[i];
+                status = m_meta->write(meta_offset, &entries[i], sizeof(entries[i]), false);
+                if(status != Status::OK) return status;
+                // update the header of the metadata file
+                if(coll_size_incr)
+                    m_header->coll_size += 1;
+                next_offset = new_next_offset;
+                doc_offset += sizes[i];
+            }
+
+            // flush the metadata entries
+            min_meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*min_id;
+            max_meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*(max_id+1);
+            status = m_meta->flush(min_meta_offset, max_meta_offset - min_meta_offset);
+
+            flushHeader();
+            return status;
+        }
+
+
         [[nodiscard]] Status read(size_t id, void* buffer, size_t* size) {
             size_t buf_size = *size;
             ScopedReadLock lock{m_lock};
@@ -731,49 +870,16 @@ class LogDatabase : public DatabaseInterface {
             return Status::NotFound;
         auto coll = p->second;
 
+        auto last_id = coll->last_id();
+
         if(!(mode & YOKAN_MODE_UPDATE_NEW)) {
             for(size_t i = 0; i < ids.size; ++i) {
-                if(ids[i] > coll->last_id())
+                if(ids[i] > last_id)
                     return Status::InvalidID;
             }
         }
 
-        const auto count = ids.size;
-        const char* doc_ptr = documents.data;
-
-        Status status;
-
-        for(size_t i = 0; i < count; ++i) {
-            const auto id = ids[i];
-            const auto doc_size = sizes[i];
-
-            if(id > coll->last_id() + 1) {
-                while(id != coll->last_id() + 1) {
-                    yk_id_t x;
-                    status = coll->append(nullptr, 0, &x);
-                    if(status != Status::OK) return status;
-                    status = coll->erase(x);
-                    if(status != Status::OK) return status;
-                }
-            }
-
-            if(id == coll->last_id() + 1) {
-                yk_id_t x;
-                status = coll->append(doc_ptr, doc_size, &x);
-            } else {
-                status = coll->update(id, doc_ptr, doc_size);
-            }
-            if(status != Status::OK) return status;
-
-            doc_ptr += doc_size;
-        }
-
-        // TODO: the above could be optimized by reusing space if the updated document
-        // has a smaller size than the original. We could also keep track of the available
-        // size separately from the document size, so that subsequent updates can still
-        // benefit from the size of the original document.
-
-        return Status::OK;
+        return coll->updateMulti(ids.size, ids.data, documents.data, sizes.data);
     }
 
     Status docLoad(const char* collection,
