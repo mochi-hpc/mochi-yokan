@@ -51,19 +51,33 @@ class LogDatabase : public DatabaseInterface {
 
         public:
 
-        explicit LRUCache(size_t max_size = 16) : m_max_size(max_size) {}
+        explicit LRUCache(size_t max_size, bool use_lock)
+        : m_max_size(max_size) {
+            if(use_lock)
+                ABT_rwlock_create(&m_lock);
+        }
 
-        // Get an object by id. Returns nullptr if not found
-        std::shared_ptr<T> get(uint64_t id) {
+        ~LRUCache() {
+            if(m_lock != ABT_RWLOCK_NULL)
+                ABT_rwlock_free(&m_lock);
+        }
+
+        // Get an object by id. If the object doesn't exist, call the function
+        // to construct it and put it in the cache before returning it.
+        template<typename Factory>
+        std::shared_ptr<T> get(uint64_t id, Factory&& make) {
             auto it = m_cache_map.find(id);
             if (it == m_cache_map.end()) {
-                return nullptr; // Not found
+                auto obj = make(id);
+                put(obj, id);
+                return obj;
+            } else {
+                m_access_list.splice(m_access_list.begin(), m_access_list, it->second);
+                return it->second->second;
             }
-
-            // Move the accessed item to the front of the list (most recently used)
-            m_access_list.splice(m_access_list.begin(), m_access_list, it->second);
-            return it->second->second;
         }
+
+        private:
 
         // Put an object in the cache
         void put(std::shared_ptr<T> obj, uint64_t id) {
@@ -86,13 +100,12 @@ class LogDatabase : public DatabaseInterface {
             }
         }
 
-        private:
-
         using ListIterator = typename std::list<std::pair<uint64_t, std::shared_ptr<T>>>::iterator;
 
         size_t m_max_size;
         std::list<std::pair<uint64_t, std::shared_ptr<T>>> m_access_list;
         std::unordered_map<uint64_t, ListIterator>         m_cache_map;
+        ABT_rwlock                                         m_lock = ABT_RWLOCK_NULL;
     };
 
     class MemoryMappedFile {
@@ -304,13 +317,12 @@ class LogDatabase : public DatabaseInterface {
                 }
                 return m_last_chunk;
             }
-            auto chunk = m_chunk_cache.get(chunk_id);
-            if(!chunk) {
-                chunk = std::make_shared<Chunk>(
+            auto make_chunk = [&](uint64_t chunk_id) {
+                return  std::make_shared<Chunk>(
                     m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
                     m_header->chunk_size);
-                m_chunk_cache.put(chunk, chunk_id);
-            }
+            };
+            auto chunk = m_chunk_cache.get(chunk_id, make_chunk);
             return chunk;
         }
 
@@ -319,10 +331,13 @@ class LogDatabase : public DatabaseInterface {
         Collection(const std::string& name,
                    const std::string& path_prefix,
                    size_t chunk_size,
+                   size_t cache_size,
                    bool use_lock)
         : m_name{name}
         , m_path_prefix{path_prefix}
-        , m_chunk_size{chunk_size} {
+        , m_chunk_size{chunk_size}
+        , m_chunk_cache{cache_size, use_lock}
+        {
             // open the metadata file of the collection
             m_meta = std::make_shared<MetaFile>(
                     m_path_prefix + "/" + name + ".meta",
@@ -625,9 +640,13 @@ class LogDatabase : public DatabaseInterface {
                 return Status::InvalidConf;
             if(cfg.contains("use_lock") && !cfg["use_lock"].is_boolean())
                 return Status::InvalidConf;
+            if(cfg.contains("cache_size") && !cfg["cache_size"].is_number_unsigned())
+                return Status::InvalidConf;
 
             auto chunk_size = cfg.value("chunk_size", 10*1024*1024);
             cfg["chunk_size"] = chunk_size;
+            auto cache_size = cfg.value("cache_size", 16);
+            cfg["cache_size"] = cache_size;
             auto create_if_missing = cfg.value("create_if_missing", true);
             cfg["create_if_missing"] = create_if_missing;
             auto error_if_exists = cfg.value("error_if_exists", false);
@@ -714,7 +733,7 @@ class LogDatabase : public DatabaseInterface {
         if(m_collections.count(name))
             return Status::KeyExists;
         auto coll = std::make_shared<Collection>(
-            name, m_path, m_chunk_size , m_lock != ABT_RWLOCK_NULL);
+            name, m_path, m_chunk_size , m_cache_size, m_lock != ABT_RWLOCK_NULL);
         m_collections.emplace(name, coll);
         return Status::OK;
     }
@@ -1073,6 +1092,7 @@ class LogDatabase : public DatabaseInterface {
             ABT_rwlock_create(&m_lock);
         m_path = m_config["path"].get<std::string>();
         m_chunk_size = m_config["chunk_size"].get<size_t>();
+        m_cache_size = m_config["cache_size"].get<size_t>();
         // lookup existing collections
         for (auto const& entry : std::filesystem::directory_iterator{m_path}) {
             if(!entry.is_regular_file())
@@ -1085,7 +1105,8 @@ class LogDatabase : public DatabaseInterface {
             auto name = filename.substr(filename.find_last_of('/')+1);
             name = name.substr(0, name.size()-5);
             auto coll = std::make_shared<Collection>(
-                name, m_path, m_chunk_size, m_lock != ABT_RWLOCK_NULL);
+                name, m_path, m_chunk_size, m_cache_size,
+                m_lock != ABT_RWLOCK_NULL);
             m_collections.emplace(name, coll);
         }
     }
@@ -1096,6 +1117,7 @@ class LogDatabase : public DatabaseInterface {
     ABT_rwlock                       m_lock = ABT_RWLOCK_NULL;
     std::string                      m_path;
     size_t                           m_chunk_size;
+    size_t                           m_cache_size;
     std::atomic<bool>                m_migrated{false};
 };
 
