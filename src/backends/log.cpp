@@ -46,6 +46,55 @@ using json = nlohmann::json;
 
 class LogDatabase : public DatabaseInterface {
 
+    template <typename T>
+    class LRUCache {
+
+        public:
+
+        explicit LRUCache(size_t max_size = 16) : m_max_size(max_size) {}
+
+        // Get an object by id. Returns nullptr if not found
+        std::shared_ptr<T> get(uint64_t id) {
+            auto it = m_cache_map.find(id);
+            if (it == m_cache_map.end()) {
+                return nullptr; // Not found
+            }
+
+            // Move the accessed item to the front of the list (most recently used)
+            m_access_list.splice(m_access_list.begin(), m_access_list, it->second);
+            return it->second->second;
+        }
+
+        // Put an object in the cache
+        void put(std::shared_ptr<T> obj, uint64_t id) {
+            auto it = m_cache_map.find(id);
+            if (it != m_cache_map.end()) {
+                // If the item exists, update it and move it to the front
+                it->second->second = obj;
+                m_access_list.splice(m_access_list.begin(), m_access_list, it->second);
+            } else {
+                // If the item doesn't exist, add it
+                if (m_cache_map.size() >= m_max_size) {
+                    // Remove the least recently used item
+                    auto lru = m_access_list.back();
+                    m_cache_map.erase(lru.first);
+                    m_access_list.pop_back();
+                }
+                // Insert the new item at the front of the list
+                m_access_list.emplace_front(id, obj);
+                m_cache_map[id] = m_access_list.begin();
+            }
+        }
+
+        private:
+
+        using ListIterator = typename std::list<std::pair<uint64_t, std::shared_ptr<T>>>::iterator;
+
+        size_t m_max_size;
+        std::list<std::pair<uint64_t, std::shared_ptr<T>>> m_access_list;
+        std::unordered_map<uint64_t, ListIterator>         m_cache_map;
+    };
+
     class MemoryMappedFile {
 
         [[nodiscard]] Status syncMemory(void *addr, size_t size) {
@@ -246,6 +295,25 @@ class LogDatabase : public DatabaseInterface {
             return m_meta->flush(0, sizeof(*m_header));
         }
 
+        auto getChunkFromID(uint64_t chunk_id) {
+            if(chunk_id == m_header->last_chunk_id) {
+                if(!m_last_chunk) {
+                    m_last_chunk = std::make_shared<Chunk>(
+                            m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
+                            m_header->chunk_size);
+                }
+                return m_last_chunk;
+            }
+            auto chunk = m_chunk_cache.get(chunk_id);
+            if(!chunk) {
+                chunk = std::make_shared<Chunk>(
+                    m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
+                    m_header->chunk_size);
+                m_chunk_cache.put(chunk, chunk_id);
+            }
+            return chunk;
+        }
+
         public:
 
         Collection(const std::string& name,
@@ -263,13 +331,8 @@ class LogDatabase : public DatabaseInterface {
             m_header = static_cast<MetadataHeader*>(m_meta->base());
             m_header->chunk_size = chunk_size;
             // open the last chunk
-            auto last_chunk_id = m_header->last_chunk_id;
-            m_last_chunk = std::make_shared<Chunk>(
-                    m_path_prefix + "/" + name + "." + std::to_string(last_chunk_id),
-                    chunk_size);
-            if(use_lock) {
-                ABT_rwlock_create(&m_lock);
-            }
+            getChunkFromID(m_header->last_chunk_id);
+            if(use_lock) ABT_rwlock_create(&m_lock);
         }
 
         ~Collection() {
@@ -327,10 +390,8 @@ class LogDatabase : public DatabaseInterface {
                 if(sizes[i] > m_chunk_size - next_offset) {
                     // flush the previous chunk
                     (void)m_last_chunk->flush(0, next_offset);
-                    last_chunk_id = m_header->last_chunk_id += 1;
-                    m_last_chunk = std::make_shared<Chunk>(
-                            m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
-                            m_chunk_size);
+                    getChunkFromID(m_header->last_chunk_id);
+                    m_header->last_chunk_id += 1;
                     next_offset  = 8;
                 }
                 // write the data
@@ -405,13 +466,7 @@ class LogDatabase : public DatabaseInterface {
                 }
                 // here we know we can overwrite an already allocated entry
                 if(sizes[i] != 0) {
-                    if(entries[i].chunk != m_header->last_chunk_id) {
-                        chunk = std::make_shared<Chunk>(
-                                m_path_prefix + "/" + m_name + "." + std::to_string(entries[i].chunk),
-                                m_chunk_size);
-                    } else {
-                        chunk = m_last_chunk;
-                    }
+                    chunk = getChunkFromID(entries[i].chunk);
                     // update in place (we don't prevent flushing, not the best but it's the
                     // cost for the user to be able to override existing entries)
                     status = chunk->write(entries[i].offset, data + doc_offset, sizes[i]);
@@ -453,10 +508,8 @@ class LogDatabase : public DatabaseInterface {
                 if(sizes[i] > m_chunk_size - next_offset) {
                     // flush the previous chunk
                     (void)m_last_chunk->flush(0, next_offset);
-                    last_chunk_id = m_header->last_chunk_id += 1;
-                    m_last_chunk = std::make_shared<Chunk>(
-                            m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
-                            m_chunk_size);
+                    getChunkFromID(m_header->last_chunk_id + 1);
+                    m_header->last_chunk_id += 1;
                     next_offset  = 8;
                 }
                 bool coll_size_incr = entries[i].size == YOKAN_KEY_NOT_FOUND;
@@ -498,14 +551,7 @@ class LogDatabase : public DatabaseInterface {
                 return Status::NotFound;
             if(buf_size < entry.size)
                 return Status::SizeError;
-            std::shared_ptr<Chunk> chunk;
-            if(entry.chunk == m_header->last_chunk_id) {
-                chunk = m_last_chunk;
-            } else {
-                chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
-                        m_chunk_size);
-            }
+            auto chunk = getChunkFromID(entry.chunk);
             status = chunk->read(entry.offset, buffer, entry.size);
             if(status != Status::OK) return status;
             *size = entry.size;
@@ -520,14 +566,7 @@ class LogDatabase : public DatabaseInterface {
             auto status = readEntryMetadata(id, entry);
             if(status == Status::NotFound || entry.size == YOKAN_KEY_NOT_FOUND)
                 return cb(id, UserMem{nullptr, YOKAN_KEY_NOT_FOUND});
-            std::shared_ptr<Chunk> chunk;
-            if(entry.chunk == m_header->last_chunk_id) {
-                chunk = m_last_chunk;
-            } else {
-                chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
-                        m_chunk_size);
-            }
+            auto chunk = getChunkFromID(entry.chunk);
             auto func = [id, &cb](const UserMem& doc) {
                 return cb(id, doc);
             };
@@ -564,6 +603,7 @@ class LogDatabase : public DatabaseInterface {
         std::shared_ptr<Chunk>    m_last_chunk;
         MetadataHeader*           m_header = nullptr;
         ABT_rwlock                m_lock = ABT_RWLOCK_NULL;
+        LRUCache<Chunk>           m_chunk_cache;
 
     };
 
