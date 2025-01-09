@@ -252,110 +252,6 @@ class LogDatabase : public DatabaseInterface {
                 ABT_rwlock_free(&m_lock);
         }
 
-        [[nodiscard]] Status append(const void* data, size_t size, yk_id_t* id) {
-            if(size > m_chunk_size)
-                return Status::SizeError;
-            ScopedWriteLock lock{m_lock};
-            uint64_t next_offset;
-            auto status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
-            if(status != Status::OK) return status;
-            auto last_chunk_id = m_header->last_chunk_id;
-            if(size > m_chunk_size - next_offset) {
-                last_chunk_id = m_header->last_chunk_id += 1;
-                m_last_chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(last_chunk_id),
-                        m_chunk_size);
-                // first 8 bytes of a chunk represent the next available offset - 8
-                next_offset = 8;
-            }
-            if(next_offset == 0) // happens when opening the very fist chunk
-                next_offset = 8;
-            // write the data
-            status = m_last_chunk->write(next_offset, data, size);
-            if(status != Status::OK) return status;
-            auto new_next_offset = next_offset + size;
-            // write the new offset
-            status = m_last_chunk->write(0, &new_next_offset, sizeof(new_next_offset));
-            if(status != Status::OK) return status;
-            // write the metadata for the entry
-            EntryMetadata entry{last_chunk_id, next_offset, size, size};
-            size_t meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*m_header->next_id;
-            status = m_meta->write(meta_offset, &entry, sizeof(entry));
-            if(status != Status::OK) return status;
-            // update the header of the metadata file
-            m_header->next_id += 1;
-            m_header->coll_size += 1;
-            flushHeader();
-            // return the ID of the document
-            *id = m_header->next_id - 1;
-            return Status::OK;
-        }
-
-        [[nodiscard]] Status update(yk_id_t id, const void* data, size_t size) {
-            if(size > m_chunk_size)
-                return Status::SizeError;
-            ScopedWriteLock lock{m_lock};
-            // read the current metadata for the entry
-            EntryMetadata entry;
-            auto meta_offset = sizeof(MetadataHeader) + sizeof(EntryMetadata)*id;
-            auto status = m_meta->read(meta_offset, &entry, sizeof(entry));
-            if(status != Status::OK) return status;
-
-            auto chunk = m_last_chunk;
-            if(size <= entry.allocated) {
-                // new entry is smaller than the allocated space, we can update in place
-                if(entry.chunk != m_header->last_chunk_id) {
-                    // not updating in the last chunk, we need to load the chunk
-                    chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(entry.chunk),
-                        m_chunk_size);
-                }
-                // update in place
-                status = chunk->write(entry.offset, data, size);
-                if(status != Status::OK) return status;
-                // update the entry
-                entry.size = size;
-                status = m_meta->write(meta_offset, &entry, sizeof(entry));
-                return status;
-            }
-
-            // new entry is larger than what was previously allocated,
-            // we need to append to the chunk
-
-            // first 8 bytes of a chunk represent the next offset
-            uint64_t next_offset;
-            status = m_last_chunk->read(0, &next_offset, sizeof(next_offset));
-            if(status != Status::OK) return status;
-            if(size > m_chunk_size - next_offset) {
-                m_header->last_chunk_id += 1;
-                m_last_chunk = std::make_shared<Chunk>(
-                        m_path_prefix + "/" + m_name + "." + std::to_string(m_header->last_chunk_id),
-                        m_chunk_size);
-                chunk = m_last_chunk;
-                next_offset = 8; // first 8 bytes of a chunk represent the next offset
-            }
-            if(next_offset == 0) // happens when opening the very fist chunk
-                next_offset = 8;
-
-            bool incr_coll_size = entry.size == YOKAN_KEY_NOT_FOUND; // previous entry was erased
-            // write the new data
-            status = chunk->write(next_offset, data, size);
-            if(status != Status::OK) return status;
-            auto new_next_offset = next_offset + size;
-            // write the new offset
-            status = chunk->write(0, &new_next_offset, sizeof(new_next_offset));
-            if(status != Status::OK) return status;
-            // write the metadata for the entry
-            entry = EntryMetadata{m_header->last_chunk_id, next_offset, size, size};
-            status = m_meta->write(meta_offset, &entry, sizeof(entry));
-            if(status != Status::OK) return status;
-            // update the header of the metadata file
-            if(incr_coll_size)
-                m_header->coll_size += 1;
-            flushHeader();
-            return Status::OK;
-        }
-
         [[nodiscard]] Status erase(uint64_t id) {
             if(id >= m_header->next_id)
                 return Status::InvalidID;
@@ -380,7 +276,7 @@ class LogDatabase : public DatabaseInterface {
             return Status::OK;
         }
 
-        [[nodiscard]] Status appendMulti(
+        [[nodiscard]] Status append(
                 size_t count, const char* data, const size_t* sizes,
                 yk_id_t* ids) {
             for(size_t i = 0; i < count; ++i) {
@@ -440,7 +336,7 @@ class LogDatabase : public DatabaseInterface {
             return status;
         }
 
-        [[nodiscard]] Status updateMulti(
+        [[nodiscard]] Status update(
                 size_t count, const yk_id_t* ids, const char* data, const size_t* sizes) {
             for(size_t i = 0; i < count; ++i) {
                 if(sizes[i] > m_chunk_size)
@@ -856,7 +752,7 @@ class LogDatabase : public DatabaseInterface {
         if(p == m_collections.end())
             return Status::NotFound;
         auto coll = p->second;
-        return coll->appendMulti(ids.size, documents.data, sizes.data, ids.data);
+        return coll->append(ids.size, documents.data, sizes.data, ids.data);
     }
 
     Status docUpdate(const char* collection,
@@ -879,7 +775,7 @@ class LogDatabase : public DatabaseInterface {
             }
         }
 
-        return coll->updateMulti(ids.size, ids.data, documents.data, sizes.data);
+        return coll->update(ids.size, ids.data, documents.data, sizes.data);
     }
 
     Status docLoad(const char* collection,
