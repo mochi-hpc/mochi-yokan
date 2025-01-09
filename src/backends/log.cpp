@@ -803,10 +803,10 @@ class LogDatabase : public DatabaseInterface {
                 size_t s = remaining;
                 status = coll->read(id, doc_ptr, &s);
                 if(status == Status::SizeError) {
-                    for(; i < count; ++i) {
-                        sizes[i] = YOKAN_SIZE_TOO_SMALL;
+                    for(size_t j = i; j < count; ++j) {
+                        sizes[j] = YOKAN_SIZE_TOO_SMALL;
                     }
-                    continue;
+                    break;
                 } else if(status == Status::NotFound || status == Status::InvalidID) {
                     sizes[i] = YOKAN_KEY_NOT_FOUND;
                     continue;
