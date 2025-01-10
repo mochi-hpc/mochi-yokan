@@ -302,6 +302,7 @@ class LogDatabase : public DatabaseInterface {
             if(offset + sizeof(MetadataHeader) > meta_size) {
                 auto status = m_meta->extend(2*meta_size);
                 if(status != Status::OK) return status;
+                m_header = static_cast<MetadataHeader*>(m_meta->base());
             }
             return m_meta->write(offset, &entry, sizeof(entry), do_flush);
         }
@@ -328,14 +329,23 @@ class LogDatabase : public DatabaseInterface {
                             m_header->chunk_size);
                 }
                 return m_last_chunk;
+            } else if(chunk_id == m_header->last_chunk_id + 1) {
+                m_last_chunk = std::make_shared<Chunk>(
+                        m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
+                        m_header->chunk_size);
+                m_header->last_chunk_id += 1;
+                flushHeader();
+                return m_last_chunk;
+            } else if(chunk_id < m_header->last_chunk_id) {
+                auto make_chunk = [&](uint64_t chunk_id) {
+                    return  std::make_shared<Chunk>(
+                            m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
+                            m_header->chunk_size);
+                };
+                return m_chunk_cache.get(chunk_id, make_chunk);
+            } else {
+                return std::shared_ptr<Chunk>();
             }
-            auto make_chunk = [&](uint64_t chunk_id) {
-                return  std::make_shared<Chunk>(
-                    m_path_prefix + "/" + m_name + "." + std::to_string(chunk_id),
-                    m_header->chunk_size);
-            };
-            auto chunk = m_chunk_cache.get(chunk_id, make_chunk);
-            return chunk;
         }
 
         public:
@@ -412,15 +422,14 @@ class LogDatabase : public DatabaseInterface {
             for(size_t i = 0; i < count; ++i) {
 
                 ids[i] = m_header->next_id;
-                auto last_chunk_id = m_header->last_chunk_id;
                 // check if we need to create a new chunk
                 if(sizes[i] > m_chunk_size - next_offset) {
                     // flush the previous chunk
                     (void)m_last_chunk->flush(0, next_offset);
-                    getChunkFromID(m_header->last_chunk_id);
-                    m_header->last_chunk_id += 1;
+                    getChunkFromID(m_header->last_chunk_id + 1);
                     next_offset  = 8;
                 }
+                auto last_chunk_id = m_header->last_chunk_id;
                 // write the data
                 status = m_last_chunk->write(next_offset, data + doc_offset, sizes[i], false);
                 if(status != Status::OK) break;
@@ -530,15 +539,14 @@ class LogDatabase : public DatabaseInterface {
                 }
                 // here we know the entry is one that needs to be appended.
 
-                auto last_chunk_id = m_header->last_chunk_id;
                 // check if we need to create a new chunk
                 if(sizes[i] > m_chunk_size - next_offset) {
                     // flush the previous chunk
                     (void)m_last_chunk->flush(0, next_offset);
                     getChunkFromID(m_header->last_chunk_id + 1);
-                    m_header->last_chunk_id += 1;
                     next_offset  = 8;
                 }
+                auto last_chunk_id = m_header->last_chunk_id;
                 bool coll_size_incr = entries[i].size == YOKAN_KEY_NOT_FOUND;
                 // write the data
                 status = m_last_chunk->write(next_offset, data + doc_offset, sizes[i], false);

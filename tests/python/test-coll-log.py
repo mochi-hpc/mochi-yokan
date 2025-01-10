@@ -21,7 +21,7 @@ class TestUpdate(unittest.TestCase):
         self.addr = self.engine.addr()
         self.hg_addr = self.addr.get_internal_hg_addr()
         self.provider_id = 42
-        confg = {
+        config = {
             "database": {
                 "type": "log",
                 "config": {
@@ -33,7 +33,7 @@ class TestUpdate(unittest.TestCase):
         }
         self.provider = Provider(mid=self.mid,
                                  provider_id=self.provider_id,
-                                 config='{"database":{"type":"map"}}')
+                                 config=json.dumps(config))
         self.client = Client(mid=self.mid)
         self.db = self.client.make_database_handle(
             address=self.hg_addr,
@@ -42,6 +42,7 @@ class TestUpdate(unittest.TestCase):
             name="matt")
 
     def tearDown(self):
+        self.db.drop_collection(name="matt")
         del self.coll
         del self.db
         del self.addr
