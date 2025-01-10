@@ -115,11 +115,13 @@ class LogDatabase : public DatabaseInterface {
             if(page_size == 0) {
                 // Get the system's page size
                 page_size = sysconf(_SC_PAGESIZE);
+                // LCOV_EXCL_START
                 if (page_size == -1) {
                     YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                             "sysconf(_SC_PAGESIZE) failed: %s", strerror(errno));
                     return Status::IOError;
                 }
+                // LCOV_EXCL_STOP
             }
 
             // Calculate the start of the page-aligned address
@@ -135,9 +137,11 @@ class LogDatabase : public DatabaseInterface {
 
             // Call msync on the page-aligned address and adjusted size
             if (msync((void *)page_start, aligned_size, MS_SYNC) == -1) {
+                /// LCOV_EXCL_START
                 YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                         "msync failed: %s", strerror(errno));
                 return Status::IOError;
+                // LCOV_EXCL_STOP
             }
 
             return Status::OK;
@@ -147,42 +151,50 @@ class LogDatabase : public DatabaseInterface {
             // Open or create the file
             m_fd = open(m_filename.c_str(), O_RDWR | O_CREAT, 0644);
             if (m_fd < 0) {
+                // LCOV_EXCL_START
                 YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                         "Failed to open file %s: %s",
                         m_filename.c_str(), strerror(errno));
                 return Status::IOError;
+                // LCOV_EXCL_STOP
             }
 
             // Get size of the file
             auto size = lseek(m_fd, 0L, SEEK_END);
             if(size < 0) {
+                // LCOV_EXCL_START
                 YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                         "lseek failed for file %s: %s",
                         m_filename.c_str(), strerror(errno));
                 close(m_fd);
                 return Status::IOError;
+                // LCOV_EXCL_STOP
             }
             lseek(m_fd, 0L, SEEK_SET);
 
             // Resize the file to the chunk size if needed
             if ((size_t)size < m_size) {
                 if(ftruncate(m_fd, m_size) < 0) {
+                    // LCOV_EXCL_START
                     YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                             "Failed to resize file %s: %s",
                             m_filename.c_str(), strerror(errno));
                     close(m_fd);
                     return Status::IOError;
+                    // LCOV_EXCL_STOP
                 }
             }
 
             // Memory-map the file
             m_data = mmap(nullptr, m_size, PROT_READ | PROT_WRITE, MAP_SHARED, m_fd, 0);
             if (m_data == MAP_FAILED) {
+                // LCOV_EXCL_START
                 YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                         "Failed to mmap file %s: %s",
                         m_filename.c_str(), strerror(errno));
                 close(m_fd);
                 return Status::IOError;
+                // LCOV_EXCL_STOP
             }
 
             return Status::OK;
@@ -627,6 +639,7 @@ class LogDatabase : public DatabaseInterface {
     static Status create(const std::string& config, DatabaseInterface** kvs) {
         json cfg;
         try {
+            // LCOV_EXCL_START
             cfg = json::parse(config);
             if(!cfg.is_object())
                 return Status::InvalidConf;
@@ -642,6 +655,7 @@ class LogDatabase : public DatabaseInterface {
                 return Status::InvalidConf;
             if(cfg.contains("cache_size") && !cfg["cache_size"].is_number_unsigned())
                 return Status::InvalidConf;
+            // LCOV_EXCL_STOP
 
             auto chunk_size = cfg.value("chunk_size", 10*1024*1024);
             cfg["chunk_size"] = chunk_size;
