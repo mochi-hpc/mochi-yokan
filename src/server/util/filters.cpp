@@ -309,6 +309,14 @@ struct CollectionFilterWrapper : public KeyPrefixFilter  {
         return m_doc_filter->docCopy(m_coll_name.c_str(), dst, max_dst_size, val, vsize);
     }
 
+    bool shouldStop(
+            const void* key, size_t ksize,
+            const void* val, size_t vsize) const override {
+        auto b = KeyPrefixFilter::shouldStop(key, ksize, val, vsize);
+        if(b) return b;
+        return m_doc_filter->shouldStop(m_coll_name.c_str(), val, vsize);
+    }
+
     static yk_id_t _ensureBigEndian(yk_id_t id) {
         #define IS_BIG_ENDIAN (*(uint16_t *)"\0\xff" < 0x100)
         if(IS_BIG_ENDIAN) {

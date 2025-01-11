@@ -38,7 +38,7 @@ extern "C" {
     X(YOKAN_ERR_KEY_EXISTS, "Key exists")                         \
     X(YOKAN_ERR_CORRUPTION, "Data corruption")                    \
     X(YOKAN_ERR_IO, "IO error")                                   \
-    X(YOKAN_ERR_INCOMPLETE, "Imcomplete operation")               \
+    X(YOKAN_ERR_INCOMPLETE, "Incomplete operation")               \
     X(YOKAN_ERR_TIMEOUT, "Timeout")                               \
     X(YOKAN_ERR_ABORTED, "Operation aborted")                     \
     X(YOKAN_ERR_BUSY, "Busy")                                     \
@@ -52,6 +52,7 @@ extern "C" {
     X(YOKAN_ERR_READONLY, "Read-only buffer")                     \
     X(YOKAN_ERR_MIGRATED, "Database has migrated")                \
     X(YOKAN_ERR_MID_NOT_LISTENING, "Margo instance not listening")\
+    X(YOKAN_STOP_ITERATION, "Stop iteration")                     \
     X(YOKAN_ERR_OTHER, "Other error")
 
 #define X(__err__, __msg__) __err__,

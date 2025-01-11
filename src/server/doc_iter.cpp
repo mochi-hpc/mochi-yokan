@@ -149,6 +149,9 @@ void yk_doc_iter_ult(hg_handle_t h)
     out.ret = static_cast<yk_return_t>(
         database->docIter(in.coll_name, in.mode, in.count, in.from_id, filter, doc_iter_func));
 
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
+
     auto ret = send_batch();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;
     ret = wait_for_previous_rpc();
@@ -279,6 +282,9 @@ void yk_doc_iter_direct_ult(hg_handle_t h)
 
     out.ret = static_cast<yk_return_t>(
         database->docIter(in.coll_name, in.mode, in.count, in.from_id, filter, doc_iter_func));
+
+    if(out.ret == YOKAN_STOP_ITERATION)
+        out.ret = YOKAN_SUCCESS;
 
     auto ret = send_batch();
     if(out.ret == YOKAN_SUCCESS) out.ret = ret;

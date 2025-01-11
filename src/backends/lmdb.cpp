@@ -142,6 +142,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
     static Status recover(
             const std::string& config,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
 
@@ -151,7 +152,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return Status::InvalidConf;
 
         if(files.empty()) return Status::IOError;
-        std::string path = files.front();
+        std::string path = root + "/" + files.front();
         path = path.substr(0, path.find_last_of('/'));
         cfg["path"] = path;
 

@@ -3,10 +3,12 @@
 #include <iostream>
 
 static const char* available_backends[] = {
+    "array",
     "map",
     "unordered_map",
     "set",
     "unordered_set",
+    "log",
 #ifdef YOKAN_HAS_LEVELDB
     "leveldb",
 #endif
@@ -35,10 +37,12 @@ static const char* available_backends[] = {
 };
 
 static const char* backend_configs[] = {
+    "{}",
     "{\"disable_doc_mixin_lock\":true}",
     "{\"disable_doc_mixin_lock\":true}",
     "{\"disable_doc_mixin_lock\":true}",
     "{\"disable_doc_mixin_lock\":true}",
+    "{\"path\":\"/tmp/log-test\"}",
 #ifdef YOKAN_HAS_LEVELDB
     "{\"path\":\"/tmp/leveldb-test\","
     " \"disable_doc_mixin_lock\":true,"

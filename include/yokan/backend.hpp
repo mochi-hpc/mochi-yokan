@@ -57,29 +57,30 @@ struct BitField {
  * @brief Status returned by all the backend functions.
  */
 enum class Status : uint8_t {
-    OK           = YOKAN_SUCCESS,
-    InvalidType  = YOKAN_ERR_INVALID_BACKEND,
-    InvalidConf  = YOKAN_ERR_INVALID_CONFIG,
-    InvalidArg   = YOKAN_ERR_INVALID_ARGS,
-    InvalidID    = YOKAN_ERR_INVALID_ID,
-    NotFound     = YOKAN_ERR_KEY_NOT_FOUND,
-    SizeError    = YOKAN_ERR_BUFFER_SIZE,
-    KeyExists    = YOKAN_ERR_KEY_EXISTS,
-    NotSupported = YOKAN_ERR_OP_UNSUPPORTED,
-    Corruption   = YOKAN_ERR_CORRUPTION,
-    IOError      = YOKAN_ERR_IO,
-    Incomplete   = YOKAN_ERR_INCOMPLETE,
-    TimedOut     = YOKAN_ERR_TIMEOUT,
-    Aborted      = YOKAN_ERR_ABORTED,
-    Busy         = YOKAN_ERR_BUSY,
-    Expired      = YOKAN_ERR_EXPIRED,
-    TryAgain     = YOKAN_ERR_TRY_AGAIN,
-    System       = YOKAN_ERR_SYSTEM,
-    Canceled     = YOKAN_ERR_CANCELED,
-    Permission   = YOKAN_ERR_PERMISSION,
-    InvalidMode  = YOKAN_ERR_MODE,
-    Migrated     = YOKAN_ERR_MIGRATED,
-    Other        = YOKAN_ERR_OTHER
+    OK            = YOKAN_SUCCESS,
+    InvalidType   = YOKAN_ERR_INVALID_BACKEND,
+    InvalidConf   = YOKAN_ERR_INVALID_CONFIG,
+    InvalidArg    = YOKAN_ERR_INVALID_ARGS,
+    InvalidID     = YOKAN_ERR_INVALID_ID,
+    NotFound      = YOKAN_ERR_KEY_NOT_FOUND,
+    SizeError     = YOKAN_ERR_BUFFER_SIZE,
+    KeyExists     = YOKAN_ERR_KEY_EXISTS,
+    NotSupported  = YOKAN_ERR_OP_UNSUPPORTED,
+    Corruption    = YOKAN_ERR_CORRUPTION,
+    IOError       = YOKAN_ERR_IO,
+    Incomplete    = YOKAN_ERR_INCOMPLETE,
+    TimedOut      = YOKAN_ERR_TIMEOUT,
+    Aborted       = YOKAN_ERR_ABORTED,
+    Busy          = YOKAN_ERR_BUSY,
+    Expired       = YOKAN_ERR_EXPIRED,
+    TryAgain      = YOKAN_ERR_TRY_AGAIN,
+    System        = YOKAN_ERR_SYSTEM,
+    Canceled      = YOKAN_ERR_CANCELED,
+    Permission    = YOKAN_ERR_PERMISSION,
+    InvalidMode   = YOKAN_ERR_MODE,
+    Migrated      = YOKAN_ERR_MIGRATED,
+    StopIteration = YOKAN_STOP_ITERATION,
+    Other         = YOKAN_ERR_OTHER
 };
 
 /**
@@ -727,10 +728,11 @@ class DatabaseFactory {
             const std::string& backendType,
             const std::string& dbConfig,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files,
             DatabaseInterface** kvs) {
         if(!hasBackendType(backendType)) return Status::InvalidType;
-        return recover_fn[backendType](dbConfig, migrationConfig, files, kvs);
+        return recover_fn[backendType](dbConfig, migrationConfig, root, files, kvs);
     }
 
     /**
@@ -755,9 +757,10 @@ class DatabaseFactory {
     static std::unordered_map<
                 std::string,
                 std::function<Status(
-                        const std::string&,
-                        const std::string&,
-                        const std::list<std::string>&,
+                        const std::string&, /* config */
+                        const std::string&, /* migration config */
+                        const std::string&, /* root */
+                        const std::list<std::string>&, /* file names (without root) */
                         DatabaseInterface**)>>
         recover_fn; /*!< Map of factory functions for each backend type */
 };
@@ -777,7 +780,7 @@ template <typename T> class __YOKANBackendRegistration {
     template<typename ... U> using void_t = void;
 
     template<typename U> using recover_t =
-        decltype(U::recover("", "", {}, nullptr));
+        decltype(U::recover("", "", "", {}, nullptr));
 
     template<typename U, typename = void_t<>>
     struct has_recover : std::false_type {};
@@ -805,9 +808,10 @@ template <typename T> class __YOKANBackendRegistration {
         ::yokan::DatabaseFactory::recover_fn[backend_name] =
             [](const std::string &database_config,
                const std::string& migration_config,
+               const std::string& root,
                const std::list<std::string>& files,
                ::yokan::DatabaseInterface** kvs) {
-                return call_recover<T>(has_recover<T>{}, database_config, migration_config, files, kvs);
+                return call_recover<T>(has_recover<T>{}, database_config, migration_config, root, files, kvs);
             };
     }
 };

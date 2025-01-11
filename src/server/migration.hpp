@@ -68,10 +68,6 @@ static inline int32_t after_migration_cb(remi_fileset_t fileset, void* uargs)
     remi_fileset_get_metadata(fileset, "db_config", &db_config);
     remi_fileset_get_metadata(fileset, "migration_config", &migration_config);
 
-    std::cerr << "TYPE: " << type << std::endl;
-    std::cerr << "DB CONFIG: " << db_config << std::endl;
-    std::cerr << "MIG CONFIG: " << migration_config << std::endl;
-
     auto json_db_config = json::parse(db_config);
     auto json_mig_config = json::parse(migration_config);
 
@@ -91,13 +87,10 @@ static inline int32_t after_migration_cb(remi_fileset_t fileset, void* uargs)
     if(rret != REMI_SUCCESS) return YOKAN_ERR_FROM_REMI;
 
     auto root_str = std::string{root.data()};
-    for(auto& filename : files) {
-        filename = root_str + "/" + filename;
-    }
 
     yk_database_t database;
     auto status = yokan::DatabaseFactory::recoverDatabase(
-        type, db_config, migration_config, files, &database);
+        type, db_config, migration_config, root_str, files, &database);
     if(status != yokan::Status::OK) {
         YOKAN_LOG_ERROR(provider->mid,
             "Could not recover database: DatabaseFactory::recoverDatabase returned %d",

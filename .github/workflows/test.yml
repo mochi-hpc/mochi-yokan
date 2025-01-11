@@ -57,8 +57,7 @@ jobs:
                  -DENABLE_UNQLITE=ON \
                  -DENABLE_LUA=ON \
                  -DENABLE_PYTHON=ON \
-                 -DENABLE_REMI=ON \
-                 -DENABLE_YCSB=ON
+                 -DENABLE_REMI=ON
         make
         ctest --output-on-failure
 

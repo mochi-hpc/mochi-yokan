@@ -113,10 +113,11 @@ class UnorderedSetDatabase : public DatabaseInterface {
     static Status recover(
             const std::string& config,
             const std::string& migrationConfig,
+            const std::string& root,
             const std::list<std::string>& files, DatabaseInterface** kvs) {
         (void)migrationConfig;
         if(files.size() != 1) return Status::InvalidArg;
-        auto filename = files.front();
+        auto filename = root + "/" + files.front();
         std::ifstream ifs(filename.c_str(), std::ios::binary);
         if(!ifs.good()) {
             return Status::IOError;
