@@ -30,31 +30,45 @@ class BackendType:
     is_sorted: bool = True
     has_values: bool = True
     is_persistent: bool = True
+    has_collections: bool = True
+    has_keyval: bool = True
 
 
 class YokanSpaceBuilder(ProviderConfigSpaceBuilder):
 
     _backends = [
-        BackendType(name='map', is_persistent=False),
-        BackendType(name='unordered_map', is_sorted=False, is_persistent=False),
-        BackendType(name='set', is_persistent=False, has_values=False),
-        BackendType(name='unordered_set', is_sorted=False, is_persistent=False, has_values=False),
+        BackendType(name='map',
+                    is_persistent=False, has_collections=True),
+        BackendType(name='unordered_map',
+                    is_sorted=False, is_persistent=False, has_collections=True),
+        BackendType(name='set',
+                    is_persistent=False, has_values=False, has_collections=False),
+        BackendType(name='unordered_set',
+                    is_sorted=False, is_persistent=False, has_values=False, has_collections=False),
         BackendType(name='rocksdb'),
         BackendType(name='leveldb'),
         BackendType(name='berkeleydb'),
         BackendType(name='lmdb'),
         BackendType(name='tkrzw'),
         BackendType(name='unqlite'),
-        BackendType(name='gdbm', is_sorted=False),
+        BackendType(name='gdbm',
+                    is_sorted=False),
+        BackendType(name='array',
+                    is_persistent=False, has_collections=True, has_keyval=False),
+        BackendType(name='log',
+                    has_collections=True, has_keyval=False),
     ]
 
     def __init__(self, *,
                  types: list[str] = ['map', 'unordered_map', 'set', 'unordered_set', 'rocksdb',
-                                    'leveldb', 'berkeleydb', 'lmdb', 'tkrzw', 'unqlite', 'gdbm'],
+                                    'leveldb', 'berkeleydb', 'lmdb', 'tkrzw', 'unqlite', 'gdbm',
+                                     'array', 'log'],
                  paths: list[str] = [],
                  need_sorted_db: bool = True,
                  need_values: bool = True,
                  need_persistence: bool = False,
+                 need_collections: bool = True,
+                 need_keyval: bool = True,
                  tags: list[str] = []):
         from .backends import available_backends
         if need_persistence and len(paths) == 0:
@@ -64,6 +78,8 @@ class YokanSpaceBuilder(ProviderConfigSpaceBuilder):
             ((not need_sorted_db) or b.is_sorted) and \
             ((not need_values) or b.has_values) and \
             ((not need_persistence) or b.is_persistent) and \
+            ((not need_collections) or b.has_collections) and \
+            ((not need_keyval) or b.has_keyval) and \
             b.name in types]
         self.paths = paths
         self.tags = tags

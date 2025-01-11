@@ -88,7 +88,7 @@ pkg_check_modules (margo REQUIRED IMPORTED_TARGET margo)
 # search for tclap
 pkg_check_modules (tclap REQUIRED IMPORTED_TARGET tclap)
 
-set (YOKAN_BACKEND_LIST map;unordered_map;set;unordered_set)
+set (YOKAN_BACKEND_LIST map;unordered_map;set;unordered_set;array;log)
 
 if (ENABLE_LEVELDB)
     pkg_check_modules (leveldb REQUIRED IMPORTED_TARGET leveldb)
