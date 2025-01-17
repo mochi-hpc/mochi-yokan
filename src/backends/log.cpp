@@ -136,14 +136,13 @@ class LogDatabase : public DatabaseInterface {
             }
 
             // Call msync on the page-aligned address and adjusted size
-            if (msync((void *)page_start, aligned_size, MS_SYNC) == -1) {
+            if (msync((void *)page_start, aligned_size, MS_ASYNC) == -1) {
                 /// LCOV_EXCL_START
                 YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
                         "msync failed: %s", strerror(errno));
                 return Status::IOError;
                 // LCOV_EXCL_STOP
             }
-
             return Status::OK;
         }
 
@@ -363,7 +362,7 @@ class LogDatabase : public DatabaseInterface {
             // open the metadata file of the collection
             m_meta = std::make_shared<MetaFile>(
                     m_path_prefix + "/" + name + ".meta",
-                    3*8*4096);
+                    8*8*4096);
             // associate the header
             m_header = static_cast<MetadataHeader*>(m_meta->base());
             m_header->chunk_size = chunk_size;
@@ -662,6 +661,8 @@ class LogDatabase : public DatabaseInterface {
             if(cfg.contains("use_lock") && !cfg["use_lock"].is_boolean())
                 return Status::InvalidConf;
             if(cfg.contains("cache_size") && !cfg["cache_size"].is_number_unsigned())
+                return Status::InvalidConf;
+            if(cfg.contains("msync_interval") && !cfg["msync_interval"].is_number_unsigned())
                 return Status::InvalidConf;
             // LCOV_EXCL_STOP
 
@@ -1115,6 +1116,7 @@ class LogDatabase : public DatabaseInterface {
         m_path = m_config["path"].get<std::string>();
         m_chunk_size = m_config["chunk_size"].get<size_t>();
         m_cache_size = m_config["cache_size"].get<size_t>();
+        m_msync_interval = m_config.value("msync_interval", std::numeric_limits<size_t>::max());
         // lookup existing collections
         for (auto const& entry : std::filesystem::directory_iterator{m_path}) {
             if(!entry.is_regular_file())
@@ -1141,6 +1143,7 @@ class LogDatabase : public DatabaseInterface {
     size_t                           m_chunk_size;
     size_t                           m_cache_size;
     std::atomic<bool>                m_migrated{false};
+    size_t                           m_msync_interval;
 };
 
 }
