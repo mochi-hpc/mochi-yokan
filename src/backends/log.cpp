@@ -43,7 +43,6 @@ namespace yokan {
 
 using json = nlohmann::json;
 
-
 class LogDatabase : public DatabaseInterface {
 
     template <typename T>
@@ -111,6 +110,7 @@ class LogDatabase : public DatabaseInterface {
     class MemoryMappedFile {
 
         [[nodiscard]] Status syncMemory(void *addr, size_t size) {
+#if 0
             static long page_size = 0;
             if(page_size == 0) {
                 // Get the system's page size
@@ -143,6 +143,7 @@ class LogDatabase : public DatabaseInterface {
                 return Status::IOError;
                 // LCOV_EXCL_STOP
             }
+#endif
             return Status::OK;
         }
 
@@ -674,7 +675,7 @@ class LogDatabase : public DatabaseInterface {
             cfg["create_if_missing"] = create_if_missing;
             auto error_if_exists = cfg.value("error_if_exists", false);
             cfg["error_if_exists"] = error_if_exists;
-            auto use_lock = cfg.value("use_lock", true);
+            auto use_lock = cfg.value("use_lock", false);
             cfg["use_lock"] = use_lock;
         } catch(...) {
             return Status::InvalidConf;
