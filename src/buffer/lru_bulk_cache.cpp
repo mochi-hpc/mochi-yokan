@@ -30,7 +30,7 @@ using map_t      = std::map<yk_buffer_t, iterator_t, bulk_less>;
 
 struct lru_bulk_cache {
     margo_instance_id          mid;
-    std::atomic<unsigned long> num_allocated;
+    std::atomic<unsigned long> num_in_use;
 
     list_t buffer_queue_readonly;
     map_t  buffer_set_readonly;
@@ -49,7 +49,7 @@ struct lru_bulk_cache {
 void* lru_bulk_cache_init(margo_instance_id mid, const char* config) {
     auto cache = new lru_bulk_cache;
     cache->mid = mid;
-    cache->num_allocated = 0;
+    cache->num_in_use = 0;
     auto cfg = json::parse(config);
     if(cfg.contains("margin") && cfg["margin"].is_number()) {
         cache->margin = cfg["margin"].get<float>();
@@ -69,12 +69,12 @@ void* lru_bulk_cache_init(margo_instance_id mid, const char* config) {
 
 void lru_bulk_cache_finalize(void* c) {
     auto cache = static_cast<lru_bulk_cache*>(c);
-    auto num_allocated = cache->num_allocated.load();
-    if(num_allocated != 0) {
+    auto num_in_use = cache->num_in_use.load();
+    if(num_in_use != 0) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
-            "%ld buffers have not been released to the bulk cache",
-            num_allocated);
+            "%lu buffers have not been released to the bulk cache",
+            num_in_use);
         // LCOV_EXCL_STOP
     }
     ABT_mutex_free(&cache->buffer_set_mtx);
@@ -123,6 +123,7 @@ yk_buffer_t lru_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
         auto result = it->first;
         list->erase(it->second);
         map->erase(it);
+        cache->num_in_use += 1;
         ABT_mutex_unlock(cache->buffer_set_mtx);
         return result;
     }
@@ -133,7 +134,6 @@ yk_buffer_t lru_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     size_t buf_size = size*(1.0 + cache->margin);
 
     auto buffer = new yk_buffer{buf_size, mode, nullptr, HG_BULK_NULL};
-    cache->num_allocated += 1;
     buffer->data          = new (std::nothrow) char[buf_size];
     if(!buffer->data) {
         // LCOV_EXCL_START
@@ -159,12 +159,13 @@ yk_buffer_t lru_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
         return nullptr;
         // LCOV_EXCL_STOP
     }
+    cache->num_in_use += 1;
     return buffer;
 }
 
 void lru_bulk_cache_release(void* c, yk_buffer_t buffer) {
     auto cache = static_cast<lru_bulk_cache*>(c);
-    cache->num_allocated -= 1;
+    cache->num_in_use -= 1;
 
     static auto release = [](lru_bulk_cache* cache, map_t& map, list_t& list, yk_buffer_t buffer) {
         list.push_front(buffer);
