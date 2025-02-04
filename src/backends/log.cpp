@@ -340,6 +340,7 @@ class LogDatabase : public DatabaseInterface {
         [[nodiscard]] Status write(size_t offset, const void* buffer, size_t size, bool do_flush = true) {
             if (offset + size > m_size)
                 return Status::SizeError;
+            if(size == 0) return Status::OK;
             auto s = pwrite(m_fd, buffer, size, offset);
             if(s != size) return Status::Other;
             if(do_flush) return flush(offset, size);
@@ -349,6 +350,7 @@ class LogDatabase : public DatabaseInterface {
         [[nodiscard]] Status read(size_t offset, void* buffer, size_t size) const {
             if (offset + size > m_size)
                 return Status::SizeError;
+            if(size == 0) return Status::OK;
             auto s = pread(m_fd, buffer, size, offset);
             if(s != size) return Status::Other;
             return Status::OK;
@@ -369,6 +371,7 @@ class LogDatabase : public DatabaseInterface {
                 return Status::SizeError;
             if (size == 0) return Status::OK;
             fsync(m_fd);
+            return Status::OK;
         }
 
         [[nodiscard]] Status extend(size_t new_size) {
