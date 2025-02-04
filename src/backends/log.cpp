@@ -274,7 +274,122 @@ class LogDatabase : public DatabaseInterface {
         void*       m_data = nullptr;
     };
 
-    using Chunk = MemoryMappedFile;
+    class ChunkFile {
+
+        [[nodiscard]] Status openFile() {
+            // Open or create the file
+            m_fd = open(m_filename.c_str(), O_RDWR | O_CREAT, 0644);
+            if (m_fd < 0) {
+                // LCOV_EXCL_START
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "Failed to open file %s: %s",
+                        m_filename.c_str(), strerror(errno));
+                return Status::IOError;
+                // LCOV_EXCL_STOP
+            }
+
+            // Get size of the file
+            auto size = lseek(m_fd, 0L, SEEK_END);
+            if(size < 0) {
+                // LCOV_EXCL_START
+                YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                        "lseek failed for file %s: %s",
+                        m_filename.c_str(), strerror(errno));
+                close(m_fd);
+                return Status::IOError;
+                // LCOV_EXCL_STOP
+            }
+            lseek(m_fd, 0L, SEEK_SET);
+
+            // Resize the file to the chunk size if needed
+            if ((size_t)size < m_size) {
+                if(ftruncate(m_fd, m_size) < 0) {
+                    // LCOV_EXCL_START
+                    YOKAN_LOG_ERROR(MARGO_INSTANCE_NULL,
+                            "Failed to resize file %s: %s",
+                            m_filename.c_str(), strerror(errno));
+                    close(m_fd);
+                    return Status::IOError;
+                    // LCOV_EXCL_STOP
+                }
+            }
+
+            return Status::OK;
+        }
+
+        public:
+
+        ChunkFile(const std::string& filename, size_t size)
+        : m_filename(filename)
+        , m_size(size) {
+            auto status = openFile();
+            if(status != Status::OK)
+                throw status;
+        }
+
+        ~ChunkFile() {
+            if (m_fd >= 0) close(m_fd);
+        }
+
+        // Disable copy and move semantics
+        ChunkFile(const ChunkFile&) = delete;
+        ChunkFile& operator=(const ChunkFile&) = delete;
+        ChunkFile(ChunkFile&&) = delete;
+        ChunkFile& operator=(ChunkFile&&) = delete;
+
+        [[nodiscard]] Status write(size_t offset, const void* buffer, size_t size, bool do_flush = true) {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            auto s = pwrite(m_fd, buffer, size, offset);
+            if(s != size) return Status::Other;
+            if(do_flush) return flush(offset, size);
+            return Status::OK;
+        }
+
+        [[nodiscard]] Status read(size_t offset, void* buffer, size_t size) const {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            auto s = pread(m_fd, buffer, size, offset);
+            if(s != size) return Status::Other;
+            return Status::OK;
+        }
+
+        template<typename Function>
+        [[nodiscard]] Status fetch(size_t offset, size_t size, Function&& func) {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            std::vector<char> buffer(size);
+            auto status = read(offset, buffer.data(), size);
+            if(status != Status::OK) return status;
+            return func(UserMem{buffer.data(), size});
+        }
+
+        [[nodiscard]] Status flush(size_t offset, size_t size) {
+            if (offset + size > m_size)
+                return Status::SizeError;
+            if (size == 0) return Status::OK;
+            fsync(m_fd);
+        }
+
+        [[nodiscard]] Status extend(size_t new_size) {
+            if (new_size <= m_size) return Status::OK;
+            if (m_fd >= 0) close(m_fd);
+            m_size = new_size;
+            return openFile();
+        }
+
+        [[nodiscard]] size_t size() const {
+            return m_size;
+        }
+
+        private:
+
+        std::string m_filename;
+        size_t      m_size;
+        int         m_fd = -1;
+    };
+
+    using Chunk = ChunkFile;
     using MetaFile = MemoryMappedFile;
 
     class Collection {
