@@ -141,6 +141,7 @@ set (yokan-vers "${YOKAN_VERSION_MAJOR}.${YOKAN_VERSION_MINOR}")
 # and what to link against)
 add_library (yokan-headers INTERFACE)
 target_include_directories (yokan-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries (yokan-headers INTERFACE PkgConfig::margo)
 
 if (ENABLE_REMI)
   set (OPTIONAL_REMI remi)
