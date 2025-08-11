@@ -236,7 +236,12 @@ extern "C" yk_return_t yk_database_handle_create(
         char buffer[sizeof("yokan")];
         size_t bufsize = sizeof("yokan");
         ret = margo_provider_get_identity(client->mid, addr, provider_id, buffer, &bufsize);
-        if(ret != HG_SUCCESS || strcmp("yokan", buffer) != 0)
+        if(ret != HG_SUCCESS) {
+            margo_debug(client->mid,
+                "margo_provider_get_identity failed with error code %d", ret);
+            return YOKAN_ERR_OTHER;
+        }
+        if(strcmp("yokan", buffer) != 0)
             return YOKAN_ERR_INVALID_PROVIDER;
     }
 
