@@ -16,16 +16,14 @@ class TestExists(unittest.TestCase):
 
     def setUp(self):
         self.engine = Engine('tcp')
-        self.mid = self.engine.get_internal_mid()
         self.addr = self.engine.addr()
-        self.hg_addr = self.addr.get_internal_hg_addr()
         self.provider_id = 42
-        self.provider = Provider(mid=self.mid,
+        self.provider = Provider(engine=self.engine,
                                  provider_id=self.provider_id,
                                  config='{"database":{"type":"map"}}')
-        self.client = Client(mid=self.mid)
+        self.client = Client(engine=self.engine)
         self.db = self.client.make_database_handle(
-            address=self.hg_addr,
+            address=self.addr,
             provider_id=self.provider_id)
         self.reference_true = dict()
         self.reference_false = dict()
@@ -48,9 +46,7 @@ class TestExists(unittest.TestCase):
     def tearDown(self):
         del self.db
         del self.addr
-        del self.hg_addr
         del self.client
-        del self.mid
         del self.provider
         del self.reference_true
         del self.reference_false

@@ -653,7 +653,17 @@ PYBIND11_MODULE(pyyokan_client, m) {
     py::class_<yokan::Client>(m, "Client")
 
         .def(py::init<py_margo_instance_id>(), "mid"_a)
-
+        .def(py::init([](py::object engine) {
+            py::object mid_attr = engine.attr("mid");
+            py::object mid;
+            if (PyCallable_Check(mid_attr.ptr())) {
+                mid = mid_attr();
+            } else {
+                mid = mid_attr;
+            }
+            py::capsule mid_capsule = mid.cast<py::capsule>();
+            return new yokan::Client(mid_capsule);
+        }), "engine"_a)
         .def("make_database_handle",
              [](const yokan::Client& client,
                 py_hg_addr_t addr,
@@ -661,7 +671,25 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 bool check) {
                 return client.makeDatabaseHandle(addr, provider_id, check);
              },
-             "address"_a, "provider_id"_a, "check"_a=true);
+             "address"_a, "provider_id"_a, "check"_a=true,
+             py::keep_alive<0, 1>())
+        .def("make_database_handle",
+             [](const yokan::Client& client,
+                py::object addr_obj,
+                uint16_t provider_id,
+                bool check) {
+                py::object addr_attr = addr_obj.attr("hg_addr");
+                py::object addr;
+                if (PyCallable_Check(addr_attr.ptr())) {
+                    addr = addr_attr();
+                } else {
+                    addr = addr_attr;
+                }
+                py::capsule addr_capsule = addr.cast<py::capsule>();
+                return client.makeDatabaseHandle(addr_capsule, provider_id, check);
+             },
+             "address"_a, "provider_id"_a, "check"_a=true,
+             py::keep_alive<0, 1>());
 
     py::class_<yokan::Database>(m, "Database")
         // --------------------------------------------------------------

@@ -17,9 +17,7 @@ class TestUpdate(unittest.TestCase):
 
     def setUp(self):
         self.engine = Engine('tcp')
-        self.mid = self.engine.get_internal_mid()
         self.addr = self.engine.addr()
-        self.hg_addr = self.addr.get_internal_hg_addr()
         self.provider_id = 42
         config = {
             "database": {
@@ -31,12 +29,12 @@ class TestUpdate(unittest.TestCase):
                 }
             }
         }
-        self.provider = Provider(mid=self.mid,
+        self.provider = Provider(engine=self.engine,
                                  provider_id=self.provider_id,
                                  config=json.dumps(config))
-        self.client = Client(mid=self.mid)
+        self.client = Client(engine=self.engine)
         self.db = self.client.make_database_handle(
-            address=self.hg_addr,
+            address=self.addr,
             provider_id=self.provider_id)
         self.coll = self.db.create_collection(
             name="matt")
@@ -46,9 +44,7 @@ class TestUpdate(unittest.TestCase):
         del self.coll
         del self.db
         del self.addr
-        del self.hg_addr
         del self.client
-        del self.mid
         del self.provider
         self.engine.finalize()
 

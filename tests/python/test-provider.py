@@ -17,7 +17,7 @@ class TestInitProvider(unittest.TestCase):
         engine = Engine('tcp')
         self.assertIsInstance(engine, Engine)
         provider = Provider(
-            mid=engine.get_internal_mid(),
+            engine=engine,
             provider_id=42,
             config='{"database":{"type":"map"}}')
         engine.finalize()
@@ -27,11 +27,11 @@ class TestInitProvider(unittest.TestCase):
         engine = Engine('tcp')
         self.assertIsInstance(engine, Engine)
         provider1 = Provider(
-            mid=engine.get_internal_mid(),
+            engine=engine,
             provider_id=42,
             config='{"database":{"type":"map"}}')
         provider2 = Provider(
-            mid=engine.get_internal_mid(),
+            engine=engine,
             provider_id=35,
             config='{"database":{"type":"map"}}')
         engine.finalize()
@@ -42,12 +42,12 @@ class TestInitProvider(unittest.TestCase):
         engine = Engine('tcp')
         self.assertIsInstance(engine, Engine)
         provider1 = Provider(
-            mid=engine.get_internal_mid(),
+            engine=engine,
             provider_id=42,
             config='{"database":{"type":"map"}}')
         with self.assertRaises(yokan.Exception):
             provider2 = Provider(
-                mid=engine.get_internal_mid(),
+                engine=engine,
                 provider_id=42,
                 config='{"database":{"type":"map"}}')
         engine.finalize()

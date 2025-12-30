@@ -22,5 +22,19 @@ PYBIND11_MODULE(pyyokan_server, m) {
                       const char*>(),
              "mid"_a,
              "provider_id"_a,
-             "config"_a);
+             "config"_a)
+        .def(py::init([](py::object engine, uint16_t provider_id, const char* config) {
+            // Get mid from engine
+            py::object mid_attr = engine.attr("mid");
+            py::object mid;
+            if (PyCallable_Check(mid_attr.ptr())) {
+                mid = mid_attr();
+            } else {
+                mid = mid_attr;
+            }
+            py::capsule mid_capsule = mid.cast<py::capsule>();
+
+            // Create provider
+            return new yokan::Provider(mid_capsule, provider_id, config);
+        }), "engine"_a, "provider_id"_a, "config"_a);
 }
