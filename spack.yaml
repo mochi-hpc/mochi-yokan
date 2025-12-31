@@ -41,3 +41,5 @@ spack:
       require: "@0.2.0:"
     mochi-bedrock:
       require: "@0.15.0:"
+    py-mochi-margo:
+      require: "@0.6.0:"

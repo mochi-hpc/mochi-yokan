@@ -9,7 +9,7 @@ from typing import Optional
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
-from pymargo.core import Engine
+from mochi.margo import Engine
 from mochi.yokan.client import Exception
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider

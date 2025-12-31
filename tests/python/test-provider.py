@@ -5,9 +5,9 @@ import unittest
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
+from mochi.margo import Engine
 from mochi.yokan.server import Exception
 from mochi.yokan.server import Provider
-from pymargo.core import Engine
 
 class TestInitProvider(unittest.TestCase):
 
