@@ -9,9 +9,8 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyyokan_common as yokan
-from pyyokan_client import Client
-from pyyokan_server import Provider
+from mochi.yokan.client import Client
+from mochi.yokan.server import Provider
 
 class TestUpdate(unittest.TestCase):
 

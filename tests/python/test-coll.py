@@ -9,9 +9,9 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyyokan_common as yokan
-from pyyokan_client import Client, Database, Collection
-from pyyokan_server import Provider
+from mochi.yokan.client import Exception
+from mochi.yokan.client import Client, Database, Collection
+from mochi.yokan.server import Provider
 
 class TestCollection(unittest.TestCase):
 
@@ -37,7 +37,7 @@ class TestCollection(unittest.TestCase):
     def test_create_collection(self):
         """Test collection creation."""
         self.db.create_collection("matthieu")
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.db.create_collection("matthieu")
         self.db.create_collection("phil")
 

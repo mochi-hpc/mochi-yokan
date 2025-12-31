@@ -7,11 +7,12 @@ import string
 
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
+print(sys.path)
 
 from pymargo.core import Engine
-import pyyokan_common as yokan
-from pyyokan_client import Client
-from pyyokan_server import Provider
+from mochi.yokan.client import Exception
+from mochi.yokan.client import Client
+from mochi.yokan.server import Provider
 
 class TestCollErase(unittest.TestCase):
 
@@ -52,7 +53,7 @@ class TestCollErase(unittest.TestCase):
                 self.coll.erase(id=i)
         for i in range(len(self.reference)):
             if i % 2 == 0:
-                with self.assertRaises(yokan.Exception):
+                with self.assertRaises(Exception):
                     doc = bytearray(128)
                     self.coll.load(id=i, buffer=doc)
             else:
@@ -68,7 +69,7 @@ class TestCollErase(unittest.TestCase):
         self.coll.erase_multi(ids=ids)
         for i in range(len(self.reference)):
             if i % 2 == 0:
-                with self.assertRaises(yokan.Exception):
+                with self.assertRaises(Exception):
                     doc = bytearray(128)
                     self.coll.load(id=i, buffer=doc)
             else:

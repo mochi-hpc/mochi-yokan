@@ -5,8 +5,8 @@ import unittest
 wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
-import pyyokan_common as yokan
-from pyyokan_server import Provider
+from mochi.yokan.server import Exception
+from mochi.yokan.server import Provider
 from pymargo.core import Engine
 
 class TestInitProvider(unittest.TestCase):
@@ -45,7 +45,7 @@ class TestInitProvider(unittest.TestCase):
             engine=engine,
             provider_id=42,
             config='{"database":{"type":"map"}}')
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             provider2 = Provider(
                 engine=engine,
                 provider_id=42,

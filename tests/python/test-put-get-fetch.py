@@ -10,9 +10,9 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyyokan_common as yokan
-from pyyokan_client import Client
-from pyyokan_server import Provider
+from mochi.yokan.client import Exception
+from mochi.yokan.client import Client
+from mochi.yokan.server import Provider
 
 class TestPutGetFetch(unittest.TestCase):
 
@@ -53,7 +53,7 @@ class TestPutGetFetch(unittest.TestCase):
             vsize = self.db.get(key=k, value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.db.get(key='xxxxx', value=out_val)
 
     def test_put_get_buffers(self):
@@ -67,7 +67,7 @@ class TestPutGetFetch(unittest.TestCase):
                                 value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.db.get(key=bytearray(b'xxxxx'), value=out_val)
 
     def test_put_fetch_strings(self):
@@ -80,7 +80,7 @@ class TestPutGetFetch(unittest.TestCase):
                 self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
             self.db.fetch(key=k_ref, callback=compare)
 
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.db.fetch(key='xxxxx', callback=compare)
 
     def test_put_fetch_buffers(self):
@@ -94,7 +94,7 @@ class TestPutGetFetch(unittest.TestCase):
                 self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
             self.db.fetch(key=bytearray(k_ref.encode('ascii')), callback=compare)
 
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.db.fetch(key=bytearray(b'xxxxx'), callback=compare)
 
     def test_put_get_partial(self):

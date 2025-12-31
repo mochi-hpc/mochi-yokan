@@ -9,9 +9,9 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-import pyyokan_common as yokan
-from pyyokan_client import Client
-from pyyokan_server import Provider
+from mochi.yokan.client import Exception
+from mochi.yokan.client import Client
+from mochi.yokan.server import Provider
 
 class TestStoreLoad(unittest.TestCase):
 
@@ -51,7 +51,7 @@ class TestStoreLoad(unittest.TestCase):
             docsize = self.coll.length(id=i)
             self.assertEqual(docsize, len(doc))
 
-        with self.assertRaises(yokan.Exception):
+        with self.assertRaises(Exception):
             self.coll.length(id=len(self.reference)+4)
 
     def test_length_multi(self):

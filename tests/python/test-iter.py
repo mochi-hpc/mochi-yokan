@@ -10,8 +10,8 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from pymargo.core import Engine
-from pyyokan_client import Client
-from pyyokan_server import Provider
+from mochi.yokan.client import Client
+from mochi.yokan.server import Provider
 
 class TestIter(unittest.TestCase):
 

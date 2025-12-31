@@ -27,6 +27,8 @@ if (ENABLE_PYTHON)
         get_filename_component (test-target ${test-python-source} NAME_WE)
         set (test-target "${test-target}-python")
         add_test (NAME ${test-target} COMMAND ${Python3_EXECUTABLE} ${test-python-source})
+        set_property (TEST ${test-target} PROPERTY ENVIRONMENT
+                      PYTHONPATH=${CMAKE_SOURCE_DIR}/python/:${CMAKE_BINARY_DIR}/python:$ENV{PYTHONPATH})
     endforeach ()
 endif ()
 
