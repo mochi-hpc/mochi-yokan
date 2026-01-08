@@ -297,7 +297,9 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         }
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -324,7 +326,9 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -333,7 +337,7 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
                          const BasicUserMem<size_t>& ksizes) override {
         (void)mode;
         size_t offset = 0;
-        ScopedReadLock lock(m_lock);
+        ScopedWriteLock lock(m_lock);
         if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
