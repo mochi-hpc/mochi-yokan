@@ -1267,7 +1267,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 return yokan::Collection(name.c_str(), db);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("__getitem__",
+        .def("open_collection",
              [](const yokan::Database& db, const std::string& name) {
                 return yokan::Collection(name.c_str(), db);
              },
