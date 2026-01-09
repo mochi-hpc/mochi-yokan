@@ -181,10 +181,8 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
     // with a NULL handler. We need to re-register them with a valid handler.
 
 #define RE_REGISTER(field, name, in_t, out_t, ult) do {          \
-    fprintf(stderr, "trying to register " name "\n");            \
     margo_registered_name(mid, name, &id, &flag);                \
     if(flag == HG_TRUE) {                                        \
-        fprintf(stderr, name " is registered, deregistering\n"); \
         margo_deregister(mid, id);                               \
     }                                                            \
     c->field = MARGO_REGISTER(mid, name, in_t, out_t, ult);      \
