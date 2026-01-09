@@ -10,6 +10,7 @@
 #include <yokan/database.h>
 #include <yokan/cxx/exception.hpp>
 #include <yokan/cxx/database.hpp>
+#include <memory>
 
 namespace yokan {
 
@@ -20,34 +21,20 @@ class Client {
     Client() = default;
 
     Client(margo_instance_id mid) {
-        auto err = yk_client_init(mid, &m_client);
+        yk_client_t client;
+        auto err = yk_client_init(mid, &client);
         YOKAN_CONVERT_AND_THROW(err);
+        m_client = std::shared_ptr<yk_client>{
+            client, yk_client_finalize};
     }
 
-    ~Client() {
-        if(m_client != YOKAN_CLIENT_NULL) {
-            yk_client_finalize(m_client);
-        }
-    }
+    Client(Client&& other) = default;
 
-    Client(Client&& other)
-    : m_client(other.m_client) {
-        other.m_client = YOKAN_CLIENT_NULL;
-    }
+    Client(const Client&) = default;
 
-    Client(const Client&) = delete;
+    Client& operator=(const Client&) = default;
 
-    Client& operator=(const Client&) = delete;
-
-    Client& operator=(Client&& other) {
-        if(this == &other) return *this;
-        if(m_client != YOKAN_CLIENT_NULL) {
-            yk_client_finalize(m_client);
-        }
-        m_client = other.m_client;
-        other.m_client = YOKAN_CLIENT_NULL;
-        return *this;
-    }
+    Client& operator=(Client&& other) = default;
 
     Database makeDatabaseHandle(
         hg_addr_t addr,
@@ -55,18 +42,18 @@ class Client {
         bool check = true) const {
         yk_database_handle_t db;
         auto err = yk_database_handle_create(
-            m_client, addr, provider_id, check, &db);
+            handle(), addr, provider_id, check, &db);
         YOKAN_CONVERT_AND_THROW(err);
-        return Database(db, false);
+        return Database(db, false, m_client);
     }
 
-    auto handle() const {
-        return m_client;
+    yk_client_t handle() const {
+        return m_client.get();
     }
 
     private:
 
-    yk_client_t m_client = YOKAN_CLIENT_NULL;
+    std::shared_ptr<yk_client> m_client;
 };
 
 }

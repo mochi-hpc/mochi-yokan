@@ -11,6 +11,7 @@
 #include <yokan/cxx/exception.hpp>
 #include <vector>
 #include <functional>
+#include <memory>
 
 namespace yokan {
 
@@ -26,73 +27,30 @@ class Database {
 
     Database() = default;
 
-    Database(yk_database_handle_t db, bool copy=true)
-    : m_db(db) {
-        if(copy && (m_db != YOKAN_DATABASE_HANDLE_NULL)) {
-            auto err = yk_database_handle_ref_incr(m_db);
+    Database(yk_database_handle_t db,
+             bool copy=true,
+             std::shared_ptr<yk_client> owner = nullptr)
+    : m_client{std::move(owner)}
+    , m_db{db, yk_database_handle_release} {
+        if(copy) {
+            auto err = yk_database_handle_ref_incr(handle());
             YOKAN_CONVERT_AND_THROW(err);
         }
     }
 
-    Database(yk_client_t client,
-             hg_addr_t addr,
-             uint16_t provider_id,
-             bool check = true)
-    {
-        auto err = yk_database_handle_create(client,
-            addr, provider_id, check, &m_db);
-        YOKAN_CONVERT_AND_THROW(err);
-    }
+    Database(const Database& other) = default;
 
-    Database(const Database& other)
-    : m_db(other.m_db) {
-        if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
-            auto err = yk_database_handle_ref_incr(m_db);
-            YOKAN_CONVERT_AND_THROW(err);
-        }
-    }
+    Database(Database&& other) = default;
 
-    Database(Database&& other)
-    : m_db(other.m_db) {
-        other.m_db = YOKAN_DATABASE_HANDLE_NULL;
-    }
+    Database& operator=(const Database& other) = default;
 
-    Database& operator=(const Database& other) {
-        if(m_db == other.m_db || &other == this)
-            return *this;
-        if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
-            auto err = yk_database_handle_release(m_db);
-            YOKAN_CONVERT_AND_THROW(err);
-        }
-        m_db = other.m_db;
-        if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
-            auto err = yk_database_handle_ref_incr(m_db);
-            YOKAN_CONVERT_AND_THROW(err);
-        }
-        return *this;
-    }
+    Database& operator=(Database&& other) = default;
 
-    Database& operator=(Database&& other) {
-        if(m_db == other.m_db || &other == this)
-            return *this;
-        if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
-            auto err = yk_database_handle_release(m_db);
-            YOKAN_CONVERT_AND_THROW(err);
-        }
-        m_db = other.m_db;
-        other.m_db = YOKAN_DATABASE_HANDLE_NULL;
-        return *this;
-    }
-
-    ~Database() {
-        if(m_db != YOKAN_DATABASE_HANDLE_NULL) {
-            yk_database_handle_release(m_db);
-        }
-    }
+    ~Database() = default;
 
     size_t count(int32_t mode = YOKAN_MODE_DEFAULT) const {
         size_t c;
-        auto err = yk_count(m_db, mode, &c);
+        auto err = yk_count(handle(), mode, &c);
         YOKAN_CONVERT_AND_THROW(err);
         return c;
     }
@@ -102,7 +60,7 @@ class Database {
              const void* value,
              size_t vsize,
              int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_put(m_db, mode, key, ksize, value, vsize);
+        auto err = yk_put(handle(), mode, key, ksize, value, vsize);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -112,7 +70,7 @@ class Database {
                   const void* const* values,
                   const size_t* vsizes,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_put_multi(m_db, mode, count,
+        auto err = yk_put_multi(handle(), mode, count,
             keys, ksizes, values, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -123,7 +81,7 @@ class Database {
                    const void* values,
                    const size_t* vsizes,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_put_packed(m_db, mode, count,
+        auto err = yk_put_packed(handle(), mode, count,
             keys, ksizes, values, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -134,7 +92,7 @@ class Database {
                  size_t offset,
                  size_t size,
                  int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_put_bulk(m_db, mode, count,
+        auto err = yk_put_bulk(handle(), mode, count,
             origin, data, offset, size);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -143,7 +101,7 @@ class Database {
                 size_t ksize,
                 int32_t mode = YOKAN_MODE_DEFAULT) const {
         uint8_t e;
-        auto err = yk_exists(m_db, mode, key, ksize, &e);
+        auto err = yk_exists(handle(), mode, key, ksize, &e);
         YOKAN_CONVERT_AND_THROW(err);
         return static_cast<bool>(e);
     }
@@ -154,7 +112,7 @@ class Database {
             const size_t* ksizes,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
         std::vector<uint8_t> flags(1+count/8);
-        auto err = yk_exists_multi(m_db, mode, count, keys, ksizes, flags.data());
+        auto err = yk_exists_multi(handle(), mode, count, keys, ksizes, flags.data());
         YOKAN_CONVERT_AND_THROW(err);
         std::vector<bool> result(count);
         for(size_t i = 0; i < count; i++) {
@@ -169,7 +127,7 @@ class Database {
             const size_t* ksizes,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
         std::vector<uint8_t> flags(1+count/8);
-        auto err = yk_exists_packed(m_db, mode, count, keys, ksizes, flags.data());
+        auto err = yk_exists_packed(handle(), mode, count, keys, ksizes, flags.data());
         YOKAN_CONVERT_AND_THROW(err);
         std::vector<bool> result(count);
         for(size_t i = 0; i < count; i++) {
@@ -185,7 +143,7 @@ class Database {
             size_t offset,
             size_t size,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_exists_bulk(m_db,
+        auto err = yk_exists_bulk(handle(),
             mode, count, origin, data, offset, size);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -194,7 +152,7 @@ class Database {
                   size_t ksize,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
         size_t vsize;
-        auto err = yk_length(m_db, mode, key, ksize, &vsize);
+        auto err = yk_length(handle(), mode, key, ksize, &vsize);
         YOKAN_CONVERT_AND_THROW(err);
         return vsize;
     }
@@ -204,7 +162,7 @@ class Database {
                      const size_t* ksizes,
                      size_t* vsizes,
                      int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_length_multi(m_db, mode, count, keys, ksizes, vsizes);
+        auto err = yk_length_multi(handle(), mode, count, keys, ksizes, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -213,7 +171,7 @@ class Database {
                       const size_t* ksizes,
                       size_t* vsizes,
                       int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_length_packed(m_db, mode, count, keys, ksizes, vsizes);
+        auto err = yk_length_packed(handle(), mode, count, keys, ksizes, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -223,7 +181,7 @@ class Database {
                     size_t offset,
                     size_t size,
                     int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_length_bulk(m_db, mode, count, origin, data, offset, size);
+        auto err = yk_length_bulk(handle(), mode, count, origin, data, offset, size);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -232,7 +190,7 @@ class Database {
              void* value,
              size_t* vsize,
              int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_get(m_db, mode, key, ksize, value, vsize);
+        auto err = yk_get(handle(), mode, key, ksize, value, vsize);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -242,7 +200,7 @@ class Database {
                   void* const* values,
                   size_t* vsizes,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_get_multi(m_db, mode, count,
+        auto err = yk_get_multi(handle(), mode, count,
             keys, ksizes, values, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -254,7 +212,7 @@ class Database {
                    void* values,
                    size_t* vsizes,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_get_packed(m_db, mode, count,
+        auto err = yk_get_packed(handle(), mode, count,
             keys, ksizes, vbufsize, values, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -266,7 +224,7 @@ class Database {
                  size_t size,
                  bool packed,
                  int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_get_bulk(m_db, mode, count, origin,
+        auto err = yk_get_bulk(handle(), mode, count, origin,
             data, offset, size, packed);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -276,7 +234,7 @@ class Database {
                yk_keyvalue_callback_t cb,
                void* uargs,
                int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_fetch(m_db, mode, key, ksize, cb, uargs);
+        auto err = yk_fetch(handle(), mode, key, ksize, cb, uargs);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -295,7 +253,7 @@ class Database {
                size_t ksize,
                const fetch_callback_type& cb,
                int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_fetch(m_db, mode, key, ksize, _fetch_dispatch, (void*)&cb);
+        auto err = yk_fetch(handle(), mode, key, ksize, _fetch_dispatch, (void*)&cb);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -307,7 +265,7 @@ class Database {
                      const yk_fetch_options_t* options = nullptr,
                      int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_fetch_packed(
-            m_db, mode, count, keys, ksizes, cb, uargs, options);
+            handle(), mode, count, keys, ksizes, cb, uargs, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -318,7 +276,7 @@ class Database {
                      const yk_fetch_options_t* options = nullptr,
                      int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_fetch_packed(
-            m_db, mode, count, keys, ksizes, _fetch_dispatch, (void*)&cb, options);
+            handle(), mode, count, keys, ksizes, _fetch_dispatch, (void*)&cb, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -330,7 +288,7 @@ class Database {
                     const yk_fetch_options_t* options = nullptr,
                     int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err= yk_fetch_multi(
-            m_db, mode, count,keys, ksizes, cb, uargs, options);
+            handle(), mode, count,keys, ksizes, cb, uargs, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -341,7 +299,7 @@ class Database {
                     const yk_fetch_options_t* options = nullptr,
                     int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err= yk_fetch_multi(
-            m_db, mode, count,keys, ksizes, _fetch_dispatch, (void*)&cb, options);
+            handle(), mode, count,keys, ksizes, _fetch_dispatch, (void*)&cb, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -355,7 +313,7 @@ class Database {
                    const yk_fetch_options_t* options = nullptr,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_fetch_bulk(
-            m_db, mode, count, origin, data, offset, size, cb, uargs, options);
+            handle(), mode, count, origin, data, offset, size, cb, uargs, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -368,14 +326,14 @@ class Database {
                    const yk_fetch_options_t* options = nullptr,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
         auto err = yk_fetch_bulk(
-            m_db, mode, count, origin, data, offset, size, _fetch_dispatch, (void*)&cb, options);
+            handle(), mode, count, origin, data, offset, size, _fetch_dispatch, (void*)&cb, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
     void erase(const void* key,
                size_t ksize,
                int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_erase(m_db, mode, key, ksize);
+        auto err = yk_erase(handle(), mode, key, ksize);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -383,7 +341,7 @@ class Database {
                     const void* const* keys,
                     const size_t* ksizes,
                     int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_erase_multi(m_db, mode, count, keys, ksizes);
+        auto err = yk_erase_multi(handle(), mode, count, keys, ksizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -391,7 +349,7 @@ class Database {
                      const void* keys,
                      const size_t* ksizes,
                      int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_erase_packed(m_db, mode, count, keys, ksizes);
+        auto err = yk_erase_packed(handle(), mode, count, keys, ksizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
@@ -401,7 +359,7 @@ class Database {
                    size_t offset,
                    size_t size,
                    int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_erase_bulk(m_db, mode, count,
+        auto err = yk_erase_bulk(handle(), mode, count,
             origin, data, offset, size);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -414,7 +372,7 @@ class Database {
                   void* const* keys,
                   size_t* ksizes,
                   int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keys(m_db, mode, from_key,
+        auto err = yk_list_keys(handle(), mode, from_key,
             from_ksize, filter, filter_size, count, keys, ksizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -429,7 +387,7 @@ class Database {
             size_t keys_buf_size,
             size_t* ksizes,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keys_packed(m_db, mode, from_key,
+        auto err = yk_list_keys_packed(handle(), mode, from_key,
             from_ksize, filter, filter_size, count, keys,
             keys_buf_size, ksizes);
         YOKAN_CONVERT_AND_THROW(err);
@@ -445,7 +403,7 @@ class Database {
             bool packed,
             size_t count,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keys_bulk(m_db, mode, from_ksize,
+        auto err = yk_list_keys_bulk(handle(), mode, from_ksize,
             filter_size, origin, data, offset, keys_buf_size,
             packed, count);
         YOKAN_CONVERT_AND_THROW(err);
@@ -461,7 +419,7 @@ class Database {
                      void* const* values,
                      size_t* vsizes,
                      int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keyvals(m_db, mode, from_key,
+        auto err = yk_list_keyvals(handle(), mode, from_key,
             from_ksize, filter, filter_size, count, keys, ksizes, values, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -479,7 +437,7 @@ class Database {
             size_t vals_buf_size,
             size_t* vsizes,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keyvals_packed(m_db, mode, from_key,
+        auto err = yk_list_keyvals_packed(handle(), mode, from_key,
             from_ksize, filter, filter_size, count, keys,
             keys_buf_size, ksizes, vals, vals_buf_size, vsizes);
         YOKAN_CONVERT_AND_THROW(err);
@@ -496,7 +454,7 @@ class Database {
             bool packed,
             size_t count,
             int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_list_keyvals_bulk(m_db, mode, from_ksize,
+        auto err = yk_list_keyvals_bulk(handle(), mode, from_ksize,
             filter_size, origin, data, offset, keys_buf_size,
             vals_buf_size, packed, count);
         YOKAN_CONVERT_AND_THROW(err);
@@ -511,7 +469,7 @@ class Database {
               void* uargs,
               const yk_iter_options_t* options = nullptr,
               int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_iter(m_db, mode, from_key, from_ksize,
+        auto err = yk_iter(handle(), mode, from_key, from_ksize,
                            filter, filter_size, count, cb, uargs, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
@@ -535,38 +493,39 @@ class Database {
               const iter_callback_type& cb,
               const yk_iter_options_t* options = nullptr,
               int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_iter(m_db, mode, from_key, from_ksize,
+        auto err = yk_iter(handle(), mode, from_key, from_ksize,
                            filter, filter_size, count, _iter_dispatch, (void*)&cb, options);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
     void createCollection(const char* name,
                           int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_collection_create(m_db, name, mode);
+        auto err = yk_collection_create(handle(), name, mode);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
     void dropCollection(const char* name,
                         int32_t mode = YOKAN_MODE_DEFAULT) const {
-        auto err = yk_collection_drop(m_db, name, mode);
+        auto err = yk_collection_drop(handle(), name, mode);
         YOKAN_CONVERT_AND_THROW(err);
     }
 
     bool collectionExists(const char* name,
                           int32_t mode = YOKAN_MODE_DEFAULT) const {
         uint8_t flag;
-        auto err = yk_collection_exists(m_db, name, mode, &flag);
+        auto err = yk_collection_exists(handle(), name, mode, &flag);
         YOKAN_CONVERT_AND_THROW(err);
         return static_cast<bool>(flag);
     }
 
-    auto handle() const {
-        return m_db;
+    yk_database_handle_t handle() const {
+        return m_db.get();
     }
 
     private:
 
-    yk_database_handle_t m_db = YOKAN_DATABASE_HANDLE_NULL;
+    std::shared_ptr<yk_client>          m_client;
+    std::shared_ptr<yk_database_handle> m_db;
 
 };
 
