@@ -25,3 +25,5 @@ This section will walk you through a series of tutorials on how to use Yokan.
    yokan/11_watcher.rst
    yokan/12_python.rst
    yokan/13_cpp.rst
+   yokan/c_api.rst
+   yokan/cpp_api.rst
