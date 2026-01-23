@@ -508,7 +508,9 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -556,7 +558,9 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -566,7 +570,7 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         (void)mode;
         size_t offset = 0;
         const auto mode_wait = mode & YOKAN_MODE_WAIT;
-        ScopedReadLock lock(m_lock);
+        ScopedWriteLock lock(m_lock);
         if(m_migrated) return Status::Migrated;
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {

@@ -56,11 +56,11 @@ class TestCollection(unittest.TestCase):
 
     def test_getitem(self):
         """Test the __getitem__ method of database objects."""
-        self.assertIsInstance(self.db["matthieu"], Collection)
+        self.assertIsInstance(self.db.open_collection("matthieu"), Collection)
         self.db.create_collection("matthieu")
-        self.assertIsInstance(self.db["matthieu"], Collection)
+        self.assertIsInstance(self.db.open_collection("matthieu"), Collection)
         self.db.drop_collection("matthieu")
-        self.assertIsInstance(self.db["matthieu"], Collection)
+        self.assertIsInstance(self.db.open_collection("matthieu"), Collection)
 
 if __name__ == '__main__':
     unittest.main()

@@ -671,8 +671,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 bool check) {
                 return client.makeDatabaseHandle(addr, provider_id, check);
              },
-             "address"_a, "provider_id"_a, "check"_a=true,
-             py::keep_alive<0, 1>())
+             "address"_a, "provider_id"_a, "check"_a=true)
         .def("make_database_handle",
              [](const yokan::Client& client,
                 py::object addr_obj,
@@ -688,8 +687,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 py::capsule addr_capsule = addr.cast<py::capsule>();
                 return client.makeDatabaseHandle(addr_capsule, provider_id, check);
              },
-             "address"_a, "provider_id"_a, "check"_a=true,
-             py::keep_alive<0, 1>());
+             "address"_a, "provider_id"_a, "check"_a=true);
 
     py::class_<yokan::Database>(m, "Database")
         // --------------------------------------------------------------
@@ -1267,7 +1265,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 return yokan::Collection(name.c_str(), db);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
-        .def("__getitem__",
+        .def("open_collection",
              [](const yokan::Database& db, const std::string& name) {
                 return yokan::Collection(name.c_str(), db);
              },

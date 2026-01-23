@@ -14,6 +14,7 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
     if(!c) return YOKAN_ERR_ALLOCATION;
 
     c->mid = mid;
+    margo_instance_ref_incr(mid);
 
     hg_bool_t flag;
     hg_id_t id;
@@ -176,32 +177,33 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
                            doc_iter_in_t, doc_iter_out_t, NULL);
     }
 
-    // The RPCs bellow should be registered regardless of whether they already were registered
+    // The RPCs bellow might have been already registered by a provider,
+    // with a NULL handler. We need to re-register them with a valid handler.
 
-    c->fetch_back_id =
-        MARGO_REGISTER(mid, "yk_fetch_back",
-                       fetch_back_in_t, fetch_back_out_t, yk_fetch_back_ult);
-    c->fetch_direct_back_id =
-        MARGO_REGISTER(mid, "yk_fetch_direct_back",
-                       fetch_direct_back_in_t, fetch_direct_back_out_t, yk_fetch_direct_back_ult);
-    c->iter_back_id =
-        MARGO_REGISTER(mid, "yk_iter_back",
-                       iter_back_in_t, iter_back_out_t, yk_iter_back_ult);
-    c->iter_direct_back_id =
-        MARGO_REGISTER(mid, "yk_iter_direct_back",
-                       iter_direct_back_in_t, iter_direct_back_out_t, yk_iter_direct_back_ult);
-    c->doc_fetch_back_id =
-        MARGO_REGISTER(mid, "yk_doc_fetch_back",
-                       doc_fetch_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_back_ult);
-    c->doc_fetch_direct_back_id =
-        MARGO_REGISTER(mid, "yk_doc_fetch_direct_back",
-                       doc_fetch_direct_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_direct_back_ult);
-    c->doc_iter_back_id =
-        MARGO_REGISTER(mid, "yk_doc_iter_back",
-                       doc_iter_back_in_t, doc_iter_back_out_t, yk_doc_iter_back_ult);
-    c->doc_iter_direct_back_id =
-        MARGO_REGISTER(mid, "yk_doc_iter_direct_back",
-                       doc_iter_direct_back_in_t, doc_iter_direct_back_out_t, yk_doc_iter_direct_back_ult);
+#define RE_REGISTER(field, name, in_t, out_t, ult) do {          \
+    margo_registered_name(mid, name, &id, &flag);                \
+    if(flag == HG_TRUE) {                                        \
+        margo_deregister(mid, id);                               \
+    }                                                            \
+    c->field = MARGO_REGISTER(mid, name, in_t, out_t, ult);      \
+} while(0)
+
+    RE_REGISTER(fetch_back_id, "yk_fetch_back",
+                fetch_back_in_t, fetch_back_out_t, yk_fetch_back_ult);
+    RE_REGISTER(fetch_direct_back_id, "yk_fetch_direct_back",
+                fetch_direct_back_in_t, fetch_direct_back_out_t, yk_fetch_direct_back_ult);
+    RE_REGISTER(iter_back_id, "yk_iter_back",
+                iter_back_in_t, iter_back_out_t, yk_iter_back_ult);
+    RE_REGISTER(iter_direct_back_id, "yk_iter_direct_back",
+                iter_direct_back_in_t, iter_direct_back_out_t, yk_iter_direct_back_ult);
+    RE_REGISTER(doc_fetch_back_id, "yk_doc_fetch_back",
+                doc_fetch_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_back_ult);
+    RE_REGISTER(doc_fetch_direct_back_id, "yk_doc_fetch_direct_back",
+                doc_fetch_direct_back_in_t, doc_fetch_back_out_t, yk_doc_fetch_direct_back_ult);
+    RE_REGISTER(doc_iter_back_id, "yk_doc_iter_back",
+                doc_iter_back_in_t, doc_iter_back_out_t, yk_doc_iter_back_ult);
+    RE_REGISTER(doc_iter_direct_back_id, "yk_doc_iter_direct_back",
+                doc_iter_direct_back_in_t, doc_iter_direct_back_out_t, yk_doc_iter_direct_back_ult);
 
     *client = c;
     return YOKAN_SUCCESS;
@@ -216,6 +218,7 @@ extern "C" yk_return_t yk_client_finalize(yk_client_t client)
             client->num_database_handles);
         // LCOV_EXCL_STOP
     }
+    margo_instance_release(client->mid);
     free(client);
     return YOKAN_SUCCESS;
 }

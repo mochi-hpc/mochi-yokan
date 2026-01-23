@@ -390,7 +390,9 @@ class SetDatabase : public DatabaseInterface {
         vals.size = 0;
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -430,7 +432,9 @@ class SetDatabase : public DatabaseInterface {
         }
         if(mode & YOKAN_MODE_CONSUME) {
             lock.unlock();
-            return erase(mode, keys, ksizes);
+            auto ret = erase(mode, keys, ksizes);
+            lock.lock();
+            return ret;
         }
         return Status::OK;
     }
@@ -439,7 +443,7 @@ class SetDatabase : public DatabaseInterface {
                          const BasicUserMem<size_t>& ksizes) override {
         size_t offset = 0;
         auto mode_wait = mode & YOKAN_MODE_WAIT;
-        ScopedReadLock lock(m_lock);
+        ScopedWriteLock lock(m_lock);
         if(m_migrated) return Status::Migrated;
         for(size_t i = 0; i < ksizes.size; i++) {
             auto key = UserMem{ keys.data + offset, ksizes[i] };
