@@ -24,6 +24,7 @@ add_library (coverage_config INTERFACE)
 
 option (ENABLE_COVERAGE   "Enable coverage reporting" OFF)
 option (ENABLE_TESTS      "Build tests" OFF)
+option (ENABLE_EXAMPLES   "Build examples in documentation" OFF)
 option (ENABLE_BENCHMARK  "Build benchmark" OFF)
 option (ENABLE_BEDROCK    "Build bedrock module" OFF)
 option (ENABLE_LEVELDB    "Build with leveldb support" OFF)
@@ -218,6 +219,10 @@ endif ()
 add_subdirectory (src)
 if (${ENABLE_TESTS})
   add_subdirectory (tests)
+endif ()
+
+if (ENABLE_EXAMPLES)
+  add_subdirectory (docs/examples/yokan)
 endif ()
 
 install (FILES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindBerkeleyDB.cmake
