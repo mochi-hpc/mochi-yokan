@@ -22,6 +22,7 @@ spack:
   - mercury~checksum~boostsys ^libfabric fabrics=tcp,rxm
   - py-mochi-margo
   - mochi-bedrock-module-api
+  - mochi-bedrock
   - rocksdb+rtti
   - mochi-remi+bedrock
   - py-configspace

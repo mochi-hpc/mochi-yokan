@@ -58,7 +58,8 @@ jobs:
                  -DENABLE_LUA=ON \
                  -DENABLE_PYTHON=ON \
                  -DENABLE_REMI=ON \
-                 -DENABLE_EXAMPLES=ON
+                 -DENABLE_EXAMPLES=ON \
+                 -DENABLE_BEDROCK=ON
         make
         ctest --output-on-failure
 

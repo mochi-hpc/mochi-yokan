@@ -52,6 +52,7 @@ jobs:
                  -DENABLE_LUA=ON \
                  -DENABLE_REMI=ON \
                  -DENABLE_PYTHON=ON \
+                 -DENABLE_BEDROCK=ON \
                  -DENABLE_EXAMPLES=ON
         make
         make test

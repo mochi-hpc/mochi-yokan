@@ -30,7 +30,9 @@ foreach (example ${EXAMPLES})
     target_link_libraries (13_yokan_${example} yokan::client thallium)
 endforeach ()
 
-# with_bedrock requires bedrock-client
 find_package (bedrock REQUIRED)
-add_executable (13_yokan_with_bedrock with_bedrock.cpp)
-target_link_libraries (13_yokan_with_bedrock yokan::client thallium bedrock::client)
+if (${bedrock_FOUND})
+    # with_bedrock requires bedrock-client
+    add_executable (13_yokan_with_bedrock with_bedrock.cpp)
+    target_link_libraries (13_yokan_with_bedrock yokan::client thallium bedrock::client)
+endif ()
