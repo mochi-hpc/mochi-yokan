@@ -4,7 +4,7 @@ libdir=${prefix}/lib
 includedir=${prefix}/include
 
 Name: yokan-server
-Description: <insert description here>
+Description: Mochi yokan server library
 Version: @YOKAN_VERSION@
 
 Requires: margo
