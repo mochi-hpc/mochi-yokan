@@ -1,6 +1,7 @@
 from mochi.margo import Engine
+from mochi.yokan.exception import Exception
 from mochi.yokan.server import Provider
-from mochi.yokan.client import Client, Exception as ClientException
+from mochi.yokan.client import Client
 import json
 from typing import Any, Optional, Dict
 
@@ -31,14 +32,14 @@ class YokanDict:
             value = bytearray(length)
             self.db.get(key=full_key, value=value)
             return json.loads(value.decode())
-        except ClientException:
+        except Exception:
             raise KeyError(key)
 
     def __delitem__(self, key: str):
         """Delete a value."""
         try:
             self.db.erase(key=self._make_key(key))
-        except ClientException:
+        except Exception:
             raise KeyError(key)
 
     def __contains__(self, key: str) -> bool:

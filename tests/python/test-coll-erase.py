@@ -10,7 +10,7 @@ sys.path.append(wd+'/../python')
 print(sys.path)
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_KEY_NOT_FOUND
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider
 
@@ -53,9 +53,10 @@ class TestCollErase(unittest.TestCase):
                 self.coll.erase(id=i)
         for i in range(len(self.reference)):
             if i % 2 == 0:
-                with self.assertRaises(Exception):
+                with self.assertRaises(Exception) as ctx:
                     doc = bytearray(128)
                     self.coll.load(id=i, buffer=doc)
+                self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
             else:
                 doc = bytearray(128)
                 self.coll.load(id=i, buffer=doc)
@@ -69,9 +70,10 @@ class TestCollErase(unittest.TestCase):
         self.coll.erase_multi(ids=ids)
         for i in range(len(self.reference)):
             if i % 2 == 0:
-                with self.assertRaises(Exception):
+                with self.assertRaises(Exception) as ctx:
                     doc = bytearray(128)
                     self.coll.load(id=i, buffer=doc)
+                self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
             else:
                 doc = bytearray(128)
                 self.coll.load(id=i, buffer=doc)

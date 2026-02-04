@@ -9,7 +9,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_KEY_NOT_FOUND
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider
 
@@ -53,8 +53,9 @@ class TestStoreLoad(unittest.TestCase):
             docsize = self.coll.load(id=i, buffer=out_doc)
             self.assertEqual(out_doc[0:docsize].decode("ascii"), doc)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.coll.load(id=len(self.reference)+4, buffer=out_doc)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_store_load_buffers(self):
         """Test that we can store and load buffer documents."""
@@ -65,8 +66,9 @@ class TestStoreLoad(unittest.TestCase):
             docsize = self.coll.load(id=i, buffer=out_doc)
             self.assertEqual(out_doc[0:docsize].decode("ascii"), doc)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.coll.load(id=len(self.reference)+4, buffer=out_doc)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_store_load_partial(self):
         """Test that we can store/load partial regions of bytearrays."""

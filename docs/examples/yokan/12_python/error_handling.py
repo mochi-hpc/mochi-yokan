@@ -1,6 +1,7 @@
 from mochi.margo import Engine
+from mochi.yokan.exception import Exception
 from mochi.yokan.server import Provider
-from mochi.yokan.client import Client, Exception as ClientException
+from mochi.yokan.client import Client
 import mochi.yokan.mode as mode
 
 engine = Engine('tcp')
@@ -14,7 +15,7 @@ value = bytearray(16)
 # Example 1: Handling missing keys
 try:
     db.get(key="nonexistent_key", value=value)
-except ClientException as e:
+except Exception as e:
     print(f"Expected error - key not found: {e}")
 
 # Example 2: Checking before getting
@@ -30,7 +31,7 @@ try:
     # Some backends may not support all modes
     # db.get(key="test", value=value, mode=mode.SOME_UNSUPPORTED_MODE)
     print("Mode check: using supported modes only")
-except ClientException as e:
+except Exception as e:
     print(f"Mode not supported: {e}")
 
 engine.finalize()

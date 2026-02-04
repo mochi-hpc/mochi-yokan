@@ -1,6 +1,7 @@
 from mochi.margo import Engine
+from mochi.yokan.exception import Exception
 from mochi.yokan.server import Provider
-from mochi.yokan.client import Client, Exception
+from mochi.yokan.client import Client
 import mochi.yokan.mode as mode
 
 engine = Engine('tcp')

@@ -9,7 +9,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_KEY_EXISTS
 from mochi.yokan.client import Client, Database, Collection
 from mochi.yokan.server import Provider
 
@@ -37,8 +37,9 @@ class TestCollection(unittest.TestCase):
     def test_create_collection(self):
         """Test collection creation."""
         self.db.create_collection("matthieu")
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.db.create_collection("matthieu")
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_EXISTS)
         self.db.create_collection("phil")
 
     def test_collection_exists(self):

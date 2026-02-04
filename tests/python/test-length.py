@@ -9,7 +9,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_KEY_NOT_FOUND
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider
 
@@ -49,15 +49,17 @@ class TestLength(unittest.TestCase):
         """Test that we can check that the keys put do have the correct length."""
         for key, val in self.reference.items():
             self.assertEqual(self.db.length(key), len(val))
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.db.length('xxxxx')
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_length_buffer(self):
         """Test that we can check that the keys put do have the correct length."""
         for key, val in self.reference.items():
             self.assertEqual(self.db.length(bytearray(key.encode('ascii'))), len(val))
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.db.length(bytearray('xxxxx'.encode('ascii')))
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_length_multi_string(self):
         """Test that we can use length_multi with string keys."""

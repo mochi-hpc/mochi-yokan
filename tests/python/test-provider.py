@@ -6,7 +6,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.server import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_INVALID_PROVIDER
 from mochi.yokan.server import Provider
 
 class TestInitProvider(unittest.TestCase):
@@ -45,11 +45,12 @@ class TestInitProvider(unittest.TestCase):
             engine=engine,
             provider_id=42,
             config='{"database":{"type":"map"}}')
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             provider2 = Provider(
                 engine=engine,
                 provider_id=42,
                 config='{"database":{"type":"map"}}')
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_INVALID_PROVIDER)
         engine.finalize()
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_INVALID_ID
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider
 
@@ -56,8 +56,9 @@ class TestUpdate(unittest.TestCase):
             docsize = self.coll.load(id=i, buffer=out_doc)
             self.assertEqual(out_doc[0:docsize].decode("ascii"), doc)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.coll.update(id=len(self.reference)+4, document="abcdef")
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_INVALID_ID)
 
     def test_update_buffers(self):
         """Test that we can update buffer documents."""
@@ -68,9 +69,10 @@ class TestUpdate(unittest.TestCase):
             docsize = self.coll.load(id=i, buffer=out_doc)
             self.assertEqual(out_doc[0:docsize].decode("ascii"), doc)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             doc = b'abcdef'
             self.coll.update(id=len(self.reference)+4, document=doc)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_INVALID_ID)
 
     def test_update_multi_strings(self):
         """Test that we can use update_multi with strings."""

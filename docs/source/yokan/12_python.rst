@@ -135,11 +135,15 @@ Collections provide:
 Error Handling
 --------------
 
-The Python bindings raise ``mochi.yokan.client.Exception`` for client errors
-and ``mochi.yokan.server.Exception`` for server errors:
+The Python bindings raise ``mochi.yokan.exception.Exception`` for both
+client and server errors:
 
 .. literalinclude:: ../../examples/yokan/12_python/error_handling.py
    :language: python
+
+This ``Exception`` class has a ``code`` integer attribute that corresponds
+to one of the ``YOKAN_ERR_*`` error codes. These error codes are available
+as global variables in the ``mochi.yokan.exception`` module.
 
 Always wrap Yokan operations in try/except blocks to handle:
 

@@ -6,6 +6,7 @@
 #include <yokan/cxx/collection.hpp>
 #include <iostream>
 #include <numeric>
+#include <optional>
 
 namespace py = pybind11;
 using namespace pybind11::literals;
@@ -824,22 +825,30 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::function<void(size_t, const py::buffer&, const py::object&)> cb, int32_t mode) {
                 auto key_info = get_buffer_info(key);
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, py::memoryview::from_memory(key, ksize), py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
                     };
-                db.fetch(
-                    (const void*)key_info.ptr,
-                    key_info.itemsize*key_info.size,
-                    func, mode);
+                try {
+                    db.fetch(
+                        (const void*)key_info.ptr,
+                        key_info.itemsize*key_info.size,
+                        func, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("fetch",
@@ -847,22 +856,30 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::function<void(size_t, const std::string&, const py::object&)> cb, int32_t mode) {
                 auto key_info = get_buffer_info(key);
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb, &key](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &key, &py_exception](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, key, py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, key, py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
                     };
-                db.fetch(
-                    (const void*)key_info.ptr,
-                    key_info.itemsize*key_info.size,
-                    func, mode);
+                try {
+                    db.fetch(
+                        (const void*)key_info.ptr,
+                        key_info.itemsize*key_info.size,
+                        func, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -882,14 +899,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     key_ptrs.push_back(key_info.ptr);
                     key_sizes.push_back(key_info.itemsize*key_info.size);
                 }
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, py::memoryview::from_memory(key, ksize), py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
@@ -897,9 +916,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_fetch_options_t options;
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
-                db.fetchMulti(
-                    keys.size(), key_ptrs.data(), key_sizes.data(),
-                    func, &options, mode);
+                try {
+                    db.fetchMulti(
+                        keys.size(), key_ptrs.data(), key_sizes.data(),
+                        func, &options, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         .def("fetch_multi",
@@ -914,14 +939,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     key_ptrs.push_back(key.data());
                     key_sizes.push_back(key.size());
                 }
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb, &keys](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &keys, &py_exception](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, keys[index], py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, keys[index], py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
@@ -929,9 +956,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_fetch_options_t options;
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
-                db.fetchMulti(
-                    keys.size(), key_ptrs.data(), key_sizes.data(),
-                    func, &options, mode);
+                try {
+                    db.fetchMulti(
+                        keys.size(), key_ptrs.data(), key_sizes.data(),
+                        func, &options, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         // --------------------------------------------------------------
@@ -948,14 +981,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, py::memoryview::from_memory(key, ksize), py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
@@ -963,9 +998,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_fetch_options_t options;
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
-                db.fetchPacked(ksizes.size(),
-                    key_info.ptr, ksizes.data(),
-                    func, &options, mode);
+                try {
+                    db.fetchPacked(ksizes.size(),
+                        key_info.ptr, ksizes.data(),
+                        func, &options, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "keys"_a, "key_sizes"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         // --------------------------------------------------------------
@@ -1427,19 +1468,27 @@ PYBIND11_MODULE(pyyokan_client, m) {
         .def("fetch",
              [](const yokan::Collection& coll, yk_id_t id,
                 std::function<void(size_t, yk_id_t, const py::object&)> cb, int32_t mode) {
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, id, py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, id, py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
                     };
-                coll.fetch(id, func, mode);
+                try {
+                    coll.fetch(id, func, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "id"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1449,14 +1498,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
                 std::function<void(size_t, yk_id_t, const py::object&)> cb,
                 int32_t mode, unsigned batch_size) {
+                std::optional<py::error_already_set> py_exception;
                 auto func =
-                    [&cb](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                    [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, id, py::memoryview::from_memory(val, vsize));
                             else
                                 cb(index, id, py::none());
                         } catch(py::error_already_set &e) {
+                            py_exception = std::move(e);
                             return YOKAN_ERR_OTHER;
                         }
                         return YOKAN_SUCCESS;
@@ -1464,9 +1515,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_doc_fetch_options_t options;
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
-                coll.fetchMulti(
-                    ids.size(), ids.data(),
-                    func, &options, mode);
+                try {
+                    coll.fetchMulti(
+                        ids.size(), ids.data(),
+                        func, &options, mode);
+                } catch(const yokan::Exception&) {
+                    if(py_exception) throw std::move(*py_exception);
+                    throw;
+                }
+                if(py_exception) throw std::move(*py_exception);
              },
              "ids"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
         // --------------------------------------------------------------

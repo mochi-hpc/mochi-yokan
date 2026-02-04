@@ -10,7 +10,7 @@ wd = os.getcwd()
 sys.path.append(wd+'/../python')
 
 from mochi.margo import Engine
-from mochi.yokan.client import Exception
+from mochi.yokan.exception import Exception, YOKAN_ERR_KEY_NOT_FOUND
 from mochi.yokan.client import Client
 from mochi.yokan.server import Provider
 
@@ -53,8 +53,9 @@ class TestPutGetFetch(unittest.TestCase):
             vsize = self.db.get(key=k, value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.db.get(key='xxxxx', value=out_val)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_put_get_buffers(self):
         """Test that we can put and get buffer key/value pairs."""
@@ -67,8 +68,9 @@ class TestPutGetFetch(unittest.TestCase):
                                 value=out_val)
             self.assertEqual(out_val[0:vsize].decode("ascii"), v)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception) as ctx:
             self.db.get(key=bytearray(b'xxxxx'), value=out_val)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_put_fetch_strings(self):
         """Test that we can fetch key/value pairs."""
@@ -80,8 +82,12 @@ class TestPutGetFetch(unittest.TestCase):
                 self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
             self.db.fetch(key=k_ref, callback=compare)
 
-        with self.assertRaises(Exception):
-            self.db.fetch(key='xxxxx', callback=compare)
+        def check_not_found(i: int, k: str, v: Optional[memoryview]):
+            if v is None:
+                raise Exception("Key not found", YOKAN_ERR_KEY_NOT_FOUND)
+        with self.assertRaises(Exception) as ctx:
+            self.db.fetch(key='xxxxx', callback=check_not_found)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_put_fetch_buffers(self):
         """Test that we can fetch key/value pairs."""
@@ -94,8 +100,12 @@ class TestPutGetFetch(unittest.TestCase):
                 self.assertEqual(v, memoryview(bytearray(v_ref.encode('ascii'))))
             self.db.fetch(key=bytearray(k_ref.encode('ascii')), callback=compare)
 
-        with self.assertRaises(Exception):
-            self.db.fetch(key=bytearray(b'xxxxx'), callback=compare)
+        def check_not_found(i: int, k: memoryview, v: Optional[memoryview]):
+            if v is None:
+                raise Exception("Key not found", YOKAN_ERR_KEY_NOT_FOUND)
+        with self.assertRaises(Exception) as ctx:
+            self.db.fetch(key=bytearray(b'xxxxx'), callback=check_not_found)
+        self.assertEqual(ctx.exception.code, YOKAN_ERR_KEY_NOT_FOUND)
 
     def test_put_get_partial(self):
         """Test that we can put/get partial regions of bytearrays."""
