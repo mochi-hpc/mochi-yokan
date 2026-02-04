@@ -26,14 +26,13 @@ class YokanDict:
 
     def __getitem__(self, key: str) -> Any:
         """Get a value (automatically deserializes from JSON)."""
-        try:
-            full_key = self._make_key(key)
-            length = self.db.length(key=full_key)
-            value = bytearray(length)
-            self.db.get(key=full_key, value=value)
-            return json.loads(value.decode())
-        except Exception:
+        full_key = self._make_key(key)
+        length = self.db.length(key=full_key)
+        if length is None:
             raise KeyError(key)
+        value = bytearray(length)
+        self.db.get(key=full_key, value=value)
+        return json.loads(value.decode())
 
     def __delitem__(self, key: str):
         """Delete a value."""

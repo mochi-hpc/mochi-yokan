@@ -162,13 +162,19 @@ static auto exists_multi_helper(const yokan::Database& db,
 }
 
 template<typename KeyType>
-static auto length_helper(const yokan::Database& db,
-                          const KeyType& key,
-                          int32_t mode) {
+static py::object length_helper(const yokan::Database& db,
+                                const KeyType& key,
+                                int32_t mode) {
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
-    return db.length(key_info.ptr, ksize, mode);
+    try {
+        return py::cast(db.length(key_info.ptr, ksize, mode));
+    } catch(const yokan::Exception& e) {
+        if(e.code() == YOKAN_ERR_KEY_NOT_FOUND)
+            return py::none();
+        throw;
+    }
 }
 
 template<typename KeyType>
@@ -1049,10 +1055,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
-             static_cast<size_t(*)(const yokan::Database&, const std::string&, int32_t)>(&length_helper),
+             static_cast<py::object(*)(const yokan::Database&, const std::string&, int32_t)>(&length_helper),
              "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("length",
-             static_cast<size_t(*)(const yokan::Database&, const py::buffer&, int32_t)>(&length_helper),
+             static_cast<py::object(*)(const yokan::Database&, const py::buffer&, int32_t)>(&length_helper),
              "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
         // LENGTH_MULTI
@@ -1530,8 +1536,14 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
-             [](const yokan::Collection& coll, yk_id_t id, int32_t mode) {
-                return coll.length(id, mode);
+             [](const yokan::Collection& coll, yk_id_t id, int32_t mode) -> py::object {
+                try {
+                    return py::cast(coll.length(id, mode));
+                } catch(const yokan::Exception& e) {
+                    if(e.code() == YOKAN_ERR_KEY_NOT_FOUND)
+                        return py::none();
+                    throw;
+                }
              },
              "id"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------

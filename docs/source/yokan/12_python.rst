@@ -59,7 +59,7 @@ The client API supports:
 - ``put(key, value, mode=0)``: Store a key/value pair
 - ``get(key, value, mode=0)``: Retrieve a value by key
 - ``exists(key, mode=0)``: Check if a key exists
-- ``length(key, mode=0)``: Get the size of a value
+- ``length(key, mode=0)``: Get the size of a value (returns ``None`` if key doesn't exist)
 - ``erase(key, mode=0)``: Delete a key/value pair
 - ``count(mode=0)``: Count total key/value pairs
 
@@ -145,9 +145,14 @@ This ``Exception`` class has a ``code`` integer attribute that corresponds
 to one of the ``YOKAN_ERR_*`` error codes. These error codes are available
 as global variables in the ``mochi.yokan.exception`` module.
 
+.. note::
+   The ``length`` method returns ``None`` instead of raising an exception when a key
+   doesn't exist. Similarly, ``length_multi`` returns ``None`` for missing keys in its
+   result list. Use ``exists`` or check for ``None`` to handle missing keys gracefully.
+
 Always wrap Yokan operations in try/except blocks to handle:
 
-- Missing keys
+- Missing keys (for operations like ``get`` and ``erase``)
 - Network errors
 - Unsupported modes
 - Invalid configurations
