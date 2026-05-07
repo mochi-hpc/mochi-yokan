@@ -373,7 +373,7 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
         //            |YOKAN_MODE_NOTIFY
-        //            |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
                     |YOKAN_MODE_NO_PREFIX
                     |YOKAN_MODE_IGNORE_KEYS
@@ -462,8 +462,9 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& vsizes) override {
         ScopedReadLock mlock(m_migration_lock);
         if(m_migrated) return Status::Migrated;
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
+
+        auto mode_new_only = mode & YOKAN_MODE_NEW_ONLY;
 
         size_t key_offset = 0;
         size_t val_offset = 0;
@@ -482,7 +483,21 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             rocksdb::WriteBatch wb;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                wb.Put(rocksdb::Slice{ keys.data + key_offset, ksizes[i] },
+                rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
+                if(mode_new_only) {
+                    std::string existing;
+                    auto s = m_db->Get(rocksdb::ReadOptions(), key, &existing);
+                    if(s.ok()) {
+                        // key exists: skip; if single-key request, report KeyExists
+                        if(ksizes.size == 1) return Status::KeyExists;
+                        key_offset += ksizes[i];
+                        val_offset += vsizes[i];
+                        continue;
+                    } else if(!s.IsNotFound()) {
+                        return convertStatus(s);
+                    }
+                }
+                wb.Put(key,
                        rocksdb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];
@@ -492,8 +507,20 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
 
         } else {
             for(size_t i = 0; i < ksizes.size; i++) {
-                auto status = m_db->Put(m_write_options,
-                          rocksdb::Slice{ keys.data + key_offset, ksizes[i] },
+                rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
+                if(mode_new_only) {
+                    std::string existing;
+                    auto s = m_db->Get(rocksdb::ReadOptions(), key, &existing);
+                    if(s.ok()) {
+                        if(ksizes.size == 1) return Status::KeyExists;
+                        key_offset += ksizes[i];
+                        val_offset += vsizes[i];
+                        continue;
+                    } else if(!s.IsNotFound()) {
+                        return convertStatus(s);
+                    }
+                }
+                auto status = m_db->Put(m_write_options, key,
                           rocksdb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];

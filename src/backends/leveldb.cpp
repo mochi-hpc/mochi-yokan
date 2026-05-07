@@ -176,7 +176,7 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
         //            |YOKAN_MODE_NOTIFY
-        //            |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
                     |YOKAN_MODE_NO_PREFIX
                     |YOKAN_MODE_IGNORE_KEYS
@@ -258,7 +258,6 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& vsizes) override {
         ScopedReadLock mlock(m_migration_lock);
         if(m_migrated) return Status::Migrated;
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -274,11 +273,26 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                               (size_t)0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
+        const bool new_only = (mode & YOKAN_MODE_NEW_ONLY);
+
         if(m_use_write_batch) {
             leveldb::WriteBatch wb;
+            std::string existing;
 
             for(size_t i = 0; i < ksizes.size; i++) {
-                wb.Put(leveldb::Slice{ keys.data + key_offset, ksizes[i] },
+                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                if(new_only) {
+                    auto s = m_db->Get(m_read_options, key, &existing);
+                    if(s.ok()) {
+                        if(ksizes.size == 1) return Status::KeyExists;
+                        key_offset += ksizes[i];
+                        val_offset += vsizes[i];
+                        continue;
+                    } else if(!s.IsNotFound()) {
+                        return convertStatus(s);
+                    }
+                }
+                wb.Put(key,
                        leveldb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];
@@ -287,9 +301,22 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
             return convertStatus(status);
 
         } else {
+            std::string existing;
             for(size_t i = 0; i < ksizes.size; i++) {
+                const leveldb::Slice key{ keys.data + key_offset, ksizes[i] };
+                if(new_only) {
+                    auto s = m_db->Get(m_read_options, key, &existing);
+                    if(s.ok()) {
+                        if(ksizes.size == 1) return Status::KeyExists;
+                        key_offset += ksizes[i];
+                        val_offset += vsizes[i];
+                        continue;
+                    } else if(!s.IsNotFound()) {
+                        return convertStatus(s);
+                    }
+                }
                 auto status = m_db->Put(m_write_options,
-                          leveldb::Slice{ keys.data + key_offset, ksizes[i] },
+                          key,
                           leveldb::Slice{ vals.data + val_offset, vsizes[i] });
                 key_offset += ksizes[i];
                 val_offset += vsizes[i];

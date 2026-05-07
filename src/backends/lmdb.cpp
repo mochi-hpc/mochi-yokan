@@ -214,7 +214,7 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
         //            |YOKAN_MODE_NOTIFY
-        //            |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
                     |YOKAN_MODE_NO_PREFIX
                     |YOKAN_MODE_IGNORE_KEYS
@@ -326,7 +326,6 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                        const BasicUserMem<size_t>& vsizes) override {
         ScopedReadLock mlock(m_migration_lock);
         if(m_migrated) return Status::Migrated;
-        (void)mode;
         if(ksizes.size != vsizes.size) return Status::InvalidArg;
 
         size_t key_offset = 0;
@@ -342,15 +341,24 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
                                               (size_t)0);
         if(total_vsizes > vals.size) return Status::InvalidArg;
 
+        unsigned int put_flags = (mode & YOKAN_MODE_NEW_ONLY) ? MDB_NOOVERWRITE : 0;
+
         MDB_txn* txn = nullptr;
         int ret = mdb_txn_begin(m_env, nullptr, 0, &txn);
         if(ret != MDB_SUCCESS) return convertStatus(ret);
         for(size_t i = 0; i < ksizes.size; i++) {
             MDB_val key{ ksizes[i], keys.data + key_offset};
             MDB_val val{ vsizes[i], vals.data + val_offset };
-            ret = mdb_put(txn, m_db, &key, &val, 0);
+            ret = mdb_put(txn, m_db, &key, &val, put_flags);
             key_offset += ksizes[i];
             val_offset += vsizes[i];
+            if(ret == MDB_KEYEXIST && (mode & YOKAN_MODE_NEW_ONLY)) {
+                if(ksizes.size == 1) {
+                    mdb_txn_abort(txn);
+                    return Status::KeyExists;
+                }
+                continue;
+            }
             if(ret != 0) {
                 mdb_txn_abort(txn);
                 return convertStatus(ret);

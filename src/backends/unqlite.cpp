@@ -204,7 +204,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
                     |YOKAN_MODE_CONSUME
         //            |YOKAN_MODE_WAIT
         //            |YOKAN_MODE_NOTIFY
-        //            |YOKAN_MODE_NEW_ONLY
+                    |YOKAN_MODE_NEW_ONLY
         //            |YOKAN_MODE_EXIST_ONLY
                     |YOKAN_MODE_NO_PREFIX
                     |YOKAN_MODE_IGNORE_KEYS
@@ -307,6 +307,7 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         size_t val_offset = 0;
 
         auto mode_append = mode & YOKAN_MODE_APPEND;
+        auto mode_new_only = mode & YOKAN_MODE_NEW_ONLY;
 
         size_t total_ksizes = std::accumulate(ksizes.data,
                                               ksizes.data + ksizes.size,
@@ -324,6 +325,19 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
             auto key_umem = keys.data + key_offset;
             auto val_umem = vals.data + val_offset;
             int ret;
+            if(mode_new_only) {
+                unqlite_int64 existing_size = 0;
+                int fret = unqlite_kv_fetch(m_db, key_umem, ksizes[i],
+                                            nullptr, &existing_size);
+                if(fret == UNQLITE_OK || fret == UNQLITE_NOMEM) {
+                    if(ksizes.size == 1) return Status::KeyExists;
+                    key_offset += ksizes[i];
+                    val_offset += vsizes[i];
+                    continue;
+                } else if(fret != UNQLITE_NOTFOUND) {
+                    return convertStatus(fret);
+                }
+            }
             if(mode_append) {
                 ret = unqlite_kv_append(m_db, key_umem, ksizes[i],
                                               val_umem, vsizes[i]);
