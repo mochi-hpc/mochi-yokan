@@ -81,9 +81,13 @@
         } \
     } while(0)
 
+/* YOKAN_MODE_EXTRA is a client-side marker that the variadic tail carries
+ * options (extracted before forwarding); the server / backend never reasons
+ * about it, so strip it here before asking the backend whether the mode is
+ * supported. */
 #define CHECK_MODE_SUPPORTED(__db__, __mode__) \
     do { \
-        if(!__db__->supportsMode(__mode__)) { \
+        if(!__db__->supportsMode((__mode__) & ~YOKAN_MODE_EXTRA)) { \
             out.ret = YOKAN_ERR_MODE; \
             YOKAN_LOG_ERROR(mid, "mode not supported by database"); \
             return; \

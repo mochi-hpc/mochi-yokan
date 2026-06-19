@@ -13,14 +13,17 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 static yk_return_t yk_exists_direct(yk_database_handle_t dbh,
                                     int32_t mode,
                                     size_t count,
                                     const void* keys,
                                     const size_t* ksizes,
-                                    uint8_t* flags)
+                                    uint8_t* flags, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, flags);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !flags)
@@ -39,6 +42,7 @@ static yk_return_t yk_exists_direct(yk_database_handle_t dbh,
     out.flags.size = std::ceil(((double)count)/8.0);
 
     in.mode        = mode;
+    in.timeout_ms  = extras.timeout_ms;
     in.keys.data   = (char*)keys;
     in.keys.size   = std::accumulate(ksizes, ksizes+count, (size_t)0);
     in.sizes.sizes = (size_t*)ksizes;
@@ -48,8 +52,8 @@ static yk_return_t yk_exists_direct(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -86,8 +90,10 @@ extern "C" yk_return_t yk_exists_bulk(yk_database_handle_t dbh,
                                         const char* origin,
                                         hg_bulk_t data,
                                         size_t offset,
-                                        size_t size)
+                                        size_t size, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, size);
+
     if(count != 0 && size == 0)
         return YOKAN_ERR_INVALID_ARGS;
 
@@ -101,6 +107,7 @@ extern "C" yk_return_t yk_exists_bulk(yk_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.mode   = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.count  = count;
     in.bulk   = data;
     in.offset = offset;
@@ -111,8 +118,8 @@ extern "C" yk_return_t yk_exists_bulk(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -128,11 +135,13 @@ extern "C" yk_return_t yk_exists(yk_database_handle_t dbh,
                                    int32_t mode,
                                    const void* key,
                                    size_t ksize,
-                                   uint8_t* flag)
+                                   uint8_t* flag, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, flag);
+
     if(ksize == 0)
         return YOKAN_ERR_INVALID_ARGS;
-    return yk_exists_packed(dbh, mode, 1, key, &ksize, flag);
+    return yk_exists_packed(dbh, YK_MODE_WITH_EXTRA(mode), 1, key, &ksize, flag, YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
@@ -140,8 +149,10 @@ extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
                                        size_t count,
                                        const void* const* keys,
                                        const size_t* ksizes,
-                                       uint8_t* flags)
+                                       uint8_t* flags, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, flags);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !flags)
@@ -149,7 +160,7 @@ extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
 
     if(mode & YOKAN_MODE_NO_RDMA) {
         if(count == 1) {
-            return yk_exists_direct(dbh, mode, count, keys[0], ksizes, flags);
+            return yk_exists_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys[0], ksizes, flags, YK_REEMIT_EXTRAS(extras));
         }
         auto total_ksizes = std::accumulate(ksizes, ksizes+count, (size_t)0);
         std::vector<char> packed_keys(total_ksizes);
@@ -158,7 +169,7 @@ extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
             std::memcpy(packed_keys.data()+offset, keys[i], ksizes[i]);
             offset += ksizes[i];
         }
-        return yk_exists_direct(dbh, mode, count, packed_keys.data(), ksizes, flags);
+        return yk_exists_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, packed_keys.data(), ksizes, flags, YK_REEMIT_EXTRAS(extras));
     }
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -189,7 +200,7 @@ extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_exists_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_exists_bulk(dbh, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size, YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_exists_packed(yk_database_handle_t dbh,
@@ -197,10 +208,12 @@ extern "C" yk_return_t yk_exists_packed(yk_database_handle_t dbh,
                                          size_t count,
                                          const void* keys,
                                          const size_t* ksizes,
-                                         uint8_t* flags)
+                                         uint8_t* flags, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, flags);
+
     if(mode & YOKAN_MODE_NO_RDMA)
-        return yk_exists_direct(dbh, mode, count, keys, ksizes, flags);
+        return yk_exists_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys, ksizes, flags, YK_REEMIT_EXTRAS(extras));
 
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -228,5 +241,5 @@ extern "C" yk_return_t yk_exists_packed(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_exists_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_exists_bulk(dbh, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size, YK_REEMIT_EXTRAS(extras));
 }

@@ -100,7 +100,7 @@ yk_return_t yk_database_handle_release(yk_database_handle_t handle);
  */
 yk_return_t yk_count(yk_database_handle_t dbh,
                      int32_t mode,
-                     size_t* count);
+                     size_t* count, ...);
 
 /**
  * @brief Put a single key/value pair into the database.
@@ -119,7 +119,7 @@ yk_return_t yk_put(yk_database_handle_t dbh,
                    const void* key,
                    size_t ksize,
                    const void* value,
-                   size_t vsize);
+                   size_t vsize, ...);
 
 /**
  * @brief Put multiple key/value pairs into the database.
@@ -142,7 +142,7 @@ yk_return_t yk_put_multi(yk_database_handle_t dbh,
                          const void* const* keys,
                          const size_t* ksizes,
                          const void* const* values,
-                         const size_t* vsizes);
+                         const size_t* vsizes, ...);
 
 /**
  * @brief Put multiple key/value pairs into the database.
@@ -165,7 +165,7 @@ yk_return_t yk_put_packed(yk_database_handle_t dbh,
                           const void* keys,
                           const size_t* ksizes,
                           const void* values,
-                          const size_t* vsizes);
+                          const size_t* vsizes, ...);
 
 /**
  * @brief Low-level put operation based on a bulk handle.
@@ -201,7 +201,7 @@ yk_return_t yk_put_bulk(yk_database_handle_t dbh,
                         const char* origin,
                         hg_bulk_t data,
                         size_t offset,
-                        size_t size);
+                        size_t size, ...);
 
 /**
  * @brief Check if the key exists in the database.
@@ -219,7 +219,7 @@ yk_return_t yk_exists(yk_database_handle_t dbh,
                       int32_t mode,
                       const void* key,
                       size_t ksize,
-                      uint8_t* exists);
+                      uint8_t* exists, ...);
 
 /**
  * @brief Check if the list of keys exist in the database.
@@ -243,7 +243,7 @@ yk_return_t yk_exists_multi(yk_database_handle_t dbh,
                             size_t count,
                             const void* const* keys,
                             const size_t* ksizes,
-                            uint8_t* flags);
+                            uint8_t* flags, ...);
 
 /**
  * @brief Same as yk_exists_multi but keys are packed
@@ -263,7 +263,7 @@ yk_return_t yk_exists_packed(yk_database_handle_t dbh,
                              size_t count,
                              const void* keys,
                              const size_t* ksizes,
-                             uint8_t* flags);
+                             uint8_t* flags, ...);
 
 /**
  * @brief Low-level exists operation based on a bulk handle.
@@ -300,7 +300,7 @@ yk_return_t yk_exists_bulk(yk_database_handle_t dbh,
                            const char* origin,
                            hg_bulk_t data,
                            size_t offset,
-                           size_t size);
+                           size_t size, ...);
 
 /**
  * @brief Interpret the bitfield returned by the yk_exists_multi,
@@ -334,7 +334,7 @@ yk_return_t yk_length(yk_database_handle_t dbh,
                       int32_t mode,
                       const void* key,
                       size_t ksize,
-                      size_t* vsize);
+                      size_t* vsize, ...);
 
 /**
  * @brief Get the size of the values associates with a list of keys.
@@ -360,7 +360,7 @@ yk_return_t yk_length_multi(yk_database_handle_t dbh,
                             size_t count,
                             const void* const* keys,
                             const size_t* ksizes,
-                            size_t* vsizes);
+                            size_t* vsizes, ...);
 
 /**
  * @brief Same as yk_length_multi but the keys are packed
@@ -380,7 +380,7 @@ yk_return_t yk_length_packed(yk_database_handle_t dbh,
                              size_t count,
                              const void* keys,
                              const size_t* ksizes,
-                             size_t* vsizes);
+                             size_t* vsizes, ...);
 
 /**
  * @brief Low-level length operation based on a bulk handle.
@@ -417,7 +417,7 @@ yk_return_t yk_length_bulk(yk_database_handle_t dbh,
                            const char* origin,
                            hg_bulk_t data,
                            size_t offset,
-                           size_t size);
+                           size_t size, ...);
 
 /**
  * @brief Get the value associated with a key. The vsize argument
@@ -443,7 +443,7 @@ yk_return_t yk_get(yk_database_handle_t dbh,
                    const void* key,
                    size_t ksize,
                    void* value,
-                   size_t* vsize);
+                   size_t* vsize, ...);
 
 /**
  * @brief Get the values associated with a set of keys.
@@ -469,7 +469,7 @@ yk_return_t yk_get_multi(yk_database_handle_t dbh,
                          const void* const* keys,
                          const size_t* ksizes,
                          void* const* values,
-                         size_t* vsizes);
+                         size_t* vsizes, ...);
 
 /**
  * @brief Get the values associated with a set of keys.
@@ -500,7 +500,7 @@ yk_return_t yk_get_packed(yk_database_handle_t dbh,
                           const size_t* ksizes,
                           size_t vbufsize,
                           void* values,
-                          size_t* vsizes);
+                          size_t* vsizes, ...);
 
 /**
  * @brief Low-level get operation based on a bulk handle.
@@ -545,7 +545,7 @@ yk_return_t yk_get_bulk(yk_database_handle_t dbh,
                         hg_bulk_t data,
                         size_t offset,
                         size_t size,
-                        bool packed);
+                        bool packed, ...);
 
 /**
  * @brief This function performs a GET but instead of providing a buffer
@@ -574,7 +574,7 @@ yk_return_t yk_fetch(yk_database_handle_t dbh,
                      const void* key,
                      size_t ksize,
                      yk_keyvalue_callback_t cb,
-                     void* uargs);
+                     void* uargs, ...);
 
 
 /**
@@ -609,7 +609,7 @@ yk_return_t yk_fetch_packed(yk_database_handle_t dbh,
                             const size_t* ksizes,
                             yk_keyvalue_callback_t cb,
                             void* uargs,
-                            const yk_fetch_options_t* options);
+                            const yk_fetch_options_t* options, ...);
 
 /**
  * @brief Multi version of yk_fetch meant to fetch multiple values at once
@@ -635,7 +635,7 @@ yk_return_t yk_fetch_multi(yk_database_handle_t dbh,
                            const size_t* ksizes,
                            yk_keyvalue_callback_t cb,
                            void* uargs,
-                           const yk_fetch_options_t* options);
+                           const yk_fetch_options_t* options, ...);
 
 /**
  * @brief Bulk version of yk_fetch meant to fetch multiple values at once
@@ -663,7 +663,7 @@ yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
                           size_t size,
                           yk_keyvalue_callback_t cb,
                           void* uargs,
-                          const yk_fetch_options_t* options);
+                          const yk_fetch_options_t* options, ...);
 /**
  * @brief Erase a key/value pair associated with the given key.
  * Note that this function will not return an error if the key
@@ -679,7 +679,7 @@ yk_return_t yk_fetch_bulk(yk_database_handle_t dbh,
 yk_return_t yk_erase(yk_database_handle_t dbh,
                      int32_t mode,
                      const void* key,
-                     size_t ksize);
+                     size_t ksize, ...);
 
 /**
  * @brief Erase multiple key/value pairs.
@@ -696,7 +696,7 @@ yk_return_t yk_erase_multi(yk_database_handle_t dbh,
                            int32_t mode,
                            size_t count,
                            const void* const* keys,
-                           const size_t* ksizes);
+                           const size_t* ksizes, ...);
 
 /**
  * @brief Erase multiple key/value pairs. Contrary
@@ -715,7 +715,7 @@ yk_return_t yk_erase_packed(yk_database_handle_t dbh,
                             int32_t mode,
                             size_t count,
                             const void* keys,
-                            const size_t* ksizes);
+                            const size_t* ksizes, ...);
 
 /**
  * @brief Low-level erase operation based on a bulk handle.
@@ -748,7 +748,7 @@ yk_return_t yk_erase_bulk(yk_database_handle_t dbh,
                           const char* origin,
                           hg_bulk_t data,
                           size_t offset,
-                          size_t size);
+                          size_t size, ...);
 
 
 /**
@@ -781,7 +781,7 @@ yk_return_t yk_list_keys(yk_database_handle_t dbh,
                          size_t filter_size,
                          size_t count,
                          void* const* keys,
-                         size_t* ksizes);
+                         size_t* ksizes, ...);
 
 /**
  * @brief Same as yk_list_keys but using a contiguous buffer to hold keys.
@@ -808,7 +808,7 @@ yk_return_t yk_list_keys_packed(yk_database_handle_t dbh,
                                 size_t count,
                                 void* keys,
                                 size_t keys_buf_size,
-                                size_t* ksizes);
+                                size_t* ksizes, ...);
 
 /**
  * @brief Low-level list_keys operation using a bulk handle.
@@ -851,7 +851,7 @@ yk_return_t yk_list_keys_bulk(yk_database_handle_t dbh,
                               size_t offset,
                               size_t keys_buf_size,
                               bool packed,
-                              size_t count);
+                              size_t count, ...);
 
 
 /**
@@ -890,7 +890,7 @@ yk_return_t yk_list_keyvals(yk_database_handle_t dbh,
                             void* const* keys,
                             size_t* ksizes,
                             void* const* values,
-                            size_t* vsizes);
+                            size_t* vsizes, ...);
 
 /**
  * @brief Same as yk_list_keyvals but using contiguous buffers
@@ -924,7 +924,7 @@ yk_return_t yk_list_keyvals_packed(yk_database_handle_t dbh,
                                    size_t* ksizes,
                                    void* values,
                                    size_t vals_buf_size,
-                                   size_t* vsizes);
+                                   size_t* vsizes, ...);
 
 /**
  * @brief Low-level list_keyvals operation using a bulk handle.
@@ -970,7 +970,7 @@ yk_return_t yk_list_keyvals_bulk(yk_database_handle_t dbh,
                                  size_t key_buf_size,
                                  size_t val_buf_size,
                                  bool packed,
-                                 size_t count);
+                                 size_t count, ...);
 
 typedef struct yk_iter_options {
     unsigned batch_size;    /* how many items to receive at once */
@@ -1011,7 +1011,7 @@ yk_return_t yk_iter(yk_database_handle_t dbh,
                     size_t count,
                     yk_keyvalue_callback_t cb,
                     void* uargs,
-                    const yk_iter_options_t* options);
+                    const yk_iter_options_t* options, ...);
 
 #ifdef __cplusplus
 }

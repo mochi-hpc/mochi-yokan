@@ -33,6 +33,8 @@ void yk_doc_list_ult(hg_handle_t h)
 
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
+    const double timeout_ms = in.timeout_ms;
+    (void)timeout_ms;
     DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
@@ -135,6 +137,8 @@ void yk_doc_list_direct_ult(hg_handle_t h)
 
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
+    const double timeout_ms = in.timeout_ms;
+    (void)timeout_ms;
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;

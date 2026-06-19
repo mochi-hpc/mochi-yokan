@@ -107,6 +107,14 @@ typedef enum yk_return_t {
  *   transfers, when multiple underlying implementations of the RPC exists.
  * - YOKAN_MODE_UPDATE_NEW: allow yk_doc_update to create a document with the
  *   specified ID if it does not exist.
+ * - YOKAN_MODE_EXTRA: indicates that the function call carries one additional
+ *   trailing variadic argument after its declared parameters. Every Yokan
+ *   function that takes a `mode` parameter is declared variadic (`...`); the
+ *   extra argument is read only when this flag is set in `mode`, and is
+ *   ignored otherwise. The type and meaning of the extra argument depend on
+ *   the function (e.g. an asynchronous request handle); see the function's
+ *   documentation. Passing this flag without an extra argument is undefined
+ *   behavior.
  *
  * Important: not all backends support all modes.
  */
@@ -128,6 +136,26 @@ typedef enum yk_return_t {
 #define YOKAN_MODE_LIB_FILTER   0b0010000000000000
 #define YOKAN_MODE_NO_RDMA      0b0100000000000000
 #define YOKAN_MODE_UPDATE_NEW   0b1000000000000000
+#define YOKAN_MODE_EXTRA        0b00000000000000010000000000000000
+
+/**
+ * @brief Tags used in the variadic argument list when YOKAN_MODE_EXTRA is set.
+ *
+ * The list is a sequence of (tag, value) pairs terminated by YOKAN_EXTRA_END.
+ * The value type is fixed per tag and the caller MUST pass exactly the
+ * documented type (mismatch is undefined behavior, as with printf).
+ *
+ * Example:
+ *   yk_put(dbh, YOKAN_MODE_EXTRA, key, ksize, value, vsize,
+ *          YOKAN_EXTRA_TIMEOUT_MS, 10.0,
+ *          YOKAN_EXTRA_END);
+ *
+ * - YOKAN_EXTRA_END:        sentinel, no value follows.
+ * - YOKAN_EXTRA_TIMEOUT_MS: value is a double (milliseconds). A value of 0.0
+ *                           means blocking forever (no timeout).
+ */
+#define YOKAN_EXTRA_END         0
+#define YOKAN_EXTRA_TIMEOUT_MS  1
 
 /**
  * @brief Record when working with collections.

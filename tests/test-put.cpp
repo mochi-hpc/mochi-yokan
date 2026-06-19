@@ -998,6 +998,53 @@ static MunitResult test_put_new_only(const MunitParameter params[], void* data)
     return MUNIT_OK;
 }
 
+/**
+ * @brief Smoke-test for the YOKAN_MODE_EXTRA variadic tail. Issues a put
+ * with an explicit YOKAN_EXTRA_TIMEOUT_MS (5 seconds — plenty of slack) and
+ * then with the "0.0 = blocking" sentinel, and confirms both succeed and
+ * round-trip via yk_get.
+ */
+static MunitResult test_put_extra_timeout(const MunitParameter params[], void* data)
+{
+    (void)params;
+    struct kv_test_context* context = (struct kv_test_context*)data;
+    yk_database_handle_t dbh = context->dbh;
+    yk_return_t ret;
+
+    if(context->reference.empty()) return MUNIT_OK;
+
+    auto& p = *context->reference.begin();
+    auto key   = p.first.data();
+    auto ksize = p.first.size();
+    auto val   = p.second.data();
+    auto vsize = p.second.size();
+
+    /* Explicit 5000ms timeout. */
+    ret = yk_put(dbh, context->mode | YOKAN_MODE_EXTRA, key, ksize, val, vsize,
+                 YOKAN_EXTRA_TIMEOUT_MS, 5000.0,
+                 YOKAN_EXTRA_END);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    /* 0.0 means blocking — should behave like a plain put. */
+    ret = yk_put(dbh, context->mode | YOKAN_MODE_EXTRA, key, ksize, val, vsize,
+                 YOKAN_EXTRA_TIMEOUT_MS, 0.0,
+                 YOKAN_EXTRA_END);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+
+    /* Confirm the value round-trips. */
+    std::vector<char> out_val(g_max_val_size);
+    size_t out_vsize = g_max_val_size;
+    ret = yk_get(dbh, context->mode, key, ksize, out_val.data(), &out_vsize);
+    SKIP_IF_NOT_IMPLEMENTED(ret);
+    munit_assert_int(ret, ==, YOKAN_SUCCESS);
+    munit_assert_int(out_vsize, ==, vsize);
+    munit_assert_memory_equal(out_vsize, val, out_val.data());
+
+    return MUNIT_OK;
+}
+
 static char* no_rdma_params[] = {
     (char*)"true", (char*)"false", (char*)NULL };
 
@@ -1045,6 +1092,8 @@ static MunitTest test_suite_tests[] = {
     { (char*) "/put/exist_only", test_put_exist_only,
         kv_test_common_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { (char*) "/put/new_only", test_put_new_only,
+        kv_test_common_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
+    { (char*) "/put/extra_timeout", test_put_extra_timeout,
         kv_test_common_context_setup, kv_test_common_context_tear_down, MUNIT_TEST_OPTION_NONE, test_params },
     { NULL, NULL, NULL, NULL, MUNIT_TEST_OPTION_NONE, NULL }
 };

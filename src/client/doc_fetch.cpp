@@ -13,6 +13,7 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 struct doc_fetch_context_base {
     margo_instance_id             mid;
@@ -39,7 +40,8 @@ static yk_return_t doc_fetch_base(yk_database_handle_t dbh,
                                   const yk_id_t* ids,
                                   void* cb,
                                   void* uargs,
-                                  const yk_doc_fetch_options_t* options)
+                                  const yk_doc_fetch_options_t* options,
+                                  double timeout_ms)
 {
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -68,6 +70,7 @@ static yk_return_t doc_fetch_base(yk_database_handle_t dbh,
     context.cb           = reinterpret_cast<decltype(context.cb)>(cb);
 
     in.mode       = mode;
+    in.timeout_ms = timeout_ms;
     in.batch_size = options ? options->batch_size : 0;
     in.coll_name  = (char*)collection;
     in.ids.ids    = (yk_id_t*)ids;
@@ -78,8 +81,8 @@ static yk_return_t doc_fetch_base(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -98,11 +101,14 @@ extern "C" yk_return_t yk_doc_fetch_bulk(yk_database_handle_t dbh,
                                          const yk_id_t* ids,
                                          yk_document_bulk_callback_t cb,
                                          void* uargs,
-                                         const yk_doc_fetch_options_t* options)
+                                         const yk_doc_fetch_options_t* options, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, options);
+
     if(mode & YOKAN_MODE_NO_RDMA)
         return YOKAN_ERR_MODE;
-    return doc_fetch_base(dbh, collection, mode, count, ids, (void*)cb, uargs, options);
+    return doc_fetch_base(dbh, collection, mode, count, ids, (void*)cb, uargs, options,
+                          extras.timeout_ms);
 }
 
 static yk_return_t invoke_callback_on_docs(
@@ -206,13 +212,15 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
                                           const yk_id_t* ids,
                                           yk_document_callback_t cb,
                                           void* uargs,
-                                          const yk_doc_fetch_options_t* options)
+                                          const yk_doc_fetch_options_t* options, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, options);
+
     if(mode & YOKAN_MODE_NO_RDMA) {
 
         return doc_fetch_base(
             dbh, collection, mode, count,
-            ids, (void*)cb, uargs, options);
+            ids, (void*)cb, uargs, options, extras.timeout_ms);
 
     } else {
 
@@ -226,7 +234,7 @@ extern "C" yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
 
         return doc_fetch_base(
             dbh, collection, mode, count,
-            ids, (void*)bulk_to_docs, &context, options);
+            ids, (void*)bulk_to_docs, &context, options, extras.timeout_ms);
     }
 }
 
@@ -235,9 +243,11 @@ extern "C" yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
                                     int32_t mode,
                                     yk_id_t id,
                                     yk_document_callback_t cb,
-                                    void* uargs)
+                                    void* uargs, ...)
 {
-    return yk_doc_fetch_multi(dbh, collection, mode, 1, &id, cb, uargs, nullptr);
+    YK_EXTRACT_EXTRAS(extras, mode, uargs);
+
+    return yk_doc_fetch_multi(dbh, collection, YK_MODE_WITH_EXTRA(mode), 1, &id, cb, uargs, nullptr, YK_REEMIT_EXTRAS(extras));
 }
 
 void yk_doc_fetch_back_ult(hg_handle_t h)

@@ -12,6 +12,7 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 static yk_return_t yk_put_direct(yk_database_handle_t dbh,
                                  int32_t mode,
@@ -19,8 +20,10 @@ static yk_return_t yk_put_direct(yk_database_handle_t dbh,
                                  const void* keys,
                                  const size_t* ksizes,
                                  const void* values,
-                                 const size_t* vsizes)
+                                 const size_t* vsizes, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, vsizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !vsizes)
@@ -35,7 +38,8 @@ static yk_return_t yk_put_direct(yk_database_handle_t dbh,
     put_direct_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.mode   = mode;
+    in.mode       = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.ksizes.sizes = (size_t*)ksizes;
     in.ksizes.count = count;
     in.vsizes.sizes = (size_t*)vsizes;
@@ -52,8 +56,8 @@ static yk_return_t yk_put_direct(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -71,8 +75,10 @@ extern "C" yk_return_t yk_put_bulk(yk_database_handle_t dbh,
                                    const char* origin,
                                    hg_bulk_t data,
                                    size_t offset,
-                                   size_t size)
+                                   size_t size, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, size);
+
     if(count != 0 && size == 0)
         return YOKAN_ERR_INVALID_ARGS;
 
@@ -85,7 +91,8 @@ extern "C" yk_return_t yk_put_bulk(yk_database_handle_t dbh,
     put_out_t out;
     hg_handle_t handle = HG_HANDLE_NULL;
 
-    in.mode   = mode;
+    in.mode       = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.count  = count;
     in.bulk   = data;
     in.offset = offset;
@@ -96,8 +103,8 @@ extern "C" yk_return_t yk_put_bulk(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -114,11 +121,13 @@ extern "C" yk_return_t yk_put(yk_database_handle_t dbh,
                                 const void* key,
                                 size_t ksize,
                                 const void* value,
-                                size_t vsize)
+                                size_t vsize, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, vsize);
     if(ksize == 0)
         return YOKAN_ERR_INVALID_ARGS;
-    return yk_put_packed(dbh, mode, 1, key, &ksize, value, &vsize);
+    return yk_put_packed(dbh, YK_MODE_WITH_EXTRA(mode), 1, key, &ksize, value, &vsize,
+                         YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
@@ -127,8 +136,10 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
                                     const void* const* keys,
                                     const size_t* ksizes,
                                     const void* const* values,
-                                    const size_t* vsizes)
+                                    const size_t* vsizes, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, vsizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!keys || !ksizes || !values || !vsizes)
@@ -136,7 +147,8 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
 
     if(mode & YOKAN_MODE_NO_RDMA) {
         if(count == 1) {
-            return yk_put_direct(dbh, mode, count, keys[0], ksizes, values[0], vsizes);
+            return yk_put_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys[0], ksizes,
+                                 values[0], vsizes, YK_REEMIT_EXTRAS(extras));
         }
         std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, (size_t)0));
         std::vector<char> packed_vals(std::accumulate(vsizes, vsizes+count, (size_t)0));
@@ -147,8 +159,9 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
             koffset += ksizes[i];
             voffset += vsizes[i];
         }
-        return yk_put_direct(dbh, mode, count, packed_keys.data(),
-                             ksizes, packed_vals.data(), vsizes);
+        return yk_put_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, packed_keys.data(),
+                             ksizes, packed_vals.data(), vsizes,
+                             YK_REEMIT_EXTRAS(extras));
     }
 
     hg_bulk_t bulk   = HG_BULK_NULL;
@@ -185,7 +198,8 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_put_bulk(dbh, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size,
+                       YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
@@ -194,10 +208,13 @@ extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
                                        const void* keys,
                                        const size_t* ksizes,
                                        const void* values,
-                                       const size_t* vsizes)
+                                       const size_t* vsizes, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, vsizes);
+
     if(mode & YOKAN_MODE_NO_RDMA) {
-        return yk_put_direct(dbh, mode, count, keys, ksizes, values, vsizes);
+        return yk_put_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys, ksizes,
+                             values, vsizes, YK_REEMIT_EXTRAS(extras));
     }
 
     if(count == 0)
@@ -235,5 +252,6 @@ extern "C" yk_return_t yk_put_packed(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_put_bulk(dbh, mode, count, nullptr, bulk, 0, total_size);
+    return yk_put_bulk(dbh, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size,
+                       YK_REEMIT_EXTRAS(extras));
 }

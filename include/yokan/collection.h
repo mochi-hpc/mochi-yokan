@@ -57,7 +57,7 @@ typedef yk_return_t (*yk_document_bulk_callback_t)(void*, size_t, size_t, hg_bul
  */
 yk_return_t yk_collection_create(yk_database_handle_t dbh,
                                  const char* name,
-                                 int32_t mode);
+                                 int32_t mode, ...);
 
 /**
  * @brief Erase the collection from the underlying database.
@@ -70,7 +70,7 @@ yk_return_t yk_collection_create(yk_database_handle_t dbh,
  */
 yk_return_t yk_collection_drop(yk_database_handle_t dbh,
                                const char* collection,
-                               int32_t mode);
+                               int32_t mode, ...);
 
 /**
  * @brief Check if the collection exists in the underlying database.
@@ -85,7 +85,7 @@ yk_return_t yk_collection_drop(yk_database_handle_t dbh,
 yk_return_t yk_collection_exists(yk_database_handle_t dbh,
                                  const char* collection,
                                  int32_t mode,
-                                 uint8_t* flag);
+                                 uint8_t* flag, ...);
 
 /**
  * @brief Get the number of documents currently stored in the
@@ -101,7 +101,7 @@ yk_return_t yk_collection_exists(yk_database_handle_t dbh,
 yk_return_t yk_collection_size(yk_database_handle_t dbh,
                                const char* collection,
                                int32_t mode,
-                               size_t* count);
+                               size_t* count, ...);
 
 /**
  * @brief Get the last document id of the collection.
@@ -118,7 +118,7 @@ yk_return_t yk_collection_size(yk_database_handle_t dbh,
 yk_return_t yk_collection_last_id(yk_database_handle_t dbh,
                                   const char* collection,
                                   int32_t mode,
-                                  yk_id_t* id);
+                                  yk_id_t* id, ...);
 
 /**
  * @brief Store a document into the collection.
@@ -137,7 +137,7 @@ yk_return_t yk_doc_store(yk_database_handle_t dbh,
                           int32_t mode,
                           const void* document,
                           size_t size,
-                          yk_id_t* id);
+                          yk_id_t* id, ...);
 
 /**
  * @brief Store multiple documents into the collection.
@@ -158,7 +158,7 @@ yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
                                size_t count,
                                const void* const* documents,
                                const size_t* rsizes,
-                               yk_id_t* ids);
+                               yk_id_t* ids, ...);
 
 /**
  * @brief Same as yk_doc_store_multi but the documents
@@ -180,7 +180,7 @@ yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
                                 size_t count,
                                 const void* documents,
                                 const size_t* rsizes,
-                                yk_id_t* ids);
+                                yk_id_t* ids, ...);
 
 /**
  * @brief Store a document using the low-level bulk handle.
@@ -208,7 +208,7 @@ yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
                               hg_bulk_t data,
                               size_t offset,
                               size_t size,
-                              yk_id_t* ids);
+                              yk_id_t* ids, ...);
 
 /**
  * @brief Load a document from the collection.
@@ -227,7 +227,7 @@ yk_return_t yk_doc_load(yk_database_handle_t dbh,
                         int32_t mode,
                         yk_id_t id,
                         void* data,
-                        size_t* size);
+                        size_t* size, ...);
 
 /**
  * @brief Load multiple documents from the collection.
@@ -248,7 +248,7 @@ yk_return_t yk_doc_load_multi(yk_database_handle_t dbh,
                                size_t count,
                                const yk_id_t* ids,
                                void* const* documents,
-                               size_t* rsizes);
+                               size_t* rsizes, ...);
 
 /**
  * @brief Same as yk_doc_load_multi but the documents
@@ -272,7 +272,7 @@ yk_return_t yk_doc_load_packed(yk_database_handle_t dbh,
                                 const yk_id_t* ids,
                                 size_t rbufsize,
                                 void* documents,
-                                size_t* rsizes);
+                                size_t* rsizes, ...);
 
 /**
  * @brief Low-level load operation based on a bulk handle.
@@ -318,7 +318,7 @@ yk_return_t yk_doc_load_bulk(yk_database_handle_t dbh,
                              hg_bulk_t data,
                              size_t offset,
                              size_t size,
-                             bool packed);
+                             bool packed, ...);
 
 /**
  * @brief Fetch a document from the collection, calling a function
@@ -340,7 +340,7 @@ yk_return_t yk_doc_fetch(yk_database_handle_t dbh,
                          int32_t mode,
                          yk_id_t id,
                          yk_document_callback_t cb,
-                         void* uargs);
+                         void* uargs, ...);
 
 /**
  * @brief Options to provide to yk_doc_fetch_multi.
@@ -374,7 +374,7 @@ yk_return_t yk_doc_fetch_multi(yk_database_handle_t dbh,
                                const yk_id_t* ids,
                                yk_document_callback_t cb,
                                void* uargs,
-                               const yk_doc_fetch_options_t* options);
+                               const yk_doc_fetch_options_t* options, ...);
 
 /**
  * @brief Fetch documents from the collection, calling a function
@@ -403,7 +403,7 @@ yk_return_t yk_doc_fetch_bulk(yk_database_handle_t dbh,
                               const yk_id_t* ids,
                               yk_document_bulk_callback_t cb,
                               void* uargs,
-                              const yk_doc_fetch_options_t* options);
+                              const yk_doc_fetch_options_t* options, ...);
 
 /**
  * @brief Get the size of a document from the collection.
@@ -420,7 +420,7 @@ yk_return_t yk_doc_length(yk_database_handle_t dbh,
                           const char* collection,
                           int32_t mode,
                           yk_id_t id,
-                          size_t* size);
+                          size_t* size, ...);
 
 /**
  * @brief Get the size of multiple documents from the collection.
@@ -439,7 +439,7 @@ yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
                                 int32_t mode,
                                 size_t count,
                                 const yk_id_t* ids,
-                                size_t* rsizes);
+                                size_t* rsizes, ...);
 
 /**
  * @brief Update a document from the collection.
@@ -458,7 +458,7 @@ yk_return_t yk_doc_update(yk_database_handle_t dbh,
                           int32_t mode,
                           yk_id_t id,
                           const void* document,
-                          size_t size);
+                          size_t size, ...);
 
 /**
  * @brief Update multiple documents.
@@ -479,7 +479,7 @@ yk_return_t yk_doc_update_multi(yk_database_handle_t dbh,
                                 size_t count,
                                 const yk_id_t* ids,
                                 const void* const* documents,
-                                const size_t* rsizes);
+                                const size_t* rsizes, ...);
 
 /**
  * @brief Update multiple documents that are contiguous in memory.
@@ -500,7 +500,7 @@ yk_return_t yk_doc_update_packed(yk_database_handle_t dbh,
                                  size_t count,
                                  const yk_id_t* ids,
                                  const void* documents,
-                                 const size_t* rsizes);
+                                 const size_t* rsizes, ...);
 
 /**
  * @brief Low-level version of update that takes an already
@@ -527,7 +527,7 @@ yk_return_t yk_doc_update_bulk(yk_database_handle_t dbh,
                                const char* origin,
                                hg_bulk_t data,
                                size_t offset,
-                               size_t size);
+                               size_t size, ...);
 
 /**
  * @brief Erase a document from the collection.
@@ -542,7 +542,7 @@ yk_return_t yk_doc_update_bulk(yk_database_handle_t dbh,
 yk_return_t yk_doc_erase(yk_database_handle_t dbh,
                          const char* collection,
                          int32_t mode,
-                         yk_id_t id);
+                         yk_id_t id, ...);
 
 /**
  * @brief Erase multiple documents from the collection.
@@ -559,7 +559,7 @@ yk_return_t yk_doc_erase_multi(yk_database_handle_t dbh,
                                const char* collection,
                                int32_t mode,
                                size_t count,
-                               const yk_id_t* ids);
+                               const yk_id_t* ids, ...);
 
 /**
  * @brief List up to max documents starting at start_id
@@ -594,7 +594,7 @@ yk_return_t yk_doc_list(yk_database_handle_t dbh,
                         size_t max,
                         yk_id_t* ids,
                         void* const* docs,
-                        size_t* doc_sizes);
+                        size_t* doc_sizes, ...);
 
 /**
  * Same as yk_doc_list but uses a single buffer to hold documents
@@ -624,7 +624,7 @@ yk_return_t yk_doc_list_packed(yk_database_handle_t dbh,
                                yk_id_t* ids,
                                size_t bufsize,
                                void* docs,
-                               size_t* doc_sizes);
+                               size_t* doc_sizes, ...);
 
 /**
  * @brief Version of yk_doc_list that works on an already
@@ -656,7 +656,7 @@ yk_return_t yk_doc_list_bulk(yk_database_handle_t dbh,
                              size_t offset,
                              size_t docs_buf_size,
                              bool packed,
-                             size_t count);
+                             size_t count, ...);
 
 /**
  * @brief Options to pass to yk_doc_iter.
@@ -695,7 +695,7 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
                         size_t max,
                         yk_document_callback_t cb,
                         void* uargs,
-                        const yk_doc_iter_options_t* options);
+                        const yk_doc_iter_options_t* options, ...);
 
 /**
  * @brief Iterate through up to max documents starting at start_id,
@@ -723,7 +723,7 @@ yk_return_t yk_doc_iter_bulk(yk_database_handle_t dbh,
                              size_t max,
                              yk_document_bulk_callback_t cb,
                              void* uargs,
-                             const yk_doc_iter_options_t* options);
+                             const yk_doc_iter_options_t* options, ...);
 
 
 #ifdef __cplusplus

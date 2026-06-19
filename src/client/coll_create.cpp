@@ -11,10 +11,13 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 extern "C" yk_return_t yk_collection_create(yk_database_handle_t dbh,
                                             const char* name,
-                                            int32_t mode) {
+                                            int32_t mode, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, mode);
+
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
@@ -25,14 +28,15 @@ extern "C" yk_return_t yk_collection_create(yk_database_handle_t dbh,
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.mode      = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.coll_name = (char*)name;
 
     hret = margo_create(mid, dbh->addr, dbh->client->coll_create_id, &handle);
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);

@@ -13,6 +13,7 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 struct doc_iter_context_base {
     margo_instance_id            mid;
@@ -133,7 +134,8 @@ static yk_return_t doc_iter_base(yk_database_handle_t dbh,
                                  size_t max,
                                  void* cb,
                                  void* uargs,
-                                 const yk_doc_iter_options_t* options)
+                                 const yk_doc_iter_options_t* options,
+                                 double timeout_ms)
 {
     if(!cb)
         return YOKAN_ERR_INVALID_ARGS;
@@ -159,6 +161,7 @@ static yk_return_t doc_iter_base(yk_database_handle_t dbh,
 
     in.coll_name    = (char*)collection;
     in.mode         = mode;
+    in.timeout_ms   = timeout_ms;
     in.batch_size   = options ? options->batch_size : 0;
     in.count        = max;
     in.from_id      = from_id;
@@ -171,8 +174,8 @@ static yk_return_t doc_iter_base(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -193,13 +196,15 @@ yk_return_t yk_doc_iter_bulk(yk_database_handle_t dbh,
                              size_t max,
                              yk_document_bulk_callback_t cb,
                              void* uargs,
-                             const yk_doc_iter_options_t* options)
+                             const yk_doc_iter_options_t* options, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, options);
+
     if(mode & YOKAN_MODE_NO_RDMA)
         return YOKAN_ERR_MODE;
     return doc_iter_base(
         dbh, collection, mode, from_id, filter,
-        filter_size, max, (void*)cb, uargs, options);
+        filter_size, max, (void*)cb, uargs, options, extras.timeout_ms);
 }
 
 yk_return_t yk_doc_iter(yk_database_handle_t dbh,
@@ -211,8 +216,10 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
                         size_t max,
                         yk_document_callback_t cb,
                         void* uargs,
-                        const yk_doc_iter_options_t* options)
+                        const yk_doc_iter_options_t* options, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, options);
+
     if(!cb)
         return YOKAN_ERR_INVALID_ARGS;
 
@@ -221,7 +228,7 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
         return doc_iter_base(
                 dbh, collection, mode, from_id,
                 filter, filter_size, max, (void*)cb,
-                uargs, options);
+                uargs, options, extras.timeout_ms);
 
     } else {
 
@@ -234,7 +241,7 @@ yk_return_t yk_doc_iter(yk_database_handle_t dbh,
         return doc_iter_base(
                 dbh, collection, mode, from_id,
                 filter, filter_size, max, (void*)bulk_to_docs,
-                &context, options);
+                &context, options, extras.timeout_ms);
 
     }
 }

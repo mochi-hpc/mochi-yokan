@@ -11,13 +11,16 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 extern "C" yk_return_t yk_doc_erase_multi(
         yk_database_handle_t dbh,
         const char* collection,
         int32_t mode,
         size_t count,
-        const yk_id_t* ids) {
+        const yk_id_t* ids, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, ids);
+
 
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -33,6 +36,7 @@ extern "C" yk_return_t yk_doc_erase_multi(
     hg_handle_t handle = HG_HANDLE_NULL;
 
     in.mode      = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.coll_name = (char*)collection;
     in.ids.count = count;
     in.ids.ids   = (yk_id_t*)ids;
@@ -41,8 +45,8 @@ extern "C" yk_return_t yk_doc_erase_multi(
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -57,6 +61,8 @@ extern "C" yk_return_t yk_doc_erase_multi(
 extern "C" yk_return_t yk_doc_erase(yk_database_handle_t dbh,
                                     const char* name,
                                     int32_t mode,
-                                    yk_id_t id) {
-    return yk_doc_erase_multi(dbh, name, mode, 1, &id);
+                                    yk_id_t id, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, id);
+
+    return yk_doc_erase_multi(dbh, name, YK_MODE_WITH_EXTRA(mode), 1, &id, YK_REEMIT_EXTRAS(extras));
 }

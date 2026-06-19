@@ -12,6 +12,7 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
                                        const char* collection,
@@ -19,7 +20,9 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
                                        size_t count,
                                        const void* records,
                                        const size_t* rsizes,
-                                       yk_id_t* ids) {
+                                       yk_id_t* ids, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, ids);
+
 
     if(count == 0)
         return YOKAN_SUCCESS;
@@ -37,6 +40,7 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
     out.ids.count = count;
 
     in.mode        = mode;
+    in.timeout_ms  = extras.timeout_ms;
     in.coll_name   = (char*)collection;
     in.sizes.count = count;
     in.sizes.sizes = (uint64_t*)rsizes;
@@ -51,8 +55,8 @@ static yk_return_t yk_doc_store_direct(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -76,7 +80,9 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
                                          hg_bulk_t data,
                                          size_t offset,
                                          size_t size,
-                                         yk_id_t* ids) {
+                                         yk_id_t* ids, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, ids);
+
     CHECK_MODE_VALID(mode);
 
     margo_instance_id mid = dbh->client->mid;
@@ -90,6 +96,7 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
     out.ids.count = count;
 
     in.mode      = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.coll_name = (char*)name;
     in.count     = count;
     in.origin    = (char*)origin;
@@ -101,8 +108,8 @@ extern "C" yk_return_t yk_doc_store_bulk(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -124,10 +131,12 @@ extern "C" yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
                                            size_t count,
                                            const void* records,
                                            const size_t* rsizes,
-                                           yk_id_t* ids) {
+                                           yk_id_t* ids, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, ids);
+
     if(mode & YOKAN_MODE_NO_RDMA) {
-        return yk_doc_store_direct(dbh, collection, mode,
-                                   count, records, rsizes, ids);
+        return yk_doc_store_direct(dbh, collection, YK_MODE_WITH_EXTRA(mode),
+                                   count, records, rsizes, ids, YK_REEMIT_EXTRAS(extras));
     }
 
     if(count == 0)
@@ -158,7 +167,7 @@ extern "C" yk_return_t yk_doc_store_packed(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_doc_store_bulk(dbh, collection, mode, count, nullptr, bulk, 0, total_size, ids);
+    return yk_doc_store_bulk(dbh, collection, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size, ids, YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
@@ -167,7 +176,9 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
                                           size_t count,
                                           const void* const* records,
                                           const size_t* rsizes,
-                                          yk_id_t* ids) {
+                                          yk_id_t* ids, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, ids);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!records || !rsizes)
@@ -183,11 +194,11 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
                 std::memcpy(packed_records.data()+offset, records[i], rsizes[i]);
                 offset += rsizes[i];
             }
-            return yk_doc_store_direct(dbh, collection, mode, count,
-                                   packed_records.data(), rsizes, ids);
+            return yk_doc_store_direct(dbh, collection, YK_MODE_WITH_EXTRA(mode), count,
+                                   packed_records.data(), rsizes, ids, YK_REEMIT_EXTRAS(extras));
         } else {
-            return yk_doc_store_direct(dbh, collection, mode, count,
-                                   records[0], rsizes, ids);
+            return yk_doc_store_direct(dbh, collection, YK_MODE_WITH_EXTRA(mode), count,
+                                   records[0], rsizes, ids, YK_REEMIT_EXTRAS(extras));
         }
     }
 
@@ -217,7 +228,7 @@ extern "C" yk_return_t yk_doc_store_multi(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_bulk_create);
     DEFER(margo_bulk_free(bulk));
 
-    return yk_doc_store_bulk(dbh, collection, mode, count, nullptr, bulk, 0, total_size, ids);
+    return yk_doc_store_bulk(dbh, collection, YK_MODE_WITH_EXTRA(mode), count, nullptr, bulk, 0, total_size, ids, YK_REEMIT_EXTRAS(extras));
 }
 
 extern "C" yk_return_t yk_doc_store(yk_database_handle_t dbh,
@@ -225,6 +236,8 @@ extern "C" yk_return_t yk_doc_store(yk_database_handle_t dbh,
                                     int32_t mode,
                                     const void* record,
                                     size_t size,
-                                    yk_id_t* id) {
-    return yk_doc_store_packed(dbh, collection, mode, 1, record, &size, id);
+                                    yk_id_t* id, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, id);
+
+    return yk_doc_store_packed(dbh, collection, YK_MODE_WITH_EXTRA(mode), 1, record, &size, id, YK_REEMIT_EXTRAS(extras));
 }

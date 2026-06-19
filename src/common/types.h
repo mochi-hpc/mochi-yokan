@@ -47,12 +47,14 @@ typedef struct uint64_list {
 static inline hg_return_t hg_proc_yk_id_t(hg_proc_t proc, yk_id_t *id);
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* list);
 static inline hg_return_t hg_proc_raw_data(hg_proc_t proc, raw_data* raw);
+static inline hg_return_t hg_proc_double(hg_proc_t proc, double* d);
 
 /* Client RPC types */
 
 /* count */
 MERCURY_GEN_PROC(count_in_t,
-        ((int32_t)(mode)))
+        ((int32_t)(mode))\
+        ((double)(timeout_ms)))
 MERCURY_GEN_PROC(count_out_t,
         ((int32_t)(ret))\
         ((uint64_t)(count)))
@@ -60,6 +62,7 @@ MERCURY_GEN_PROC(count_out_t,
 /* exists */
 MERCURY_GEN_PROC(exists_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
@@ -71,6 +74,7 @@ MERCURY_GEN_PROC(exists_out_t,
 /* exists (direct) */
 MERCURY_GEN_PROC(exists_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((raw_data)(keys))\
         ((uint64_list)(sizes)))
 MERCURY_GEN_PROC(exists_direct_out_t,
@@ -80,6 +84,7 @@ MERCURY_GEN_PROC(exists_direct_out_t,
 /* length */
 MERCURY_GEN_PROC(length_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
@@ -91,6 +96,7 @@ MERCURY_GEN_PROC(length_out_t,
 /* length (direct) */
 MERCURY_GEN_PROC(length_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((raw_data)(keys))\
         ((uint64_list)(sizes)))
 MERCURY_GEN_PROC(length_direct_out_t,
@@ -100,6 +106,7 @@ MERCURY_GEN_PROC(length_direct_out_t,
 /* put */
 MERCURY_GEN_PROC(put_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
@@ -111,6 +118,7 @@ MERCURY_GEN_PROC(put_out_t,
 /* put (direct) */
 MERCURY_GEN_PROC(put_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_list)(ksizes))\
         ((uint64_list)(vsizes))\
         ((raw_data)(keys))\
@@ -121,6 +129,7 @@ MERCURY_GEN_PROC(put_direct_out_t,
 /* get */
 MERCURY_GEN_PROC(get_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
@@ -133,6 +142,7 @@ MERCURY_GEN_PROC(get_out_t,
 /* get (direct) */
 MERCURY_GEN_PROC(get_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_size_t)(vbufsize))\
         ((uint64_list)(ksizes))\
         ((raw_data)(keys)))
@@ -144,6 +154,7 @@ MERCURY_GEN_PROC(get_direct_out_t,
 /* fetch */
 MERCURY_GEN_PROC(fetch_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint32_t)(batch_size))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -157,6 +168,7 @@ MERCURY_GEN_PROC(fetch_out_t,
 /* fetch (direct) */
 MERCURY_GEN_PROC(fetch_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint32_t)(batch_size))\
         ((uint64_list)(ksizes))\
         ((raw_data)(keys))\
@@ -186,6 +198,7 @@ MERCURY_GEN_PROC(fetch_direct_back_out_t,
 /* erase */
 MERCURY_GEN_PROC(erase_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
         ((uint64_t)(size))\
@@ -197,6 +210,7 @@ MERCURY_GEN_PROC(erase_out_t,
 /* erase (direct) */
 MERCURY_GEN_PROC(erase_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_list)(ksizes))\
         ((raw_data)(keys)))
 MERCURY_GEN_PROC(erase_direct_out_t,
@@ -205,6 +219,7 @@ MERCURY_GEN_PROC(erase_direct_out_t,
 /* list_keys */
 MERCURY_GEN_PROC(list_keys_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
         ((uint64_t)(from_ksize))\
@@ -219,6 +234,7 @@ MERCURY_GEN_PROC(list_keys_out_t,
 /* list_keys (direct) */
 MERCURY_GEN_PROC(list_keys_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((raw_data)(from_key))\
         ((raw_data)(filter))\
@@ -231,6 +247,7 @@ MERCURY_GEN_PROC(list_keys_direct_out_t,
 /* list_keyvals */
 MERCURY_GEN_PROC(list_keyvals_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
         ((uint64_t)(from_ksize))\
@@ -246,6 +263,7 @@ MERCURY_GEN_PROC(list_keyvals_out_t,
 /* list_keyvals (direct) */
 MERCURY_GEN_PROC(list_keyvals_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((raw_data)(from_key))\
         ((raw_data)(filter))\
@@ -261,6 +279,7 @@ MERCURY_GEN_PROC(list_keyvals_direct_out_t,
 /* iter */
 MERCURY_GEN_PROC(iter_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_bool_t)(no_values))\
         ((uint32_t)(batch_size))\
         ((uint64_t)(count))\
@@ -294,6 +313,7 @@ MERCURY_GEN_PROC(iter_direct_back_out_t,
 /* coll_create */
 MERCURY_GEN_PROC(coll_create_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_create_out_t,
         ((int32_t)(ret)))
@@ -301,6 +321,7 @@ MERCURY_GEN_PROC(coll_create_out_t,
 /* coll_drop */
 MERCURY_GEN_PROC(coll_drop_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_drop_out_t,
         ((int32_t)(ret)))
@@ -308,6 +329,7 @@ MERCURY_GEN_PROC(coll_drop_out_t,
 /* coll_exists */
 MERCURY_GEN_PROC(coll_exists_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_exists_out_t,
         ((int32_t)(ret))\
@@ -316,6 +338,7 @@ MERCURY_GEN_PROC(coll_exists_out_t,
 /* coll_last_id */
 MERCURY_GEN_PROC(coll_last_id_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_last_id_out_t,
         ((int32_t)(ret))\
@@ -324,6 +347,7 @@ MERCURY_GEN_PROC(coll_last_id_out_t,
 /* coll_size */
 MERCURY_GEN_PROC(coll_size_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name)))
 MERCURY_GEN_PROC(coll_size_out_t,
         ((int32_t)(ret))\
@@ -332,6 +356,7 @@ MERCURY_GEN_PROC(coll_size_out_t,
 /* doc_erase */
 MERCURY_GEN_PROC(doc_erase_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids)))
 MERCURY_GEN_PROC(doc_erase_out_t,
@@ -340,6 +365,7 @@ MERCURY_GEN_PROC(doc_erase_out_t,
 /* doc_store */
 MERCURY_GEN_PROC(doc_store_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_t)(count))\
         ((uint64_t)(offset))\
@@ -353,6 +379,7 @@ MERCURY_GEN_PROC(doc_store_out_t,
 /* doc_store (direct) */
 MERCURY_GEN_PROC(doc_store_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(sizes))\
         ((raw_data)(docs)))
@@ -363,6 +390,7 @@ MERCURY_GEN_PROC(doc_store_direct_out_t,
 /* doc_update */
 MERCURY_GEN_PROC(doc_update_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
         ((uint64_t)(offset))\
@@ -375,6 +403,7 @@ MERCURY_GEN_PROC(doc_update_out_t,
 /* doc_update (direct) */
 MERCURY_GEN_PROC(doc_update_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
         ((uint64_list)(sizes))\
@@ -385,6 +414,7 @@ MERCURY_GEN_PROC(doc_update_direct_out_t,
 /* doc_load */
 MERCURY_GEN_PROC(doc_load_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
         ((uint64_t)(offset))\
@@ -398,6 +428,7 @@ MERCURY_GEN_PROC(doc_load_out_t,
 /* doc_load (direct) */
 MERCURY_GEN_PROC(doc_load_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
         ((hg_size_t)(bufsize)))
@@ -409,6 +440,7 @@ MERCURY_GEN_PROC(doc_load_direct_out_t,
 /* doc_fetch */
 MERCURY_GEN_PROC(doc_fetch_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint32_t)(batch_size))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids))\
@@ -436,6 +468,7 @@ MERCURY_GEN_PROC(doc_fetch_direct_back_in_t,
 /* doc_length */
 MERCURY_GEN_PROC(doc_length_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((uint64_list)(ids)))
 MERCURY_GEN_PROC(doc_length_out_t,
@@ -445,6 +478,7 @@ MERCURY_GEN_PROC(doc_length_out_t,
 /* doc_list */
 MERCURY_GEN_PROC(doc_list_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((hg_string_t)(coll_name))\
         ((hg_bool_t)(packed))\
         ((uint64_t)(count))\
@@ -460,6 +494,7 @@ MERCURY_GEN_PROC(doc_list_out_t,
 /* doc_list (direct) */
 MERCURY_GEN_PROC(doc_list_direct_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint64_t)(count))\
         ((yk_id_t)(from_id))\
         ((hg_string_t)(coll_name))\
@@ -474,6 +509,7 @@ MERCURY_GEN_PROC(doc_list_direct_out_t,
 /* doc_iter */
 MERCURY_GEN_PROC(doc_iter_in_t,
         ((int32_t)(mode))\
+        ((double)(timeout_ms))\
         ((uint32_t)(batch_size))\
         ((hg_string_t)(coll_name))\
         ((uint64_t)(count))\
@@ -514,6 +550,11 @@ static inline hg_return_t hg_proc_yk_id_t(
         hg_proc_t proc, yk_id_t* id)
 {
     return hg_proc_uint64_t(proc, id);
+}
+
+static inline hg_return_t hg_proc_double(hg_proc_t proc, double* d)
+{
+    return hg_proc_memcpy(proc, d, sizeof(*d));
 }
 
 static inline hg_return_t hg_proc_uint64_list(hg_proc_t proc, uint64_list* in)

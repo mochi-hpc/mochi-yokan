@@ -13,6 +13,7 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 struct iter_context {
     yk_keyvalue_callback_t cb;
@@ -29,8 +30,10 @@ yk_return_t yk_iter(yk_database_handle_t dbh,
                     size_t count,
                     yk_keyvalue_callback_t cb,
                     void* uargs,
-                    const yk_iter_options_t* options)
+                    const yk_iter_options_t* options, ...)
 {
+    YK_EXTRACT_EXTRAS(extras, mode, options);
+
     if(!cb)
         return YOKAN_ERR_INVALID_ARGS;
 
@@ -61,6 +64,7 @@ yk_return_t yk_iter(yk_database_handle_t dbh,
     }
 
     in.mode          = mode;
+    in.timeout_ms    = extras.timeout_ms;
     in.no_values     = context.options.ignore_values;
     in.batch_size    = context.options.batch_size;
     in.count         = count;
@@ -75,8 +79,8 @@ yk_return_t yk_iter(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);

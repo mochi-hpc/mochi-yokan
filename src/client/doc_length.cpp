@@ -11,13 +11,16 @@
 #include "../common/types.h"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/extras.h"
 
 extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
                                          const char* collection,
                                          int32_t mode,
                                          size_t count,
                                          const yk_id_t* ids,
-                                         size_t* rsizes) {
+                                         size_t* rsizes, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, rsizes);
+
     if(count == 0)
         return YOKAN_SUCCESS;
     else if(!ids || !rsizes)
@@ -36,6 +39,7 @@ extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
     out.sizes.count = count;
 
     in.mode      = mode;
+    in.timeout_ms = extras.timeout_ms;
     in.coll_name = (char*)collection;
     in.ids.count = count;
     in.ids.ids   = (yk_id_t*)ids;
@@ -44,8 +48,8 @@ extern "C" yk_return_t yk_doc_length_multi(yk_database_handle_t dbh,
     CHECK_HRET(hret, margo_create);
     DEFER(margo_destroy(handle));
 
-    hret = margo_provider_forward(dbh->provider_id, handle, &in);
-    CHECK_HRET(hret, margo_provider_forward);
+    hret = margo_provider_forward_timed(dbh->provider_id, handle, &in, extras.timeout_ms);
+    CHECK_HRET(hret, margo_provider_forward_timed);
 
     hret = margo_get_output(handle, &out);
     CHECK_HRET(hret, margo_get_output);
@@ -65,9 +69,11 @@ extern "C" yk_return_t yk_doc_length(yk_database_handle_t dbh,
                                    const char* collection,
                                    int32_t mode,
                                    yk_id_t id,
-                                   size_t* size) {
+                                   size_t* size, ...) {
+    YK_EXTRACT_EXTRAS(extras, mode, size);
+
     if(size == nullptr) return YOKAN_ERR_INVALID_ARGS;
-    auto ret = yk_doc_length_multi(dbh, collection, mode, 1, &id, size);
+    auto ret = yk_doc_length_multi(dbh, collection, YK_MODE_WITH_EXTRA(mode), 1, &id, size, YK_REEMIT_EXTRAS(extras));
     if(ret == YOKAN_SUCCESS && *size == YOKAN_KEY_NOT_FOUND)
         return YOKAN_ERR_KEY_NOT_FOUND;
     return ret;
