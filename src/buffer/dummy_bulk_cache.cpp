@@ -10,21 +10,21 @@
 
 namespace yokan {
 
-struct default_bulk_cache {
+struct dummy_bulk_cache {
     margo_instance_id          mid;
     std::atomic<unsigned long> num_allocated;
 };
 
-void* default_bulk_cache_init(margo_instance_id mid, const char* config) {
+void* dummy_bulk_cache_init(margo_instance_id mid, const char* config) {
     (void)config;
-    auto cache = new default_bulk_cache;
+    auto cache = new dummy_bulk_cache;
     cache->mid = mid;
     cache->num_allocated = 0;
     return cache;
 }
 
-void default_bulk_cache_finalize(void* c) {
-    auto cache = static_cast<default_bulk_cache*>(c);
+void dummy_bulk_cache_finalize(void* c) {
+    auto cache = static_cast<dummy_bulk_cache*>(c);
     auto num_allocated = cache->num_allocated.load();
     if(num_allocated != 0) {
         // LCOV_EXCL_START
@@ -36,8 +36,8 @@ void default_bulk_cache_finalize(void* c) {
     delete cache;
 }
 
-yk_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
-    auto cache = static_cast<default_bulk_cache*>(c);
+yk_buffer_t dummy_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
+    auto cache = static_cast<dummy_bulk_cache*>(c);
     if(size == 0) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
@@ -52,7 +52,7 @@ yk_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     if(!buffer->data) {
         // LCOV_EXCL_START
         YOKAN_LOG_ERROR(cache->mid,
-            "Allocation of %lu-byte buffer failed in default_bulk_cache",
+            "Allocation of %lu-byte buffer failed in dummy_bulk_cache",
             size);
         delete buffer;
         return nullptr;
@@ -76,8 +76,8 @@ yk_buffer_t default_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     return buffer;
 }
 
-void default_bulk_cache_release(void* c, yk_buffer_t buffer) {
-    auto cache = static_cast<default_bulk_cache*>(c);
+void dummy_bulk_cache_release(void* c, yk_buffer_t buffer) {
+    auto cache = static_cast<dummy_bulk_cache*>(c);
     margo_bulk_free(buffer->bulk);
     delete[] buffer->data;
     delete buffer;
@@ -88,11 +88,11 @@ void default_bulk_cache_release(void* c, yk_buffer_t buffer) {
 
 extern "C" {
 
-yk_bulk_cache yk_default_bulk_cache = {
-    yokan::default_bulk_cache_init,
-    yokan::default_bulk_cache_finalize,
-    yokan::default_bulk_cache_get,
-    yokan::default_bulk_cache_release
+yk_bulk_cache yk_dummy_bulk_cache = {
+    yokan::dummy_bulk_cache_init,
+    yokan::dummy_bulk_cache_finalize,
+    yokan::dummy_bulk_cache_get,
+    yokan::dummy_bulk_cache_release
 };
 
 }

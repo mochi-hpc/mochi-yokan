@@ -12,7 +12,7 @@
 #include "../common/linker.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
-#include "../buffer/default_bulk_cache.hpp"
+#include "../buffer/dummy_bulk_cache.hpp"
 #include "../buffer/keep_all_bulk_cache.hpp"
 #include "../buffer/lru_bulk_cache.hpp"
 #include <string>
@@ -81,7 +81,7 @@ yk_return_t yk_provider_register(
         if(a.cache)
             config["buffer_cache"]["type"] = "external";
         else
-            config["buffer_cache"]["type"] = "default";
+            config["buffer_cache"]["type"] = "lru";
     }
     if(not config["buffer_cache"].is_object()) {
         YOKAN_LOG_ERROR(mid, "\"buffer_cache\" field in configuration is not an object");
@@ -155,8 +155,8 @@ yk_return_t yk_provider_register(
         p->bulk_cache = *a.cache;
     } else {
         auto& buffer_cache_type = config["buffer_cache"]["type"].get_ref<const std::string&>();
-        if(buffer_cache_type == "default") {
-            p->bulk_cache = yk_default_bulk_cache;
+        if(buffer_cache_type == "dummy") {
+            p->bulk_cache = yk_dummy_bulk_cache;
         } else if(buffer_cache_type == "keep_all") {
             p->bulk_cache = yk_keep_all_bulk_cache;
         } else if(buffer_cache_type == "lru") {
