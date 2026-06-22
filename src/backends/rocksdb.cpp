@@ -482,24 +482,34 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         if(m_use_write_batch) {
             rocksdb::WriteBatch wb;
 
+            std::vector<rocksdb::Slice> key_slices;
+            key_slices.reserve(ksizes.size);
             for(size_t i = 0; i < ksizes.size; i++) {
-                rocksdb::Slice key{ keys.data + key_offset, ksizes[i] };
+                key_slices.emplace_back(keys.data + key_offset, ksizes[i]);
+                key_offset += ksizes[i];
+            }
+
+            std::vector<rocksdb::Status> statuses;
+            if(mode_new_only) {
+                std::vector<std::string> existing(ksizes.size);
+                statuses = m_db->MultiGet(rocksdb::ReadOptions(),
+                                          key_slices, &existing);
+            }
+
+            for(size_t i = 0; i < ksizes.size; i++) {
                 if(mode_new_only) {
-                    std::string existing;
-                    auto s = m_db->Get(rocksdb::ReadOptions(), key, &existing);
+                    const auto& s = statuses[i];
                     if(s.ok()) {
                         // key exists: skip; if single-key request, report KeyExists
                         if(ksizes.size == 1) return Status::KeyExists;
-                        key_offset += ksizes[i];
                         val_offset += vsizes[i];
                         continue;
                     } else if(!s.IsNotFound()) {
                         return convertStatus(s);
                     }
                 }
-                wb.Put(key,
+                wb.Put(key_slices[i],
                        rocksdb::Slice{ vals.data + val_offset, vsizes[i] });
-                key_offset += ksizes[i];
                 val_offset += vsizes[i];
             }
             auto status = m_db->Write(m_write_options, &wb);
