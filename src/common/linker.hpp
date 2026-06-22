@@ -7,7 +7,10 @@
 #define __YOKAN_DL_H
 
 #include "logging.h"
+#include <abt.h>
 #include <dlfcn.h>
+#include <string>
+#include <unordered_set>
 
 namespace yokan {
 
@@ -47,13 +50,33 @@ class Linker {
         }
     }
 
+    /* Idempotent: on a cache hit, returns immediately without taking
+     * glibc's _dl_load_lock. Loaded handles are intentionally never
+     * dlclose'd — filter shared libraries register std::function callbacks
+     * into static FilterFactory maps whose code lives in the .so, so
+     * unloading would leave dangling pointers. */
     static void open(const std::string& filename) {
-        void* handle;
-        handle = dlopen(filename.c_str(), RTLD_NOW | RTLD_GLOBAL);
+        static ABT_mutex_memory s_mtx_mem = ABT_MUTEX_INITIALIZER;
+        static std::unordered_set<std::string> s_loaded;
+        ABT_mutex s_mtx = ABT_MUTEX_MEMORY_GET_HANDLE(&s_mtx_mem);
+
+        ABT_mutex_lock(s_mtx);
+        if(s_loaded.count(filename)) {
+            ABT_mutex_unlock(s_mtx);
+            return;
+        }
+        ABT_mutex_unlock(s_mtx);
+
+        void* handle = dlopen(filename.c_str(), RTLD_NOW | RTLD_GLOBAL);
         if(!handle) {
            YOKAN_LOG_ERROR(0, "dlopen failed to open file %s (%s)",
                 filename.c_str(), dlerror());
+           return;
         }
+
+        ABT_mutex_lock(s_mtx);
+        s_loaded.insert(filename);
+        ABT_mutex_unlock(s_mtx);
     }
 };
 
