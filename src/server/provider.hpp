@@ -13,6 +13,8 @@
 #include <nlohmann/json.hpp>
 #include <margo.h>
 #include <unordered_map>
+#include <list>
+#include <utility>
 #include <string>
 #include <cstring>
 
@@ -26,6 +28,12 @@ typedef struct yk_provider {
     json               config;              // JSON configuration
     yk_bulk_cache      bulk_cache;          // Bulk cache functions
     void*              bulk_cache_data;     // Bulk cache data
+
+    /* LRU cache of resolved origin addresses (keyed by address string). */
+    ABT_mutex                                                                            addr_cache_mtx;
+    std::list<std::pair<std::string, hg_addr_t>>                                         addr_cache;
+    std::unordered_map<std::string,
+                       std::list<std::pair<std::string, hg_addr_t>>::iterator>           addr_cache_index;
 
     /* Database */
     yk_database_t db;
@@ -166,4 +174,14 @@ void yk_doc_iter_direct_ult(hg_handle_t h);
 
 DECLARE_MARGO_RPC_HANDLER(yk_get_remi_provider_id_ult)
 void yk_get_remi_provider_id_ult(hg_handle_t h);
+
+/* Returns a non-owning hg_addr_t for the RPC origin. When `origin` is NULL,
+ * returns the handle's source address (valid for handle lifetime). When set,
+ * looks up the address (caching the result in the provider's LRU) and returns
+ * the cached, provider-owned handle. The caller MUST NOT call margo_addr_free
+ * on the returned address. */
+hg_return_t yk_provider_resolve_addr(yk_provider_t provider,
+                                     hg_handle_t  h,
+                                     const char*  origin,
+                                     hg_addr_t*   addr_out);
 #endif

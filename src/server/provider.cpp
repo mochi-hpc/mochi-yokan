@@ -115,6 +115,7 @@ yk_return_t yk_provider_register(
     p->provider_id = provider_id;
     p->pool = a.pool;
     p->config = config;
+    ABT_mutex_create(&p->addr_cache_mtx);
 
     /* REMI client and provider */
 #ifdef YOKAN_HAS_REMI
@@ -513,8 +514,64 @@ static void yk_finalize_provider(void* p)
     margo_deregister(mid, provider->doc_list_direct_id);
     margo_deregister(mid, provider->doc_iter_id);
     provider->bulk_cache.finalize(provider->bulk_cache_data);
+    for(auto& e : provider->addr_cache)
+        margo_addr_free(mid, e.second);
+    provider->addr_cache.clear();
+    provider->addr_cache_index.clear();
+    ABT_mutex_free(&provider->addr_cache_mtx);
     delete provider;
     YOKAN_LOG_TRACE(mid, "YOKAN provider successfuly finalized");
+}
+
+hg_return_t yk_provider_resolve_addr(yk_provider_t provider,
+                                     hg_handle_t  h,
+                                     const char*  origin,
+                                     hg_addr_t*   addr_out)
+{
+    if(!origin) {
+        const struct hg_info* info = margo_get_info(h);
+        *addr_out = info->addr;
+        return HG_SUCCESS;
+    }
+    constexpr size_t MAX_CACHE_ENTRIES = 64;
+    std::string key{origin};
+
+    ABT_mutex_lock(provider->addr_cache_mtx);
+    auto it = provider->addr_cache_index.find(key);
+    if(it != provider->addr_cache_index.end()) {
+        provider->addr_cache.splice(provider->addr_cache.begin(),
+                                    provider->addr_cache, it->second);
+        *addr_out = it->second->second;
+        ABT_mutex_unlock(provider->addr_cache_mtx);
+        return HG_SUCCESS;
+    }
+    ABT_mutex_unlock(provider->addr_cache_mtx);
+
+    hg_addr_t addr = HG_ADDR_NULL;
+    hg_return_t hret = margo_addr_lookup(provider->mid, origin, &addr);
+    if(hret != HG_SUCCESS) return hret;
+
+    ABT_mutex_lock(provider->addr_cache_mtx);
+    auto it2 = provider->addr_cache_index.find(key);
+    if(it2 != provider->addr_cache_index.end()) {
+        margo_addr_free(provider->mid, addr);
+        provider->addr_cache.splice(provider->addr_cache.begin(),
+                                    provider->addr_cache, it2->second);
+        *addr_out = it2->second->second;
+        ABT_mutex_unlock(provider->addr_cache_mtx);
+        return HG_SUCCESS;
+    }
+    provider->addr_cache.emplace_front(key, addr);
+    provider->addr_cache_index[key] = provider->addr_cache.begin();
+    while(provider->addr_cache.size() > MAX_CACHE_ENTRIES) {
+        auto& back = provider->addr_cache.back();
+        margo_addr_free(provider->mid, back.second);
+        provider->addr_cache_index.erase(back.first);
+        provider->addr_cache.pop_back();
+    }
+    *addr_out = addr;
+    ABT_mutex_unlock(provider->addr_cache_mtx);
+    return HG_SUCCESS;
 }
 
 yk_return_t yk_provider_destroy(

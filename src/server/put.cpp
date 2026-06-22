@@ -39,14 +39,8 @@ void yk_put_ult(hg_handle_t h)
     double bulk_timeout;
     DEFER(margo_free_input(h, &in));
 
-    if(in.origin) {
-        hret = margo_addr_lookup(mid, in.origin, &origin_addr);
-        CHECK_HRET_OUT(hret, margo_addr_lookup);
-    } else {
-        hret = margo_addr_dup(mid, info->addr, &origin_addr);
-        CHECK_HRET_OUT(hret, margo_addr_dup);
-    }
-    DEFER(margo_addr_free(mid, origin_addr));
+    hret = yk_provider_resolve_addr(provider, h, in.origin, &origin_addr);
+    CHECK_HRET_OUT(hret, yk_provider_resolve_addr);
 
     yk_database* database = provider->db;
     CHECK_DATABASE(database);
