@@ -62,9 +62,9 @@ void yk_doc_load_ult(hg_handle_t h)
 
     if(!in.packed) {
         /* transfer available sizes for each document */
-        hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, buffer->bulk, 0, docs_offset);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+            in.bulk, in.offset, buffer->bulk, 0, docs_offset, 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 
     yokan::BasicUserMem<yk_id_t> ids{ in.ids.ids, in.ids.count };
@@ -84,16 +84,16 @@ void yk_doc_load_ult(hg_handle_t h)
         margo_request req = MARGO_REQUEST_NULL;
         if(docs_umem.size != 0) {
             // transfer docs
-            hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
+            hret = margo_bulk_itransfer_timed(mid, HG_BULK_PUSH, origin_addr,
                     in.bulk, in.offset + docs_offset,
-                    buffer->bulk, docs_offset, in.size - docs_offset, &req);
-            CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+                    buffer->bulk, docs_offset, in.size - docs_offset, 0.0, &req);
+            CHECK_HRET_OUT(hret, margo_bulk_itransfer_timed);
         }
         // transfer doc sizes
-        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset,
-                buffer->bulk, 0, count*sizeof(size_t));
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+                buffer->bulk, 0, count*sizeof(size_t), 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
         if(req != MARGO_REQUEST_NULL) {
             hret = margo_wait(req);

@@ -63,9 +63,9 @@ void yk_get_ult(hg_handle_t h)
     size_t sizes_to_transfer = in.count*sizeof(size_t);
     if(!in.packed) sizes_to_transfer *= 2;
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // build buffer wrappers for key sizes
     auto ptr = buffer->data;
@@ -109,10 +109,10 @@ void yk_get_ult(hg_handle_t h)
     }
 
     // transfer the actual keys from the client
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            buffer->bulk, keys_offset, total_ksize);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+            buffer->bulk, keys_offset, total_ksize, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // create UserMem wrapper for keys
     auto keys = yokan::UserMem{ ptr + keys_offset, total_ksize };
@@ -131,16 +131,16 @@ void yk_get_ult(hg_handle_t h)
         if(vals.size != 0) {
             size_t xfer_size = remaining_vsize;
             if(in.count == 1) xfer_size = vsizes[0];
-            hret = margo_bulk_itransfer(mid, HG_BULK_PUSH, origin_addr,
+            hret = margo_bulk_itransfer_timed(mid, HG_BULK_PUSH, origin_addr,
                     in.bulk, in.offset + vals_offset,
-                    buffer->bulk, vals_offset, xfer_size, &req);
-            CHECK_HRET_OUT(hret, margo_bulk_itransfer);
+                    buffer->bulk, vals_offset, xfer_size, 0.0, &req);
+            CHECK_HRET_OUT(hret, margo_bulk_itransfer_timed);
         }
 
-        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + vsizes_offset,
-                buffer->bulk, vsizes_offset, in.count*sizeof(size_t));
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+                buffer->bulk, vsizes_offset, in.count*sizeof(size_t), 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
         if(req != MARGO_REQUEST_NULL) {
             hret = margo_wait(req);

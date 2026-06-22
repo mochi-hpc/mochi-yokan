@@ -53,9 +53,9 @@ void yk_doc_update_ult(hg_handle_t h)
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-                               in.bulk, in.offset, buffer->bulk, 0, in.size);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+                               in.bulk, in.offset, buffer->bulk, 0, in.size, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     yk_database* database = provider->db;
     CHECK_DATABASE(database);

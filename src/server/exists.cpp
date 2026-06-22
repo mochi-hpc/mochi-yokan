@@ -62,9 +62,9 @@ void yk_exists_ult(hg_handle_t h)
     // transfer ksizes
     size_t sizes_to_transfer = in.count*sizeof(size_t);
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // build buffer wrappers for key sizes
     auto ptr = buffer->data;
@@ -95,10 +95,10 @@ void yk_exists_ult(hg_handle_t h)
     }
 
     // transfer the actual keys from the client
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            buffer->bulk, keys_offset, total_ksize);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+            buffer->bulk, keys_offset, total_ksize, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // create memory wrapper for keys
     auto keys = yokan::UserMem{ ptr + keys_offset, total_ksize };
@@ -115,10 +115,10 @@ void yk_exists_ult(hg_handle_t h)
 
     if(out.ret == YOKAN_SUCCESS) {
         // transfer the bit field back the client
-        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + flags_offset,
-                buffer->bulk, flags_offset, flags_size);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+                buffer->bulk, flags_offset, flags_size, 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_exists_ult)

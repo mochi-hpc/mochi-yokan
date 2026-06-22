@@ -66,9 +66,9 @@ void yk_fetch_ult(hg_handle_t h)
     // transfer ksizes
     size_t sizes_to_transfer = in.count*sizeof(size_t);
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, keys_buffer->bulk, 0, sizes_to_transfer);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+            in.bulk, in.offset, keys_buffer->bulk, 0, sizes_to_transfer, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // build buffer wrappers for key sizes
     auto ksizes_ptr  = reinterpret_cast<size_t*>(keys_buffer->data);
@@ -92,10 +92,10 @@ void yk_fetch_ult(hg_handle_t h)
     }
 
     // transfer the actual keys from the client
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
+    hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            keys_buffer->bulk, keys_offset, total_ksize);
-    CHECK_HRET_OUT(hret, margo_bulk_transfer);
+            keys_buffer->bulk, keys_offset, total_ksize, 0.0);
+    CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     struct previous_op {
         std::vector<char>   values;

@@ -67,9 +67,9 @@ void yk_list_keys_ult(hg_handle_t h)
     if(!in.packed) size_to_transfer += in.count*sizeof(size_t);
 
     if(size_to_transfer > 0) {
-        hret = margo_bulk_transfer(mid, HG_BULK_PULL, origin_addr,
-                in.bulk, in.offset, buffer->bulk, 0, size_to_transfer);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
+                in.bulk, in.offset, buffer->bulk, 0, size_to_transfer, 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 
     // build buffer wrappers
@@ -94,10 +94,10 @@ void yk_list_keys_ult(hg_handle_t h)
     if(out.ret == YOKAN_SUCCESS) {
         size_to_transfer = in.count*sizeof(size_t)
                          + keys.size;
-        hret = margo_bulk_transfer(mid, HG_BULK_PUSH, origin_addr,
+        hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + ksizes_offset,
-                buffer->bulk, ksizes_offset, size_to_transfer);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer);
+                buffer->bulk, ksizes_offset, size_to_transfer, 0.0);
+        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_list_keys_ult)
