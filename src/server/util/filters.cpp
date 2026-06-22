@@ -30,6 +30,10 @@ struct KeyPrefixFilter : public KeyValueFilter {
     KeyPrefixFilter(int32_t mode, UserMem prefix)
     : m_mode(mode), m_prefix(std::move(prefix)) {}
 
+    bool isPassthrough() const override {
+        return m_prefix.size == 0;
+    }
+
     bool requiresValue() const override {
         return false;
     }
@@ -94,6 +98,10 @@ struct KeySuffixFilter : public KeyValueFilter {
 
     KeySuffixFilter(int32_t mode, UserMem suffix)
     : m_mode(mode), m_suffix(std::move(suffix)) {}
+
+    bool isPassthrough() const override {
+        return m_suffix.size == 0;
+    }
 
     bool requiresValue() const override {
         return false;
@@ -199,6 +207,10 @@ struct LuaKeyValueFilter : public KeyValueFilter {
 struct DefaultDocFilter : public DocFilter {
 
     DefaultDocFilter() = default;
+
+    bool isPassthrough() const override {
+        return true;
+    }
 
     bool check(const char* collection, yk_id_t id, const void* val, size_t vsize) const override {
         (void)collection;

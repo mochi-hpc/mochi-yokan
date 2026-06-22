@@ -31,6 +31,17 @@ class KeyValueFilter {
     virtual ~KeyValueFilter() = default;
 
     /**
+     * @brief Returns true when the filter is a no-op: check always accepts,
+     * keySizeFrom/valSizeFrom return the input sizes unchanged, and keyCopy/
+     * valCopy are plain memcpy. Callers MAY use this to skip per-element
+     * virtual calls and copy directly. Defaults to false; built-in filters
+     * (e.g. an empty prefix filter without YOKAN_MODE_NO_PREFIX) override it.
+     */
+    virtual bool isPassthrough() const {
+        return false;
+    }
+
+    /**
      * @brief Returns whether the filter requires the value to be loaded
      * when calling check. If not, some backends may chose to call check
      * with a nullptr value and vsize of 0 to avoid loading a value
@@ -117,6 +128,16 @@ class DocFilter {
     public:
 
     virtual ~DocFilter() = default;
+
+    /**
+     * @brief Returns true when the filter is a no-op: check always accepts,
+     * docSizeFrom returns the input size unchanged, and docCopy is plain
+     * memcpy. Callers MAY use this to skip per-element virtual calls.
+     * Defaults to false; the default DocFilter overrides it.
+     */
+    virtual bool isPassthrough() const {
+        return false;
+    }
 
     /**
      * @brief Checks whether the document passes the filter.

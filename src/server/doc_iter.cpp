@@ -130,19 +130,28 @@ void yk_doc_iter_ult(hg_handle_t h)
         return;
     }
 
+    const bool filter_passthrough = filter->isPassthrough();
+
     auto doc_iter_func = [&](yk_id_t id, const yokan::UserMem& doc) -> yokan::Status {
-        //  filtered_docsize is an upper-bound here
-        auto filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
+        size_t filtered_docsize;
         auto current_size = docs.size();
-        docs.resize(current_size + filtered_docsize);
-        filtered_docsize = filter->docCopy(
-            in.coll_name,
-            docs.data() + current_size,
-            filtered_docsize, doc.data, doc.size);
+        if(filter_passthrough) {
+            filtered_docsize = doc.size;
+            docs.resize(current_size + filtered_docsize);
+            std::memcpy(docs.data() + current_size, doc.data, filtered_docsize);
+        } else {
+            //  filtered_docsize is an upper-bound here
+            filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
+            docs.resize(current_size + filtered_docsize);
+            filtered_docsize = filter->docCopy(
+                in.coll_name,
+                docs.data() + current_size,
+                filtered_docsize, doc.data, doc.size);
+            // filtered_docsize may have changed
+            docs.resize(current_size + filtered_docsize);
+        }
         ids.push_back(id);
         docsizes.push_back(filtered_docsize);
-        // filtered_docsize may have changed
-        docs.resize(current_size + filtered_docsize);
         if(docsizes.size() == in.batch_size)
             return (yokan::Status)send_batch();
         return yokan::Status::OK;
@@ -269,16 +278,25 @@ void yk_doc_iter_direct_ult(hg_handle_t h)
         return;
     }
 
+    const bool filter_passthrough = filter->isPassthrough();
+
     auto doc_iter_func = [&](yk_id_t id, const yokan::UserMem& doc) -> yokan::Status {
-        // filtered_docsize is an upper-bound here
-        auto filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
+        size_t filtered_docsize;
         auto current_size = docs.size();
-        docs.resize(current_size + filtered_docsize);
-        filtered_docsize = filter->docCopy(in.coll_name, docs.data() + current_size, filtered_docsize, doc.data, doc.size);
+        if(filter_passthrough) {
+            filtered_docsize = doc.size;
+            docs.resize(current_size + filtered_docsize);
+            std::memcpy(docs.data() + current_size, doc.data, filtered_docsize);
+        } else {
+            // filtered_docsize is an upper-bound here
+            filtered_docsize = filter->docSizeFrom(in.coll_name, doc.data, doc.size);
+            docs.resize(current_size + filtered_docsize);
+            filtered_docsize = filter->docCopy(in.coll_name, docs.data() + current_size, filtered_docsize, doc.data, doc.size);
+            // filtered_docsize may have changed
+            docs.resize(current_size + filtered_docsize);
+        }
         ids.push_back(id);
         docsizes.push_back(filtered_docsize);
-        // filtered_docsize  may have changed
-        docs.resize(current_size + filtered_docsize);
         if(docsizes.size() == in.batch_size)
             return (yokan::Status)send_batch();
         return yokan::Status::OK;
