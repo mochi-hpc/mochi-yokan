@@ -47,6 +47,7 @@ static void put_helper(const yokan::Database& db, const KeyType& key,
     auto val_info = get_buffer_info(val);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     CHECK_BUFFER_IS_CONTIGUOUS(val_info);
+    py::gil_scoped_release release;
     db.put(key_info.ptr,
             key_info.itemsize*key_info.size,
             val_info.ptr,
@@ -73,6 +74,7 @@ static void put_multi_helper(const yokan::Database& db,
         key_sizes[i] = key_info.itemsize*key_info.size;
         val_sizes[i] = val_info.itemsize*val_info.size;
     }
+    py::gil_scoped_release release;
     db.putMulti(count,
             keys.data(),
             key_sizes.data(),
@@ -90,11 +92,14 @@ static auto get_helper(const yokan::Database& db, const KeyType& key,
     CHECK_BUFFER_IS_CONTIGUOUS(val_info);
     CHECK_BUFFER_IS_WRITABLE(val_info);
     size_t vsize = val_info.itemsize*val_info.size;
-    db.get(key_info.ptr,
-           key_info.itemsize*key_info.size,
-           val_info.ptr,
-           &vsize,
-           mode);
+    {
+        py::gil_scoped_release release;
+        db.get(key_info.ptr,
+               key_info.itemsize*key_info.size,
+               val_info.ptr,
+               &vsize,
+               mode);
+    }
     return vsize;
 }
 
@@ -118,12 +123,15 @@ static auto get_multi_helper(const yokan::Database& db,
         key_sizes[i] = key_info.itemsize*key_info.size;
         val_sizes[i] = val_info.itemsize*val_info.size;
     }
-    db.getMulti(count,
-                keys.data(),
-                key_sizes.data(),
-                vals.data(),
-                val_sizes.data(),
-                mode);
+    {
+        py::gil_scoped_release release;
+        db.getMulti(count,
+                    keys.data(),
+                    key_sizes.data(),
+                    vals.data(),
+                    val_sizes.data(),
+                    mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(val_sizes[i] == YOKAN_KEY_NOT_FOUND)
@@ -142,6 +150,7 @@ static auto exists_helper(const yokan::Database& db,
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
+    py::gil_scoped_release release;
     return db.exists(key_info.ptr, ksize, mode);
 }
 
@@ -158,6 +167,7 @@ static auto exists_multi_helper(const yokan::Database& db,
         key_ptrs[i] = key_info.ptr;
         key_size[i] = key_info.itemsize*key_info.size;
     }
+    py::gil_scoped_release release;
     return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
 }
 
@@ -169,7 +179,12 @@ static py::object length_helper(const yokan::Database& db,
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
     try {
-        return py::cast(db.length(key_info.ptr, ksize, mode));
+        size_t len;
+        {
+            py::gil_scoped_release release;
+            len = db.length(key_info.ptr, ksize, mode);
+        }
+        return py::cast(len);
     } catch(const yokan::Exception& e) {
         if(e.code() == YOKAN_ERR_KEY_NOT_FOUND)
             return py::none();
@@ -191,7 +206,10 @@ static auto length_multi_helper(const yokan::Database& db,
         key_ptrs[i] = key_info.ptr;
         key_size[i] = key_info.itemsize*key_info.size;
     }
-    db.lengthMulti(count, key_ptrs.data(), key_size.data(), val_size.data(), mode);
+    {
+        py::gil_scoped_release release;
+        db.lengthMulti(count, key_ptrs.data(), key_size.data(), val_size.data(), mode);
+    }
     py::list result;
     for(size_t i = 0; i < count; i++) {
         if(val_size[i] != YOKAN_KEY_NOT_FOUND)
@@ -209,6 +227,7 @@ static void erase_helper(const yokan::Database& db,
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
+    py::gil_scoped_release release;
     db.erase(key_info.ptr, ksize, mode);
 }
 
@@ -225,6 +244,7 @@ static void erase_multi_helper(const yokan::Database& db,
         key_ptrs[i] = key_info.ptr;
         key_size[i] = key_info.itemsize*key_info.size;
     }
+    py::gil_scoped_release release;
     return db.eraseMulti(count, key_ptrs.data(), key_size.data(), mode);
 }
 
@@ -248,14 +268,17 @@ static auto list_keys_helper(const yokan::Database& db,
         keys_data[i] = key_info.ptr;
         keys_size[i] = key_info.itemsize*key_info.size;
     }
-    db.listKeys(from_key_info.ptr,
-            from_key_info.itemsize*from_key_info.size,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count,
-            keys_data.data(),
-            keys_size.data(),
-            mode);
+    {
+        py::gil_scoped_release release;
+        db.listKeys(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count,
+                keys_data.data(),
+                keys_size.data(),
+                mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(keys_size[i] == YOKAN_NO_MORE_KEYS)
@@ -284,15 +307,18 @@ static auto list_keys_packed_helper(const yokan::Database& db,
     CHECK_BUFFER_IS_WRITABLE(keys_info);
     size_t keys_buf_size = (size_t)keys_info.itemsize*keys_info.size;
     std::vector<size_t> key_sizes(count);
-    db.listKeysPacked(from_key_info.ptr,
-            from_key_info.itemsize*from_key_info.size,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count,
-            keys_info.ptr,
-            keys_buf_size,
-            key_sizes.data(),
-            mode);
+    {
+        py::gil_scoped_release release;
+        db.listKeysPacked(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count,
+                keys_info.ptr,
+                keys_buf_size,
+                key_sizes.data(),
+                mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(key_sizes[i] == YOKAN_NO_MORE_KEYS)
@@ -332,16 +358,19 @@ static auto list_keyvals_helper(const yokan::Database& db,
         vals_data[i] = val_info.ptr;
         vals_size[i] = val_info.itemsize*val_info.size;
     }
-    db.listKeyVals(from_key_info.ptr,
-            from_key_info.itemsize*from_key_info.size,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count,
-            keys_data.data(),
-            keys_size.data(),
-            vals_data.data(),
-            vals_size.data(),
-            mode);
+    {
+        py::gil_scoped_release release;
+        db.listKeyVals(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count,
+                keys_data.data(),
+                keys_size.data(),
+                vals_data.data(),
+                vals_size.data(),
+                mode);
+    }
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
     for(size_t i=0; i < count; i++) {
@@ -377,18 +406,21 @@ static auto list_keyvals_packed_helper(
     size_t vbuf_size = (size_t)vals_info.itemsize*vals_info.size;
     std::vector<size_t> key_sizes(count);
     std::vector<size_t> val_sizes(count);
-    db.listKeyValsPacked(from_key_info.ptr,
-            from_key_info.itemsize*from_key_info.size,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count,
-            keys_info.ptr,
-            kbuf_size,
-            key_sizes.data(),
-            vals_info.ptr,
-            vbuf_size,
-            val_sizes.data(),
-            mode);
+    {
+        py::gil_scoped_release release;
+        db.listKeyValsPacked(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count,
+                keys_info.ptr,
+                kbuf_size,
+                key_sizes.data(),
+                vals_info.ptr,
+                vbuf_size,
+                val_sizes.data(),
+                mode);
+    }
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
     for(size_t i=0; i < count; i++) {
@@ -431,6 +463,7 @@ static auto iter_helper(
     CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
     yokan::Database::iter_callback_type func =
         [&cb, ignore_values](size_t i, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+            py::gil_scoped_acquire acquire;
             try {
                 if(ignore_values)
                     cb(i, to_memory_view<KeyType>::apply(key, ksize), py::none());
@@ -447,6 +480,7 @@ static auto iter_helper(
     options.batch_size    = batch_size;
     options.ignore_values = ignore_values;
     options.pool          = ABT_POOL_NULL;
+    py::gil_scoped_release release;
     db.iter(from_key_info.ptr,
             from_key_info.itemsize*from_key_info.size,
             filter_info.ptr,
@@ -459,6 +493,7 @@ static auto doc_store_helper(const yokan::Collection& coll,
                              const DocType& doc, int32_t mode) {
     auto doc_info = get_buffer_info(doc);
     CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
+    py::gil_scoped_release release;
     return coll.store(doc_info.ptr, doc_info.itemsize*doc_info.size, mode);
 }
 
@@ -476,8 +511,11 @@ static auto doc_store_multi_helper(const yokan::Collection& coll,
         doc_ptrs[i] = doc_info.ptr;
         doc_sizes[i] = doc_info.itemsize*doc_info.size;
     }
-    coll.storeMulti(count, doc_ptrs.data(), doc_sizes.data(),
-                    ids.data(), mode);
+    {
+        py::gil_scoped_release release;
+        coll.storeMulti(count, doc_ptrs.data(), doc_sizes.data(),
+                        ids.data(), mode);
+    }
     return ids;
 }
 
@@ -486,6 +524,7 @@ static void doc_update_helper(const yokan::Collection& coll, yk_id_t id,
                               const DocType& doc, int32_t mode) {
     auto doc_info = get_buffer_info(doc);
     CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
+    py::gil_scoped_release release;
     coll.update(id, doc_info.ptr, doc_info.itemsize*doc_info.size, mode);
 }
 
@@ -506,6 +545,7 @@ static void doc_update_multi_helper(const yokan::Collection& coll,
         doc_ptrs[i] = doc_info.ptr;
         doc_sizes[i] = doc_info.itemsize*doc_info.size;
     }
+    py::gil_scoped_release release;
     coll.updateMulti(count, ids.data(), doc_ptrs.data(), doc_sizes.data(), mode);
 }
 
@@ -515,7 +555,10 @@ static auto doc_load_helper(const yokan::Collection& coll, yk_id_t id,
     CHECK_BUFFER_IS_CONTIGUOUS(val_info);
     CHECK_BUFFER_IS_WRITABLE(val_info);
     size_t vsize = val_info.itemsize*val_info.size;
-    coll.load(id, val_info.ptr, &vsize, mode);
+    {
+        py::gil_scoped_release release;
+        coll.load(id, val_info.ptr, &vsize, mode);
+    }
     return vsize;
 }
 
@@ -536,8 +579,11 @@ static auto doc_load_multi_helper(const yokan::Collection& coll,
         doc_ptrs[i] = doc_info.ptr;
         doc_sizes[i] = doc_info.itemsize*doc_info.size;
     }
-    coll.loadMulti(count, ids.data(),
-                   doc_ptrs.data(), doc_sizes.data(), mode);
+    {
+        py::gil_scoped_release release;
+        coll.loadMulti(count, ids.data(),
+                       doc_ptrs.data(), doc_sizes.data(), mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(doc_sizes[i] == YOKAN_KEY_NOT_FOUND)
@@ -569,13 +615,16 @@ static auto list_docs_helper(const yokan::Collection& coll,
         buf_size[i] = buf_info.itemsize*buf_info.size;
     }
     std::vector<yk_id_t> ids(count);
-    coll.list(start_id,
-              filter_info.ptr,
-              filter_info.itemsize*filter_info.size,
-              count, ids.data(),
-              buf_data.data(),
-              buf_size.data(),
-              mode);
+    {
+        py::gil_scoped_release release;
+        coll.list(start_id,
+                  filter_info.ptr,
+                  filter_info.itemsize*filter_info.size,
+                  count, ids.data(),
+                  buf_data.data(),
+                  buf_size.data(),
+                  mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(buf_size[i] == YOKAN_NO_MORE_DOCS)
@@ -605,14 +654,17 @@ static auto list_docs_packed_helper(const yokan::Collection& coll,
     size_t buf_size = (size_t)buf_info.itemsize*buf_info.size;
     std::vector<size_t> doc_sizes(count);
     std::vector<yk_id_t> ids(count);
-    coll.listPacked(start_id,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count, ids.data(),
-            buf_size,
-            buf_info.ptr,
-            doc_sizes.data(),
-            mode);
+    {
+        py::gil_scoped_release release;
+        coll.listPacked(start_id,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count, ids.data(),
+                buf_size,
+                buf_info.ptr,
+                doc_sizes.data(),
+                mode);
+    }
     py::list result;
     for(size_t i=0; i < count; i++) {
         if(doc_sizes[i] == YOKAN_NO_MORE_DOCS)
@@ -636,6 +688,7 @@ static auto doc_iter_helper(
     CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
     yokan::Collection::iter_callback_type func =
         [&cb](size_t i, yk_id_t id, const void* doc, size_t docsize) -> yk_return_t {
+            py::gil_scoped_acquire acquire;
             try {
                 cb(i, id, py::memoryview::from_memory((void*)doc, docsize, true));
             } catch(py::error_already_set &e) {
@@ -647,6 +700,7 @@ static auto doc_iter_helper(
     yk_doc_iter_options_t options;
     options.batch_size    = batch_size;
     options.pool          = ABT_POOL_NULL;
+    py::gil_scoped_release release;
     coll.iter(from_id, filter_info.ptr, filter_info.itemsize*filter_info.size,
               max, func, &options, mode);
 }
@@ -702,6 +756,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("count",
              [](const yokan::Database& db, int32_t mode) {
+                py::gil_scoped_release release;
                 return db.count(mode);
              }, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -762,6 +817,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 if((ssize_t)total_val_size > val_info.itemsize*val_info.size) {
                     throw std::length_error("values buffer is smaller than accumulated value_sizes");
                 }
+                py::gil_scoped_release release;
                 db.putPacked(count,
                        key_info.ptr,
                        key_sizes.data(),
@@ -812,8 +868,11 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 }
                 size_t vbuf_size = (size_t)(val_info.itemsize*val_info.size);
                 std::vector<size_t> val_sizes(count);
-                db.getPacked(count, key_info.ptr, key_sizes.data(),
-                             vbuf_size, val_info.ptr, val_sizes.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    db.getPacked(count, key_info.ptr, key_sizes.data(),
+                                 vbuf_size, val_info.ptr, val_sizes.data(), mode);
+                }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
                     if(val_sizes[i] != YOKAN_KEY_NOT_FOUND)
@@ -834,6 +893,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
@@ -846,6 +906,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         return YOKAN_SUCCESS;
                     };
                 try {
+                    py::gil_scoped_release release;
                     db.fetch(
                         (const void*)key_info.ptr,
                         key_info.itemsize*key_info.size,
@@ -865,6 +926,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &key, &py_exception](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, key, py::memoryview::from_memory(val, vsize));
@@ -877,6 +939,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         return YOKAN_SUCCESS;
                     };
                 try {
+                    py::gil_scoped_release release;
                     db.fetch(
                         (const void*)key_info.ptr,
                         key_info.itemsize*key_info.size,
@@ -908,6 +971,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
@@ -923,6 +987,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
                 try {
+                    py::gil_scoped_release release;
                     db.fetchMulti(
                         keys.size(), key_ptrs.data(), key_sizes.data(),
                         func, &options, mode);
@@ -948,6 +1013,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &keys, &py_exception](size_t index, const void*, size_t, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, keys[index], py::memoryview::from_memory(val, vsize));
@@ -963,6 +1029,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
                 try {
+                    py::gil_scoped_release release;
                     db.fetchMulti(
                         keys.size(), key_ptrs.data(), key_sizes.data(),
                         func, &options, mode);
@@ -990,6 +1057,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, const void* key, size_t ksize, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, py::memoryview::from_memory(key, ksize), py::memoryview::from_memory(val, vsize));
@@ -1005,6 +1073,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
                 try {
+                    py::gil_scoped_release release;
                     db.fetchPacked(ksizes.size(),
                         key_info.ptr, ksizes.data(),
                         func, &options, mode);
@@ -1049,6 +1118,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
+                py::gil_scoped_release release;
                 return db.existsPacked(count, key_info.ptr, key_sizes.data(), mode);
              }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1088,7 +1158,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
                 std::vector<size_t> val_sizes(count);
-                db.lengthPacked(count, key_info.ptr, key_sizes.data(), val_sizes.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    db.lengthPacked(count, key_info.ptr, key_sizes.data(), val_sizes.data(), mode);
+                }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
                     if(val_sizes[i] != YOKAN_KEY_NOT_FOUND)
@@ -1134,6 +1207,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 if((ssize_t)total_key_size > key_info.itemsize*key_info.size) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
+                py::gil_scoped_release release;
                 db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
              }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1308,7 +1382,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("create_collection",
              [](const yokan::Database& db, const std::string& name, int32_t mode) {
-                db.createCollection(name.c_str(), mode);
+                {
+                    py::gil_scoped_release release;
+                    db.createCollection(name.c_str(), mode);
+                }
                 return yokan::Collection(name.c_str(), db);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
@@ -1319,11 +1396,13 @@ PYBIND11_MODULE(pyyokan_client, m) {
              "name"_a)
         .def("drop_collection",
              [](const yokan::Database& db, const std::string& name, int32_t mode) {
+                py::gil_scoped_release release;
                 db.dropCollection(name.c_str(), mode);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         .def("collection_exists",
              [](const yokan::Database& db, const std::string& name, int32_t mode) {
+                py::gil_scoped_release release;
                 return db.collectionExists(name.c_str(), mode);
              },
              "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
@@ -1337,6 +1416,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("size",
              [](const yokan::Collection& coll, int32_t mode) {
+                py::gil_scoped_release release;
                 return coll.size(mode);
              }, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1379,7 +1459,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("documents buffer is smaller than accumulated doc_sizes");
                 }
                 std::vector<yk_id_t> ids(count);
-                coll.storePacked(count, docs_info.ptr, doc_sizes.data(), ids.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    coll.storePacked(count, docs_info.ptr, doc_sizes.data(), ids.data(), mode);
+                }
                 return ids;
              }, "documents"_a, "doc_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1427,7 +1510,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 if((ssize_t)total_doc_sizes > docs_info.itemsize*docs_info.size) {
                     throw std::length_error("documents buffer is smaller than accumulated doc_sizes");
                 }
-                coll.updatePacked(count, ids.data(), docs_info.ptr, doc_sizes.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    coll.updatePacked(count, ids.data(), docs_info.ptr, doc_sizes.data(), mode);
+                }
                 return ids;
              }, "ids"_a, "documents"_a, "doc_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
@@ -1457,8 +1543,11 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
                 size_t doc_buf_size = (size_t)(doc_info.itemsize*doc_info.size);
                 std::vector<size_t> doc_sizes(count);
-                coll.loadPacked(count, ids.data(),
-                                doc_buf_size, doc_info.ptr, doc_sizes.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    coll.loadPacked(count, ids.data(),
+                                    doc_buf_size, doc_info.ptr, doc_sizes.data(), mode);
+                }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
                     if(doc_sizes[i] != YOKAN_KEY_NOT_FOUND)
@@ -1477,6 +1566,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, id, py::memoryview::from_memory(val, vsize));
@@ -1489,6 +1579,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         return YOKAN_SUCCESS;
                     };
                 try {
+                    py::gil_scoped_release release;
                     coll.fetch(id, func, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
@@ -1507,6 +1598,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
+                        py::gil_scoped_acquire acquire;
                         try {
                             if(vsize <= YOKAN_LAST_VALID_SIZE)
                                 cb(index, id, py::memoryview::from_memory(val, vsize));
@@ -1522,6 +1614,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.pool       = ABT_POOL_NULL;
                 options.batch_size = batch_size;
                 try {
+                    py::gil_scoped_release release;
                     coll.fetchMulti(
                         ids.size(), ids.data(),
                         func, &options, mode);
@@ -1538,7 +1631,12 @@ PYBIND11_MODULE(pyyokan_client, m) {
         .def("length",
              [](const yokan::Collection& coll, yk_id_t id, int32_t mode) -> py::object {
                 try {
-                    return py::cast(coll.length(id, mode));
+                    size_t len;
+                    {
+                        py::gil_scoped_release release;
+                        len = coll.length(id, mode);
+                    }
+                    return py::cast(len);
                 } catch(const yokan::Exception& e) {
                     if(e.code() == YOKAN_ERR_KEY_NOT_FOUND)
                         return py::none();
@@ -1552,7 +1650,10 @@ PYBIND11_MODULE(pyyokan_client, m) {
         .def("length_multi",
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids, int32_t mode) {
                 std::vector<size_t> len(ids.size());
-                coll.lengthMulti(ids.size(), ids.data(), len.data(), mode);
+                {
+                    py::gil_scoped_release release;
+                    coll.lengthMulti(ids.size(), ids.data(), len.data(), mode);
+                }
                 py::list result;
                 for(size_t i = 0; i < ids.size(); i++) {
                     if(len[i] != YOKAN_KEY_NOT_FOUND)
@@ -1568,6 +1669,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("erase",
              [](const yokan::Collection& coll, yk_id_t id, int32_t mode) {
+                py::gil_scoped_release release;
                 coll.erase(id, mode);
              },
              "id"_a, "mode"_a=YOKAN_MODE_DEFAULT)
@@ -1576,6 +1678,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // --------------------------------------------------------------
         .def("erase_multi",
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids, int32_t mode) {
+                py::gil_scoped_release release;
                 coll.eraseMulti(ids.size(), ids.data(), mode);
              },
              "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT)
