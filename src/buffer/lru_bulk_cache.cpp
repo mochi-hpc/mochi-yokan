@@ -34,14 +34,16 @@ struct lru_bulk_cache {
 
     list_t buffer_queue_readonly;
     map_t  buffer_set_readonly;
+    ABT_mutex mtx_readonly;
 
     list_t buffer_queue_writeonly;
     map_t  buffer_set_writeonly;
+    ABT_mutex mtx_writeonly;
 
     list_t buffer_queue_readwrite;
     map_t  buffer_set_readwrite;
+    ABT_mutex mtx_readwrite;
 
-    ABT_mutex buffer_set_mtx;
     float     margin;
     size_t    capacity;
 };
@@ -63,7 +65,9 @@ void* lru_bulk_cache_init(margo_instance_id mid, const char* config) {
     } else {
         cache->capacity = 32;
     }
-    ABT_mutex_create(&cache->buffer_set_mtx);
+    ABT_mutex_create(&cache->mtx_readonly);
+    ABT_mutex_create(&cache->mtx_writeonly);
+    ABT_mutex_create(&cache->mtx_readwrite);
     return cache;
 }
 
@@ -77,7 +81,9 @@ void lru_bulk_cache_finalize(void* c) {
             num_in_use);
         // LCOV_EXCL_STOP
     }
-    ABT_mutex_free(&cache->buffer_set_mtx);
+    ABT_mutex_free(&cache->mtx_readonly);
+    ABT_mutex_free(&cache->mtx_writeonly);
+    ABT_mutex_free(&cache->mtx_readwrite);
     for(auto& map : { std::ref(cache->buffer_set_readonly),
                       std::ref(cache->buffer_set_writeonly),
                       std::ref(cache->buffer_set_readwrite) }) {
@@ -105,29 +111,33 @@ yk_buffer_t lru_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
     // try to find a buffer that's already allocated with the right size
     map_t* map   = nullptr;
     list_t* list = nullptr;
+    ABT_mutex mtx = ABT_MUTEX_NULL;
     if(mode == HG_BULK_READ_ONLY) {
         map = &cache->buffer_set_readonly;
         list = &cache->buffer_queue_readonly;
+        mtx = cache->mtx_readonly;
     } else if(mode == HG_BULK_WRITE_ONLY) {
         map = &cache->buffer_set_writeonly;
         list = &cache->buffer_queue_writeonly;
+        mtx = cache->mtx_writeonly;
     } else if(mode == HG_BULK_READWRITE) {
         map = &cache->buffer_set_readwrite;
         list = &cache->buffer_queue_readwrite;
+        mtx = cache->mtx_readwrite;
     }
 
     yk_buffer lbound{ size, mode, nullptr, HG_BULK_NULL };
-    ABT_mutex_spinlock(cache->buffer_set_mtx);
+    ABT_mutex_spinlock(mtx);
     auto it = map->lower_bound(&lbound);
     if(it != map->end()) { // item found
         auto result = it->first;
         list->erase(it->second);
         map->erase(it);
         cache->num_in_use += 1;
-        ABT_mutex_unlock(cache->buffer_set_mtx);
+        ABT_mutex_unlock(mtx);
         return result;
     }
-    ABT_mutex_unlock(cache->buffer_set_mtx);
+    ABT_mutex_unlock(mtx);
 
     // item not found in cache, allocate a new one
 
@@ -182,7 +192,12 @@ void lru_bulk_cache_release(void* c, yk_buffer_t buffer) {
         }
     };
 
-    ABT_mutex_spinlock(cache->buffer_set_mtx);
+    ABT_mutex mtx = ABT_MUTEX_NULL;
+    if(buffer->mode == HG_BULK_READ_ONLY) mtx = cache->mtx_readonly;
+    else if(buffer->mode == HG_BULK_WRITE_ONLY) mtx = cache->mtx_writeonly;
+    else if(buffer->mode == HG_BULK_READWRITE) mtx = cache->mtx_readwrite;
+
+    ABT_mutex_spinlock(mtx);
     if(buffer->mode == HG_BULK_READ_ONLY) {
         release(cache, cache->buffer_set_readonly, cache->buffer_queue_readonly, buffer);
     } else if(buffer->mode == HG_BULK_WRITE_ONLY) {
@@ -190,7 +205,7 @@ void lru_bulk_cache_release(void* c, yk_buffer_t buffer) {
     } else if(buffer->mode == HG_BULK_READWRITE) {
         release(cache, cache->buffer_set_readwrite, cache->buffer_queue_readwrite, buffer);
     }
-    ABT_mutex_unlock(cache->buffer_set_mtx);
+    ABT_mutex_unlock(mtx);
 }
 
 }

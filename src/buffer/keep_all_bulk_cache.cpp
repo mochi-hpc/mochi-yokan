@@ -29,7 +29,9 @@ struct keep_all_bulk_cache {
     std::set<yk_buffer_t, bulk_less> buffer_set_readonly;
     std::set<yk_buffer_t, bulk_less> buffer_set_writeonly;
     std::set<yk_buffer_t, bulk_less> buffer_set_readwrite;
-    ABT_mutex                        buffer_set_mtx;
+    ABT_mutex                        mtx_readonly;
+    ABT_mutex                        mtx_writeonly;
+    ABT_mutex                        mtx_readwrite;
     float                            margin;
 };
 
@@ -45,7 +47,9 @@ void* keep_all_bulk_cache_init(margo_instance_id mid, const char* config) {
     } else {
         cache->margin = 0.0;
     }
-    ABT_mutex_create(&cache->buffer_set_mtx);
+    ABT_mutex_create(&cache->mtx_readonly);
+    ABT_mutex_create(&cache->mtx_writeonly);
+    ABT_mutex_create(&cache->mtx_readwrite);
     return cache;
 }
 
@@ -60,7 +64,9 @@ void keep_all_bulk_cache_finalize(void* c) {
         // LCOV_EXCL_STOP
     }
 
-    ABT_mutex_free(&cache->buffer_set_mtx);
+    ABT_mutex_free(&cache->mtx_readonly);
+    ABT_mutex_free(&cache->mtx_writeonly);
+    ABT_mutex_free(&cache->mtx_readwrite);
     for(auto& set_ref : {
             std::ref(cache->buffer_set_readonly),
             std::ref(cache->buffer_set_writeonly),
@@ -88,24 +94,29 @@ yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
 
     // try to find a buffer that's already allocated with the right size
     std::set<yk_buffer_t, bulk_less>* set = nullptr;
-    if(mode == HG_BULK_READ_ONLY)
+    ABT_mutex mtx = ABT_MUTEX_NULL;
+    if(mode == HG_BULK_READ_ONLY) {
         set = &cache->buffer_set_readonly;
-    else if(mode == HG_BULK_WRITE_ONLY)
+        mtx = cache->mtx_readonly;
+    } else if(mode == HG_BULK_WRITE_ONLY) {
         set = &cache->buffer_set_writeonly;
-    else if(mode == HG_BULK_READWRITE)
+        mtx = cache->mtx_writeonly;
+    } else if(mode == HG_BULK_READWRITE) {
         set = &cache->buffer_set_readwrite;
+        mtx = cache->mtx_readwrite;
+    }
 
     yk_buffer lbound{ size, mode, nullptr, HG_BULK_NULL };
-    ABT_mutex_spinlock(cache->buffer_set_mtx);
+    ABT_mutex_spinlock(mtx);
     auto it = set->lower_bound(&lbound);
     if(it != set->end()) { // item found
         auto result = *it;
         set->erase(it);
         cache->num_in_use += 1;
-        ABT_mutex_unlock(cache->buffer_set_mtx);
+        ABT_mutex_unlock(mtx);
         return result;
     }
-    ABT_mutex_unlock(cache->buffer_set_mtx);
+    ABT_mutex_unlock(mtx);
 
     // item not found in cache, allocate a new one
 
@@ -144,15 +155,19 @@ yk_buffer_t keep_all_bulk_cache_get(void* c, size_t size, hg_uint8_t mode) {
 void keep_all_bulk_cache_release(void* c, yk_buffer_t buffer) {
     auto cache = static_cast<keep_all_bulk_cache*>(c);
     cache->num_in_use -= 1;
-    ABT_mutex_spinlock(cache->buffer_set_mtx);
     if(buffer->mode == HG_BULK_READ_ONLY) {
+        ABT_mutex_spinlock(cache->mtx_readonly);
         cache->buffer_set_readonly.insert(buffer);
+        ABT_mutex_unlock(cache->mtx_readonly);
     } else if(buffer->mode == HG_BULK_WRITE_ONLY) {
+        ABT_mutex_spinlock(cache->mtx_writeonly);
         cache->buffer_set_writeonly.insert(buffer);
+        ABT_mutex_unlock(cache->mtx_writeonly);
     } else if(buffer->mode == HG_BULK_READWRITE) {
+        ABT_mutex_spinlock(cache->mtx_readwrite);
         cache->buffer_set_readwrite.insert(buffer);
+        ABT_mutex_unlock(cache->mtx_readwrite);
     }
-    ABT_mutex_unlock(cache->buffer_set_mtx);
 }
 
 }
