@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/bulk_timeout.h"
 #include <numeric>
 
 void yk_doc_load_ult(hg_handle_t h)
@@ -36,7 +37,8 @@ void yk_doc_load_ult(hg_handle_t h)
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
-    (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    double bulk_timeout;
     DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
@@ -62,8 +64,9 @@ void yk_doc_load_ult(hg_handle_t h)
 
     if(!in.packed) {
         /* transfer available sizes for each document */
+        bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, buffer->bulk, 0, docs_offset, 0.0);
+            in.bulk, in.offset, buffer->bulk, 0, docs_offset, bulk_timeout);
         CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 
@@ -84,15 +87,17 @@ void yk_doc_load_ult(hg_handle_t h)
         margo_request req = MARGO_REQUEST_NULL;
         if(docs_umem.size != 0) {
             // transfer docs
+            bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
             hret = margo_bulk_itransfer_timed(mid, HG_BULK_PUSH, origin_addr,
                     in.bulk, in.offset + docs_offset,
-                    buffer->bulk, docs_offset, in.size - docs_offset, 0.0, &req);
+                    buffer->bulk, docs_offset, in.size - docs_offset, bulk_timeout, &req);
             CHECK_HRET_OUT(hret, margo_bulk_itransfer_timed);
         }
         // transfer doc sizes
+        bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset,
-                buffer->bulk, 0, count*sizeof(size_t), 0.0);
+                buffer->bulk, 0, count*sizeof(size_t), bulk_timeout);
         CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
         if(req != MARGO_REQUEST_NULL) {
@@ -135,6 +140,8 @@ void yk_doc_load_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
     (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    (void)t_start;
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;

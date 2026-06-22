@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/bulk_timeout.h"
 #include <numeric>
 #include <cmath>
 
@@ -34,7 +35,8 @@ void yk_exists_ult(hg_handle_t h)
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
-    (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    double bulk_timeout;
     DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
@@ -62,8 +64,9 @@ void yk_exists_ult(hg_handle_t h)
     // transfer ksizes
     size_t sizes_to_transfer = in.count*sizeof(size_t);
 
+    bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
     hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
-            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer, 0.0);
+            in.bulk, in.offset, buffer->bulk, 0, sizes_to_transfer, bulk_timeout);
     CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // build buffer wrappers for key sizes
@@ -95,9 +98,10 @@ void yk_exists_ult(hg_handle_t h)
     }
 
     // transfer the actual keys from the client
+    bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
     hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
             in.bulk, in.offset + keys_offset,
-            buffer->bulk, keys_offset, total_ksize, 0.0);
+            buffer->bulk, keys_offset, total_ksize, bulk_timeout);
     CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     // create memory wrapper for keys
@@ -115,9 +119,10 @@ void yk_exists_ult(hg_handle_t h)
 
     if(out.ret == YOKAN_SUCCESS) {
         // transfer the bit field back the client
+        bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + flags_offset,
-                buffer->bulk, flags_offset, flags_size, 0.0);
+                buffer->bulk, flags_offset, flags_size, bulk_timeout);
         CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 }
@@ -154,6 +159,8 @@ void yk_exists_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
     (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    (void)t_start;
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;

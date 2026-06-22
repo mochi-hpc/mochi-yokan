@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/bulk_timeout.h"
 #include <numeric>
 #include <iostream>
 
@@ -37,7 +38,8 @@ void yk_doc_store_ult(hg_handle_t h)
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
-    (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    double bulk_timeout;
     DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
@@ -58,8 +60,9 @@ void yk_doc_store_ult(hg_handle_t h)
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
+    bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
     hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
-                               in.bulk, in.offset, buffer->bulk, 0, in.size, 0.0);
+                               in.bulk, in.offset, buffer->bulk, 0, in.size, bulk_timeout);
     CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
 
     auto ptr = buffer->data;
@@ -121,6 +124,8 @@ void yk_doc_store_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
     (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    (void)t_start;
     DEFER(margo_free_input(h, &in));
 
     auto count = in.sizes.count;

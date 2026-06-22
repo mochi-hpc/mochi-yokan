@@ -9,6 +9,7 @@
 #include "../common/defer.hpp"
 #include "../common/logging.h"
 #include "../common/checks.h"
+#include "../common/bulk_timeout.h"
 #include <numeric>
 #include <iostream>
 
@@ -34,7 +35,8 @@ void yk_doc_list_ult(hg_handle_t h)
     hret = margo_get_input(h, &in);
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
-    (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    double bulk_timeout;
     DEFER(margo_free_input(h, &in));
 
     if(in.origin) {
@@ -69,8 +71,9 @@ void yk_doc_list_ult(hg_handle_t h)
     if(!in.packed) size_to_transfer += in.count*sizeof(size_t);
 
     if(size_to_transfer > 0) {
+        bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PULL, origin_addr,
-                in.bulk, in.offset, buffer->bulk, 0, size_to_transfer, 0.0);
+                in.bulk, in.offset, buffer->bulk, 0, size_to_transfer, bulk_timeout);
         CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 
@@ -104,9 +107,10 @@ void yk_doc_list_ult(hg_handle_t h)
         size_to_transfer = in.count*sizeof(size_t)
                          + in.count*sizeof(yk_id_t)
                          + in.docs_buf_size;
+        bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + doc_sizes_offset,
-                buffer->bulk, doc_sizes_offset, size_to_transfer, 0.0);
+                buffer->bulk, doc_sizes_offset, size_to_transfer, bulk_timeout);
         CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
     }
 }
@@ -139,6 +143,8 @@ void yk_doc_list_direct_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, margo_get_input);
     const double timeout_ms = in.timeout_ms;
     (void)timeout_ms;
+    const double t_start = ABT_get_wtime();
+    (void)t_start;
     DEFER(margo_free_input(h, &in));
 
     yk_database* database = provider->db;
