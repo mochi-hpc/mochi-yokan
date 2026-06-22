@@ -21,24 +21,75 @@
 #include <experimental/string_view>
 #endif
 
+#if defined(__cpp_lib_generic_unordered_lookup) && __cpp_lib_generic_unordered_lookup >= 201811L
+#define YOKAN_HET_LOOKUP 1
+#endif
+
 namespace yokan {
 
 using json = nlohmann::json;
 
+#ifdef YOKAN_USE_STD_STRING_VIEW
+using sv = std::string_view;
+#else
+using sv = std::experimental::string_view;
+#endif
+
 template<typename KeyType>
 struct UnorderedSetDatabaseHash {
 
-#ifdef YOKAN_USE_STD_STRING_VIEW
-    using sv = std::string_view;
-#else
-    using sv = std::experimental::string_view;
-#endif
+    using is_transparent = void;
 
     std::size_t operator()(KeyType const& key) const noexcept
     {
         return std::hash<sv>{}({ key.data(), key.size() });
     }
+
+    std::size_t operator()(sv key) const noexcept
+    {
+        return std::hash<sv>{}(key);
+    }
 };
+
+template<typename KeyType>
+struct UnorderedSetDatabaseEqual {
+
+    using is_transparent = void;
+
+    bool operator()(const KeyType& a, const KeyType& b) const noexcept {
+        return a == b;
+    }
+
+    bool operator()(const KeyType& a, sv b) const noexcept {
+        return sv{a.data(), a.size()} == b;
+    }
+
+    bool operator()(sv a, const KeyType& b) const noexcept {
+        return a == sv{b.data(), b.size()};
+    }
+};
+
+template<typename Set, typename Scratch>
+inline auto het_find(Set& s, const char* d, size_t sz, Scratch& scratch) {
+#ifdef YOKAN_HET_LOOKUP
+    (void)scratch;
+    return s.find(sv{d, sz});
+#else
+    scratch.assign(d, sz);
+    return s.find(scratch);
+#endif
+}
+
+template<typename Set, typename Scratch>
+inline auto het_count(Set& s, const char* d, size_t sz, Scratch& scratch) {
+#ifdef YOKAN_HET_LOOKUP
+    (void)scratch;
+    return s.count(sv{d, sz});
+#else
+    scratch.assign(d, sz);
+    return s.count(scratch);
+#endif
+}
 
 class UnorderedSetDatabase : public DatabaseInterface {
 
@@ -225,8 +276,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            key.assign(keys.data + offset, ksizes[i]);
-            flags[i] = m_db->count(key) > 0;
+            flags[i] = het_count(*m_db, keys.data + offset, ksizes[i], key) > 0;
             offset += ksizes[i];
         }
         return Status::OK;
@@ -243,8 +293,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            key.assign(keys.data + offset, ksizes[i]);
-            auto it = m_db->find(key);
+            auto it = het_find(*m_db, keys.data + offset, ksizes[i], key);
             if(it == m_db->end()) vsizes[i] = KeyNotFound;
             else vsizes[i] = 0;
             offset += ksizes[i];
@@ -273,9 +322,11 @@ class UnorderedSetDatabase : public DatabaseInterface {
         ScopedWriteLock lock(m_lock);
         if(m_migrated) return Status::Migrated;
 
+        auto scratch_key = key_type(m_key_allocator);
+
         if(mode & YOKAN_MODE_EXIST_ONLY) {
             if(ksizes.size == 1) {
-                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) == m_db->end())
+                if(het_find(*m_db, keys.data, ksizes[0], scratch_key) == m_db->end())
                     return Status::NotFound;
             }
             return Status::OK;
@@ -283,7 +334,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
 
         if(mode & YOKAN_MODE_NEW_ONLY) {
             if(ksizes.size == 1) {
-                if(m_db->find(key_type{keys.data, ksizes[0], m_key_allocator}) != m_db->end())
+                if(het_find(*m_db, keys.data, ksizes[0], scratch_key) != m_db->end())
                     return Status::KeyExists;
             }
         }
@@ -308,8 +359,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
 
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
-            key.assign(keys.data + key_offset, ksizes[i]);
-            auto it = m_db->find(key);
+            auto it = het_find(*m_db, keys.data + key_offset, ksizes[i], key);
             if(it == m_db->end()) {
                 vsizes[i] = KeyNotFound;
             } else {
@@ -336,10 +386,9 @@ class UnorderedSetDatabase : public DatabaseInterface {
 
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
-            key.assign(keys.data + key_offset, ksizes[i]);
             auto key_umem = UserMem{keys.data + key_offset, ksizes[i]};
             auto val_umem = UserMem{nullptr, 0};
-            auto it = m_db->find(key);
+            auto it = het_find(*m_db, keys.data + key_offset, ksizes[i], key);
             if(it == m_db->end()) {
                 val_umem.size = KeyNotFound;
             }
@@ -367,8 +416,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
         auto key = key_type(m_key_allocator);
         for(size_t i = 0; i < ksizes.size; i++) {
             if(offset + ksizes[i] > keys.size) return Status::InvalidArg;
-            key.assign(keys.data + offset, ksizes[i]);
-            auto it = m_db->find(key);
+            auto it = het_find(*m_db, keys.data + offset, ksizes[i], key);
             if(it != m_db->end()) {
                 m_db->erase(it);
             }
@@ -450,7 +498,7 @@ class UnorderedSetDatabase : public DatabaseInterface {
 
     using key_type = std::basic_string<char, std::char_traits<char>,
                                        Allocator<char>>;
-    using equal_type = std::equal_to<key_type>;
+    using equal_type = UnorderedSetDatabaseEqual<key_type>;
     using allocator = Allocator<key_type>;
     using hash_type = UnorderedSetDatabaseHash<key_type>;
     using unordered_set_type = std::unordered_set<key_type, hash_type, equal_type, allocator>;
