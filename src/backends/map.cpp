@@ -589,6 +589,41 @@ retry:
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+        if(prefix.size == 0) {
+            m_db->clear();
+            return Status::OK;
+        }
+        auto is_default_cmp = (m_db->key_comp().cmp == &comparator::DefaultMemCmp);
+        if(is_default_cmp) {
+            auto it = m_db->lower_bound(prefix);
+            const auto end = m_db->end();
+            while(it != end) {
+                auto& key = it->first;
+                if(key.size() < prefix.size
+                || std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    break;
+                it = m_db->erase(it);
+            }
+        } else {
+            auto it = m_db->begin();
+            const auto end = m_db->end();
+            while(it != end) {
+                auto& key = it->first;
+                if(key.size() >= prefix.size
+                && std::memcmp(key.data(), prefix.data, prefix.size) == 0) {
+                    it = m_db->erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        return Status::OK;
+    }
+
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {

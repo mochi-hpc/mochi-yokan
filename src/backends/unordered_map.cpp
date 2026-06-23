@@ -633,6 +633,23 @@ class UnorderedMapDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+        for(auto it = m_db->begin(); it != m_db->end();) {
+            const auto& key = it->first;
+            if(prefix.size == 0
+            || (key.size() >= prefix.size
+                && std::memcmp(key.data(), prefix.data, prefix.size) == 0)) {
+                it = m_db->erase(it);
+            } else {
+                ++it;
+            }
+        }
+        return Status::OK;
+    }
+
     struct UnorderedMapMigrationHandle : public MigrationHandle {
 
         UnorderedMapDatabase&   m_db;

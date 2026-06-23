@@ -467,6 +467,38 @@ class SetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+        if(prefix.size == 0) {
+            m_db->clear();
+            return Status::OK;
+        }
+        const auto key_cmp = m_db->key_comp();
+        if(key_cmp.cmp == &comparator::DefaultMemCmp) {
+            auto it = m_db->lower_bound(prefix);
+            while(it != m_db->end()) {
+                auto& key = *it;
+                if(key.size() < prefix.size
+                || std::memcmp(key.data(), prefix.data, prefix.size) != 0)
+                    break;
+                it = m_db->erase(it);
+            }
+        } else {
+            auto it = m_db->begin();
+            while(it != m_db->end()) {
+                auto& key = *it;
+                if(key.size() >= prefix.size
+                && std::memcmp(key.data(), prefix.data, prefix.size) == 0)
+                    it = m_db->erase(it);
+                else
+                    ++it;
+            }
+        }
+        return Status::OK;
+    }
+
     virtual Status listKeys(int32_t mode, bool packed,
                             const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,

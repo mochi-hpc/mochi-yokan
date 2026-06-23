@@ -658,6 +658,45 @@ class RocksDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return convertStatus(status);
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+        (void)mode;
+        if(prefix.size == 0) {
+            rocksdb::WriteBatch wb;
+            std::unique_ptr<rocksdb::Iterator> it(m_db->NewIterator(m_read_options));
+            for(it->SeekToFirst(); it->Valid(); it->Next()) wb.Delete(it->key());
+            auto status = m_db->Write(m_write_options, &wb);
+            return convertStatus(status);
+        }
+        std::string end((const char*)prefix.data, prefix.size);
+        ssize_t i = (ssize_t)end.size() - 1;
+        for(; i >= 0; --i) {
+            if((unsigned char)end[i] != 0xFF) {
+                end[i] = (char)((unsigned char)end[i] + 1);
+                end.resize(i + 1);
+                break;
+            }
+        }
+        rocksdb::Slice begin_slice{ prefix.data, prefix.size };
+        if(i < 0) {
+            rocksdb::WriteBatch wb;
+            std::unique_ptr<rocksdb::Iterator> it(m_db->NewIterator(m_read_options));
+            for(it->Seek(begin_slice); it->Valid(); it->Next()) {
+                auto k = it->key();
+                if(k.size() < prefix.size
+                || std::memcmp(k.data(), prefix.data, prefix.size) != 0) break;
+                wb.Delete(k);
+            }
+            auto status = m_db->Write(m_write_options, &wb);
+            return convertStatus(status);
+        }
+        rocksdb::Slice end_slice{ end };
+        auto status = m_db->DeleteRange(m_write_options, m_db->DefaultColumnFamily(),
+                                        begin_slice, end_slice);
+        return convertStatus(status);
+    }
+
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {

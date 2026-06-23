@@ -66,6 +66,17 @@ All basic operations:
 - Take an optional mode parameter (defaults to ``YOKAN_MODE_DEFAULT``)
 - Throw ``yokan::Exception`` on errors
 
+To erase every key/value pair sharing a common prefix in one call, use
+``eraseRange``:
+
+.. code-block:: cpp
+
+    std::string prefix = "user:";
+    db.eraseRange(prefix.data(), prefix.size());
+
+    // An empty prefix clears the entire database:
+    db.eraseRange(nullptr, 0);
+
 Batch Operations
 ----------------
 

@@ -364,6 +364,13 @@ class Database {
         YOKAN_CONVERT_AND_THROW(err);
     }
 
+    void eraseRange(const void* prefix,
+                    size_t prefix_size,
+                    int32_t mode = YOKAN_MODE_DEFAULT) const {
+        auto err = yk_erase_range(handle(), mode, prefix, prefix_size);
+        YOKAN_CONVERT_AND_THROW(err);
+    }
+
     void listKeys(const void* from_key,
                   size_t from_ksize,
                   const void* filter,

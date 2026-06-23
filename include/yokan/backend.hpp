@@ -321,6 +321,23 @@ class DatabaseInterface {
     }
 
     /**
+     * @brief Erase every key/value pair whose key starts with the given prefix.
+     * An empty prefix erases every key in the database.
+     *
+     * The default implementation falls back to a bounded
+     * listKeys(YOKAN_MODE_PREFIX) + erase loop, which works on any backend
+     * that supports prefix listing and erase. Backends with a native range
+     * delete (e.g. rocksdb's DeleteRange) or a cursor delete should override
+     * for a faster path.
+     *
+     * @param [in] mode Mode.
+     * @param [in] prefix Prefix that keys must start with to be erased.
+     *
+     * @return Status.
+     */
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix);
+
+    /**
      * @brief This version of listKeys uses a single contiguous buffer
      * to hold all the keys. Their size is stored in the keySizes user-allocated
      * buffer. After a successful call, keySizes.size holds the number of keys read.

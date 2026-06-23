@@ -152,6 +152,12 @@ class NullDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        (void)prefix;
+        return Status::OK;
+    }
+
     ~NullDatabase() {}
 
     private:

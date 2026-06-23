@@ -425,6 +425,21 @@ class UnorderedSetDatabase : public DatabaseInterface {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+        for(auto it = m_db->begin(); it != m_db->end();) {
+            if(it->size() >= prefix.size
+               && std::memcmp(it->data(), prefix.data, prefix.size) == 0) {
+                it = m_db->erase(it);
+            } else {
+                ++it;
+            }
+        }
+        return Status::OK;
+    }
+
     struct UnorderedSetMigrationHandle : public MigrationHandle {
 
         UnorderedSetDatabase&   m_db;

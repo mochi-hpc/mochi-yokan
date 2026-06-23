@@ -415,6 +415,58 @@ class BerkeleyDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        if(prefix.size > 0 && m_db_type != DB_BTREE)
+            return Status::NotSupported;
+
+        Dbc* cursor = nullptr;
+        int status = m_db->cursor(nullptr, &cursor, 0);
+        if(status != 0) return convertStatus(status);
+
+        /* DB_DBT_REALLOC lets BDB malloc/realloc the key buffer to fit
+         * whatever the actual key is (keys in this test are much larger
+         * than the prefix). Same approach for val, but we don't need it. */
+        auto key = Dbt{ nullptr, 0 };
+        key.set_flags(DB_DBT_REALLOC);
+        auto val = Dbt{ nullptr, 0 };
+        val.set_flags(DB_DBT_REALLOC);
+
+        Status ret = Status::OK;
+
+        if(prefix.size == 0) {
+            status = cursor->get(&key, &val, DB_FIRST);
+            while(status == 0) {
+                int r = cursor->del(0);
+                if(r != 0 && r != DB_KEYEMPTY) { ret = convertStatus(r); goto complete; }
+                status = cursor->get(&key, &val, DB_NEXT);
+            }
+            if(status != DB_NOTFOUND) ret = convertStatus(status);
+        } else {
+            /* Seed the key buffer with the prefix; BDB may realloc it on
+             * return if the actual key is longer. */
+            key.set_data(std::malloc(prefix.size));
+            std::memcpy(key.get_data(), prefix.data, prefix.size);
+            key.set_size(prefix.size);
+            status = cursor->get(&key, &val, DB_SET_RANGE);
+            while(status == 0) {
+                if(key.get_size() < prefix.size
+                || std::memcmp(key.get_data(), prefix.data, prefix.size) != 0)
+                    break;
+                int r = cursor->del(0);
+                if(r != 0 && r != DB_KEYEMPTY) { ret = convertStatus(r); goto complete; }
+                status = cursor->get(&key, &val, DB_NEXT);
+            }
+            if(status != 0 && status != DB_NOTFOUND) ret = convertStatus(status);
+        }
+
+complete:
+        if(key.get_data()) std::free(key.get_data());
+        if(val.get_data()) std::free(val.get_data());
+        cursor->close();
+        return ret;
+    }
+
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {

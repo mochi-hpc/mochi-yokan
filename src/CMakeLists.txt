@@ -4,6 +4,7 @@ set (server-src-files
      server/count.cpp
      server/put.cpp
      server/erase.cpp
+     server/erase_range.cpp
      server/get.cpp
      server/fetch.cpp
      server/length.cpp
@@ -104,6 +105,7 @@ set (client-src-files
      client/count.cpp
      client/put.cpp
      client/erase.cpp
+     client/erase_range.cpp
      client/get.cpp
      client/fetch.cpp
      client/length.cpp

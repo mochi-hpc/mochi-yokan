@@ -525,6 +525,50 @@ class UnQLiteDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+
+        /* UnQLite's KV cursor iterates in hash order, not lexicographic, so
+         * we cannot break on the first non-matching key — full scan, collect
+         * matches, then delete in a second pass (also safer than mutating
+         * during cursor iteration). */
+        std::vector<std::string> to_delete;
+
+        unqlite_kv_cursor* cursor = nullptr;
+        int ret = unqlite_kv_cursor_init(m_db, &cursor);
+        if(ret != UNQLITE_OK) return convertStatus(ret);
+
+        ret = unqlite_kv_cursor_first_entry(cursor);
+        if(ret != UNQLITE_OK && ret != UNQLITE_NOTFOUND) {
+            unqlite_kv_cursor_release(m_db, cursor);
+            return convertStatus(ret);
+        }
+
+        while(unqlite_kv_cursor_valid_entry(cursor)) {
+            int klen = 0;
+            unqlite_kv_cursor_key(cursor, nullptr, &klen);
+            std::string kbuf;
+            kbuf.resize((size_t)klen);
+            unqlite_kv_cursor_key(cursor, &kbuf[0], &klen);
+            bool match = (prefix.size == 0) ||
+                         ((size_t)klen >= prefix.size &&
+                          std::memcmp(kbuf.data(), prefix.data, prefix.size) == 0);
+            if(match) to_delete.emplace_back(std::move(kbuf));
+            unqlite_kv_cursor_next_entry(cursor);
+        }
+
+        unqlite_kv_cursor_release(m_db, cursor);
+
+        for(const auto& k : to_delete) {
+            int dret = unqlite_kv_delete(m_db, k.data(), (int)k.size());
+            if(dret != UNQLITE_OK && dret != UNQLITE_NOTFOUND)
+                return convertStatus(dret);
+        }
+        return Status::OK;
+    }
+
 #if 0
     private:
 

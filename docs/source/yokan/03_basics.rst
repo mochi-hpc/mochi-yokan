@@ -29,6 +29,20 @@ single key/value pairs:
 - :code:`yk_get`: gets the value associated with the given key.
 - :code:`yk_fetch`: gets the value associated with the given key using a functional style.
 - :code:`yk_erase`: erases the key/value pair associated with the given key.
+- :code:`yk_erase_range`: erases every key/value pair whose key starts with the
+  given prefix. An empty prefix erases every key in the database. Backends
+  with a native range delete (e.g. RocksDB's :code:`DeleteRange`) use a fast
+  path; others fall back to an iteration loop.
+
+For example:
+
+.. code-block:: c
+
+    /* Erase every key starting with "user:" */
+    ret = yk_erase_range(db_handle, YOKAN_MODE_DEFAULT, "user:", 5);
+
+    /* Clear the entire database */
+    ret = yk_erase_range(db_handle, YOKAN_MODE_DEFAULT, NULL, 0);
 
 These functions are extensively documented in the *yokan/database.h* header.
 

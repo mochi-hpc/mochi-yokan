@@ -1211,6 +1211,22 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
              }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
         // --------------------------------------------------------------
+        // ERASE_RANGE
+        // --------------------------------------------------------------
+        .def("erase_range",
+             [](const yokan::Database& db, const std::string& prefix, int32_t mode) {
+                py::gil_scoped_release release;
+                db.eraseRange(prefix.data(), prefix.size(), mode);
+             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        .def("erase_range",
+             [](const yokan::Database& db, const py::buffer& prefix, int32_t mode) {
+                auto info = get_buffer_info(prefix);
+                CHECK_BUFFER_IS_CONTIGUOUS(info);
+                size_t psize = info.itemsize*info.size;
+                py::gil_scoped_release release;
+                db.eraseRange(info.ptr, psize, mode);
+             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+        // --------------------------------------------------------------
         // LIST_KEYS
         // --------------------------------------------------------------
         .def("list_keys",

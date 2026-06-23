@@ -512,6 +512,59 @@ class LMDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return convertStatus(ret);
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+        (void)mode;
+
+        MDB_txn* txn = nullptr;
+        int ret = mdb_txn_begin(m_env, nullptr, 0, &txn);
+        if(ret != MDB_SUCCESS) return convertStatus(ret);
+        MDB_cursor* cursor = nullptr;
+        ret = mdb_cursor_open(txn, m_db, &cursor);
+        if(ret != MDB_SUCCESS) {
+            mdb_txn_abort(txn);
+            return convertStatus(ret);
+        }
+        MDB_val key{ 0, nullptr };
+        MDB_val val{ 0, nullptr };
+        if(prefix.size > 0) {
+            key.mv_size = prefix.size;
+            key.mv_data = (void*)prefix.data;
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_SET_RANGE);
+            while(ret == MDB_SUCCESS) {
+                if(key.mv_size < prefix.size) break;
+                if(std::memcmp(key.mv_data, prefix.data, prefix.size) != 0) break;
+                ret = mdb_cursor_del(cursor, 0);
+                if(ret != MDB_SUCCESS) {
+                    mdb_cursor_close(cursor);
+                    mdb_txn_abort(txn);
+                    return convertStatus(ret);
+                }
+                ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+            }
+        } else {
+            ret = mdb_cursor_get(cursor, &key, &val, MDB_FIRST);
+            while(ret == MDB_SUCCESS) {
+                ret = mdb_cursor_del(cursor, 0);
+                if(ret != MDB_SUCCESS) {
+                    mdb_cursor_close(cursor);
+                    mdb_txn_abort(txn);
+                    return convertStatus(ret);
+                }
+                ret = mdb_cursor_get(cursor, &key, &val, MDB_NEXT);
+            }
+        }
+        if(ret != MDB_SUCCESS && ret != MDB_NOTFOUND) {
+            mdb_cursor_close(cursor);
+            mdb_txn_abort(txn);
+            return convertStatus(ret);
+        }
+        mdb_cursor_close(cursor);
+        ret = mdb_txn_commit(txn);
+        return convertStatus(ret);
+    }
+
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {

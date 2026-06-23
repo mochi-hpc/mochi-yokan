@@ -655,6 +655,65 @@ class TkrzwDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+
+        std::string_view prefix_sv{prefix.data, prefix.size};
+        auto iterator = m_db->MakeIterator();
+        tkrzw::Status status;
+
+        if(m_db->IsOrdered()) {
+            if(prefix.size == 0) {
+                status = iterator->First();
+            } else {
+                status = iterator->Jump(prefix_sv);
+            }
+            while(status.IsOK()) {
+                std::string key;
+                status = iterator->Get(&key);
+                if(!status.IsOK()) {
+                    if(status == tkrzw::Status::NOT_FOUND_ERROR) break;
+                    return convertStatus(status);
+                }
+                if(prefix.size != 0 &&
+                   (key.size() < prefix.size ||
+                    std::memcmp(key.data(), prefix.data, prefix.size) != 0))
+                    break;
+                status = iterator->Remove();
+                if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                    return convertStatus(status);
+            }
+            if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                return convertStatus(status);
+        } else {
+            status = iterator->First();
+            while(status.IsOK()) {
+                std::string key;
+                status = iterator->Get(&key);
+                if(!status.IsOK()) {
+                    if(status == tkrzw::Status::NOT_FOUND_ERROR) break;
+                    return convertStatus(status);
+                }
+                if(prefix.size == 0 ||
+                   (key.size() >= prefix.size &&
+                    std::memcmp(key.data(), prefix.data, prefix.size) == 0)) {
+                    status = iterator->Remove();
+                    if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                        return convertStatus(status);
+                } else {
+                    status = iterator->Next();
+                    if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                        return convertStatus(status);
+                }
+            }
+            if(!status.IsOK() && status != tkrzw::Status::NOT_FOUND_ERROR)
+                return convertStatus(status);
+        }
+        return Status::OK;
+    }
+
     struct ListKeys : public tkrzw::DBM::RecordProcessor {
 
         int32_t               m_mode;

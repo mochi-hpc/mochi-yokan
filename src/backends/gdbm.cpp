@@ -348,6 +348,30 @@ class GDBMDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return Status::OK;
     }
 
+    virtual Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        (void)mode;
+        ScopedWriteLock lock(m_lock);
+        if(m_migrated) return Status::Migrated;
+        /* GDBM docs warn that mutating during gdbm_nextkey iteration is
+         * unspecified, so we do two passes: collect first, delete second. */
+        std::vector<std::string> to_delete;
+        datum k = gdbm_firstkey(m_db);
+        while(k.dptr != nullptr) {
+            datum next = gdbm_nextkey(m_db, k);
+            bool match = (prefix.size == 0) ||
+                         ((size_t)k.dsize >= prefix.size &&
+                          std::memcmp(k.dptr, prefix.data, prefix.size) == 0);
+            if(match) to_delete.emplace_back(k.dptr, k.dsize);
+            free(k.dptr);
+            k = next;
+        }
+        for(const auto& s : to_delete) {
+            datum d = { const_cast<char*>(s.data()), (int)s.size() };
+            gdbm_delete(m_db, d);
+        }
+        return Status::OK;
+    }
+
     struct GDBMMigrationHandle : public MigrationHandle {
 
         GDBMDatabase&   m_db;

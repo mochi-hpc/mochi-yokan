@@ -216,6 +216,14 @@ MERCURY_GEN_PROC(erase_direct_in_t,
 MERCURY_GEN_PROC(erase_direct_out_t,
         ((int32_t)(ret)))
 
+/* erase_range (always direct: prefix is small) */
+MERCURY_GEN_PROC(erase_range_in_t,
+        ((int32_t)(mode))\
+        ((double)(timeout_ms))\
+        ((raw_data)(prefix)))
+MERCURY_GEN_PROC(erase_range_out_t,
+        ((int32_t)(ret)))
+
 /* list_keys */
 MERCURY_GEN_PROC(list_keys_in_t,
         ((int32_t)(mode))\

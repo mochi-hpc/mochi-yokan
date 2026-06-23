@@ -35,6 +35,7 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         margo_registered_name(mid, "yk_fetch_direct",        &c->fetch_direct_id,        &flag);
         margo_registered_name(mid, "yk_erase",               &c->erase_id,               &flag);
         margo_registered_name(mid, "yk_erase_direct",        &c->erase_direct_id,        &flag);
+        margo_registered_name(mid, "yk_erase_range",         &c->erase_range_id,         &flag);
         margo_registered_name(mid, "yk_list_keys",           &c->list_keys_id,           &flag);
         margo_registered_name(mid, "yk_list_keys_direct",    &c->list_keys_direct_id,    &flag);
         margo_registered_name(mid, "yk_list_keyvals",        &c->list_keyvals_id,        &flag);
@@ -102,6 +103,9 @@ extern "C" yk_return_t yk_client_init(margo_instance_id mid, yk_client_t* client
         c->erase_direct_id =
             MARGO_REGISTER(mid, "yk_erase_direct",
                            erase_direct_in_t, erase_direct_out_t, NULL);
+        c->erase_range_id =
+            MARGO_REGISTER(mid, "yk_erase_range",
+                           erase_range_in_t, erase_range_out_t, NULL);
         c->list_keys_id =
             MARGO_REGISTER(mid, "yk_list_keys",
                            list_keys_in_t, list_keys_out_t, NULL);

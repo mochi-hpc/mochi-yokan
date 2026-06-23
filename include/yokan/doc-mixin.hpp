@@ -102,30 +102,28 @@ class DocumentStoreMixin : public DB {
         auto status = _collExists(collection, name_len, &coll_exists);
         if(status != Status::OK) return status;
 
-        /* Resolve next_id either from the cache (drop the entry while we are
-         * here) or from disk if the collection has not been touched in this
-         * process yet. */
-        yk_id_t next_id = 0;
         auto it = m_cached_metadata.find(coll_name);
-        if(it != m_cached_metadata.end()) {
-            next_id = it->second->next_id.load(std::memory_order_relaxed);
-            m_cached_metadata.erase(it);
-        } else if(coll_exists) {
-            CollectionMetadataDisk disk{0, 0};
-            status = _readMetadataFromDisk(collection, name_len, &disk);
-            if(status != Status::OK) return status;
-            next_id = disk.next_id;
-        }
+        if(it != m_cached_metadata.end()) m_cached_metadata.erase(it);
 
-        std::vector<yk_id_t> id_storage(next_id);
-        for(yk_id_t i = 0; i < next_id; i++) id_storage[i] = i;
-        BasicUserMem<yk_id_t> ids_umem{id_storage.data(), id_storage.size()};
-        auto keys = _keysFromIds(collection, name_len, ids_umem);
-        std::vector<size_t> ksizes(id_storage.size()+1, name_len+1+sizeof(yk_id_t));
-        keys.resize(keys.size() + name_len);
-        std::memcpy(keys.data() + keys.size() - name_len, collection, name_len);
-        ksizes[ksizes.size()-1] = name_len;
-        return erase(mode, keys, ksizes);
+        /* Doc keys all have the form <collection>\0<be_id>, so a single
+         * eraseRange on the "<collection>\0" prefix removes every document
+         * regardless of how many IDs were ever issued (next_id is monotonic
+         * and historically the loop allocated next_id slots even when the
+         * live count was tiny). The collection's metadata key — just
+         * "<collection>" with no trailing NUL — sits OUTSIDE that prefix and
+         * is erased separately. */
+        std::vector<char> doc_prefix(name_len + 1);
+        std::memcpy(doc_prefix.data(), collection, name_len);
+        doc_prefix[name_len] = '\0';
+        UserMem prefix_umem{ doc_prefix.data(), doc_prefix.size() };
+        status = this->eraseRange(mode, prefix_umem);
+        if(status != Status::OK) return status;
+
+        std::vector<char> meta_key(collection, collection + name_len);
+        UserMem meta_keys{ meta_key.data(), meta_key.size() };
+        std::vector<size_t> meta_ksizes{ name_len };
+        BasicUserMem<size_t> meta_ksizes_umem{ meta_ksizes.data(), meta_ksizes.size() };
+        return erase(mode, meta_keys, meta_ksizes_umem);
     }
 
     Status collExists(int32_t mode, const char* collection, bool* flag) const override {

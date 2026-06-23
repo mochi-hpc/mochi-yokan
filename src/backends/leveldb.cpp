@@ -445,6 +445,29 @@ class LevelDBDatabase : public DocumentStoreMixin<DatabaseInterface> {
         return convertStatus(status);
     }
 
+    Status eraseRange(int32_t mode, const UserMem& prefix) override {
+        ScopedReadLock mlock(m_migration_lock);
+        if(m_migrated) return Status::Migrated;
+        (void)mode;
+        leveldb::WriteBatch wb;
+        std::unique_ptr<leveldb::Iterator> it(m_db->NewIterator(m_read_options));
+        if(prefix.size == 0) {
+            it->SeekToFirst();
+        } else {
+            it->Seek(leveldb::Slice{ prefix.data, prefix.size });
+        }
+        for(; it->Valid(); it->Next()) {
+            leveldb::Slice k = it->key();
+            if(prefix.size > 0) {
+                if(k.size() < prefix.size) break;
+                if(std::memcmp(k.data(), prefix.data, prefix.size) != 0) break;
+            }
+            wb.Delete(k);
+        }
+        auto status = m_db->Write(m_write_options, &wb);
+        return convertStatus(status);
+    }
+
     virtual Status listKeys(int32_t mode, bool packed, const UserMem& fromKey,
                             const std::shared_ptr<KeyValueFilter>& filter,
                             UserMem& keys, BasicUserMem<size_t>& keySizes) const override {

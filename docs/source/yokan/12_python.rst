@@ -61,7 +61,22 @@ The client API supports:
 - ``exists(key, mode=0)``: Check if a key exists
 - ``length(key, mode=0)``: Get the size of a value (returns ``None`` if key doesn't exist)
 - ``erase(key, mode=0)``: Delete a key/value pair
+- ``erase_range(prefix, mode=0)``: Delete every key/value pair whose key
+  starts with ``prefix``. An empty prefix clears the database.
 - ``count(mode=0)``: Count total key/value pairs
+
+For example:
+
+.. code-block:: python
+
+    # Delete every key starting with "user:"
+    db.erase_range("user:")
+
+    # Or with a bytes prefix:
+    db.erase_range(b"user:")
+
+    # Clear the entire database
+    db.erase_range("")
 
 .. note::
    The ``get`` method does not return the value, instead an appropriately-sized

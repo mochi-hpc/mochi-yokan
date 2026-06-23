@@ -28,6 +28,7 @@ typedef struct yk_client {
     hg_id_t           fetch_direct_back_id;
     hg_id_t           erase_id;
     hg_id_t           erase_direct_id;
+    hg_id_t           erase_range_id;
     hg_id_t           list_keys_id;
     hg_id_t           list_keys_direct_id;
     hg_id_t           list_keyvals_id;

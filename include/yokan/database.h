@@ -750,6 +750,25 @@ yk_return_t yk_erase_bulk(yk_database_handle_t dbh,
                           size_t offset,
                           size_t size, ...);
 
+/**
+ * @brief Erase every key/value pair whose key starts with the given prefix.
+ * An empty prefix (prefix_size == 0) erases every key in the database.
+ *
+ * Backends with native range delete (e.g. RocksDB DeleteRange) use a fast
+ * path; the default fallback iterates with listKeys+erase.
+ *
+ * @param[in] dbh Database handle.
+ * @param[in] mode 0 or bitwise "or" of YOKAN_MODE_* flags.
+ * @param[in] prefix Prefix bytes (may be NULL iff prefix_size == 0).
+ * @param[in] prefix_size Size of the prefix.
+ *
+ * @return YOKAN_SUCCESS or corresponding error code.
+ */
+yk_return_t yk_erase_range(yk_database_handle_t dbh,
+                           int32_t mode,
+                           const void* prefix,
+                           size_t prefix_size, ...);
+
 
 /**
  * @brief Lists up to count keys from from_key (included if
