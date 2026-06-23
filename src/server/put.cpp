@@ -47,7 +47,7 @@ void yk_put_ult(hg_handle_t h)
     CHECK_MODE_SUPPORTED(database, in.mode);
 
     yk_buffer_t buffer = provider->bulk_cache.get(
-        provider->bulk_cache_data, in.size, HG_BULK_READWRITE);
+        provider->bulk_cache_data, in.size, HG_BULK_WRITE_ONLY);
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 

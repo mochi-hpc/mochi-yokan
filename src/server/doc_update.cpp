@@ -45,7 +45,7 @@ void yk_doc_update_ult(hg_handle_t h)
     CHECK_HRET_OUT(hret, yk_provider_resolve_addr);
 
     yk_buffer_t buffer = provider->bulk_cache.get(
-        provider->bulk_cache_data, in.size, HG_BULK_READWRITE);
+        provider->bulk_cache_data, in.size, HG_BULK_WRITE_ONLY);
     CHECK_BUFFER(buffer);
     DEFER(provider->bulk_cache.release(provider->bulk_cache_data, buffer));
 
