@@ -6,6 +6,7 @@
 #ifndef __YOKAN_DOC_MIXIN_H
 #define __YOKAN_DOC_MIXIN_H
 
+#include <atomic>
 #include <iostream>
 #include <limits>
 #include <yokan/backend.hpp>
@@ -24,13 +25,24 @@ namespace yokan {
 template <typename DB>
 class DocumentStoreMixin : public DB {
 
+    /* In-memory metadata: atomic counters so id allocation and size updates
+     * do not need to serialize through m_lock. The map below stores
+     * shared_ptr<CollectionMetadata> so handlers can hold a stable pointer
+     * to the entry while doing unlocked work. */
     struct CollectionMetadata {
-        yk_id_t size    = 0;
-        yk_id_t next_id = 0;
+        std::atomic<yk_id_t> size{0};
+        std::atomic<yk_id_t> next_id{0};
+    };
+
+    /* POD layout used on disk for the metadata value. Matches the original
+     * {size, next_id} pair so existing collections stay readable. */
+    struct CollectionMetadataDisk {
+        yk_id_t size;
+        yk_id_t next_id;
     };
 
     ABT_rwlock m_lock = ABT_RWLOCK_NULL;
-    mutable std::unordered_map<std::string, CollectionMetadata> m_cached_metadata;
+    mutable std::unordered_map<std::string, std::shared_ptr<CollectionMetadata>> m_cached_metadata;
 
     public:
 
@@ -66,36 +78,53 @@ class DocumentStoreMixin : public DB {
 
     Status collCreate(int32_t mode, const char* name) override {
         (void)mode;
+        auto name_len = strlen(name);
+        std::string coll_name(name, name_len);
+
         ScopedWriteLock lock(m_lock);
         bool coll_exists;
-        auto name_len = strlen(name);
         auto status = _collExists(name, name_len, &coll_exists);
         if(status != Status::OK) return status;
         if(coll_exists) return Status::KeyExists;
-        CollectionMetadata metadata;
-        return _collPutMetadata(name, name_len, &metadata);
+        auto meta = std::make_shared<CollectionMetadata>();
+        status = _flushMetadata(name, name_len, *meta);
+        if(status != Status::OK) return status;
+        m_cached_metadata[coll_name] = std::move(meta);
+        return Status::OK;
     }
 
     Status collDrop(int32_t mode, const char* collection) override {
-        (void)mode;
+        auto name_len = strlen(collection);
+        std::string coll_name(collection, name_len);
+
         ScopedWriteLock lock(m_lock);
         bool coll_exists;
-        auto name_len = strlen(collection);
         auto status = _collExists(collection, name_len, &coll_exists);
         if(status != Status::OK) return status;
-        CollectionMetadata metadata;
-        status = _collGetMetadata(collection, name_len, &metadata);
-        if(status != Status::OK) return status;
-        std::vector<yk_id_t> ids(metadata.next_id);
-        for(yk_id_t id = 0; id < ids.size(); id++) {
-            ids[id] = id;
+
+        /* Resolve next_id either from the cache (drop the entry while we are
+         * here) or from disk if the collection has not been touched in this
+         * process yet. */
+        yk_id_t next_id = 0;
+        auto it = m_cached_metadata.find(coll_name);
+        if(it != m_cached_metadata.end()) {
+            next_id = it->second->next_id.load(std::memory_order_relaxed);
+            m_cached_metadata.erase(it);
+        } else if(coll_exists) {
+            CollectionMetadataDisk disk{0, 0};
+            status = _readMetadataFromDisk(collection, name_len, &disk);
+            if(status != Status::OK) return status;
+            next_id = disk.next_id;
         }
-        auto keys = _keysFromIds(collection, name_len, ids);
-        std::vector<size_t> ksizes(ids.size()+1, name_len+1+sizeof(yk_id_t));
+
+        std::vector<yk_id_t> id_storage(next_id);
+        for(yk_id_t i = 0; i < next_id; i++) id_storage[i] = i;
+        BasicUserMem<yk_id_t> ids_umem{id_storage.data(), id_storage.size()};
+        auto keys = _keysFromIds(collection, name_len, ids_umem);
+        std::vector<size_t> ksizes(id_storage.size()+1, name_len+1+sizeof(yk_id_t));
         keys.resize(keys.size() + name_len);
         std::memcpy(keys.data() + keys.size() - name_len, collection, name_len);
         ksizes[ksizes.size()-1] = name_len;
-        m_cached_metadata.erase(std::string(collection, name_len));
         return erase(mode, keys, ksizes);
     }
 
@@ -107,21 +136,19 @@ class DocumentStoreMixin : public DB {
 
     Status collLastID(int32_t mode, const char* collection, yk_id_t* id) const override {
         (void)mode;
-        CollectionMetadata metadata;
-        ScopedReadLock lock(m_lock);
-        auto status = _collGetMetadata(collection, strlen(collection), &metadata);
+        std::shared_ptr<CollectionMetadata> meta;
+        auto status = _getOrLoadMetadata(collection, strlen(collection), meta);
         if(status == Status::OK)
-            *id = metadata.next_id-1;
+            *id = meta->next_id.load(std::memory_order_relaxed) - 1;
         return status;
     }
 
     Status collSize(int32_t mode, const char* collection, size_t* size) const override {
         (void)mode;
-        ScopedReadLock lock(m_lock);
-        CollectionMetadata metadata;
-        auto status = _collGetMetadata(collection, strlen(collection), &metadata);
+        std::shared_ptr<CollectionMetadata> meta;
+        auto status = _getOrLoadMetadata(collection, strlen(collection), meta);
         if(status == Status::OK)
-            *size = metadata.size;
+            *size = meta->size.load(std::memory_order_relaxed);
         return status;
     }
 
@@ -143,27 +170,24 @@ class DocumentStoreMixin : public DB {
                     const BasicUserMem<size_t>& sizes,
                     BasicUserMem<yk_id_t>& ids) override {
         auto count = ids.size;
-        CollectionMetadata metadata;
         auto name_len = strlen(collection);
-        {
-            ScopedWriteLock lock(m_lock);
-            auto status = _collGetMetadata(collection, name_len, &metadata);
-            if(status != Status::OK) return status;
-            for(uint64_t i = 0; i < count; i++) {
-                ids[i] = metadata.next_id + i;
-            }
-            metadata.next_id += count;
-            status = _collPutMetadata(collection, name_len, &metadata, false);
-            if(status != Status::OK) return status;
-        }
+
+        std::shared_ptr<CollectionMetadata> meta;
+        auto status = _getOrLoadMetadata(collection, name_len, meta);
+        if(status != Status::OK) return status;
+
+        /* Lock-free id allocation: concurrent docStore on the same collection
+         * each get a contiguous slice. */
+        yk_id_t first_id = meta->next_id.fetch_add(count, std::memory_order_relaxed);
+        for(uint64_t i = 0; i < count; i++) ids[i] = first_id + i;
+
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
-        auto status = put(mode, keys, ksizes, documents, sizes);
+        status = put(mode, keys, ksizes, documents, sizes);
         if(status != Status::OK) return status;
-        ScopedWriteLock lock(m_lock);
-        _collGetMetadata(collection, name_len, &metadata);
-        metadata.size += count;
-        return _collPutMetadata(collection, name_len, &metadata);
+
+        meta->size.fetch_add(count, std::memory_order_relaxed);
+        return _flushMetadata(collection, name_len, *meta);
     }
 
     Status docUpdate(const char* collection,
@@ -176,10 +200,11 @@ class DocumentStoreMixin : public DB {
         auto name_len = strlen(collection);
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
-        ScopedWriteLock lock(m_lock);
-        CollectionMetadata metadata;
-        auto status = _collGetMetadata(collection, name_len, &metadata);
+
+        std::shared_ptr<CollectionMetadata> meta;
+        auto status = _getOrLoadMetadata(collection, name_len, meta);
         if(status != Status::OK) return status;
+
         if(mode & YOKAN_MODE_UPDATE_NEW) {
             std::vector<uint8_t> existsBuffer(1 + sizes.size/8);
             BitField existsBitfield{existsBuffer.data(), sizes.size};
@@ -193,12 +218,19 @@ class DocumentStoreMixin : public DB {
             }
             status = put(mode, keys, ksizes, documents, sizes);
             if(status != Status::OK) return status;
-            metadata.size += extraKeys;
-            metadata.next_id = maxID + 1;
-            return _collPutMetadata(collection, name_len, &metadata);
+            meta->size.fetch_add(extraKeys, std::memory_order_relaxed);
+            /* Bump next_id to at least maxID+1 without clobbering a higher
+             * value that a concurrent docStore may have just installed. */
+            yk_id_t target = maxID + 1;
+            yk_id_t cur = meta->next_id.load(std::memory_order_relaxed);
+            while(cur < target &&
+                  !meta->next_id.compare_exchange_weak(cur, target,
+                                                       std::memory_order_relaxed)) {}
+            return _flushMetadata(collection, name_len, *meta);
         } else {
+            yk_id_t current_next_id = meta->next_id.load(std::memory_order_relaxed);
             for(unsigned i=0; i < ids.size; i++) {
-                if(ids[i] >= metadata.next_id)
+                if(ids[i] >= current_next_id)
                     return Status::InvalidID;
             }
             // FIXME: we may be updating keys that have been previously deleted,
@@ -215,10 +247,12 @@ class DocumentStoreMixin : public DB {
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
         auto name_len = strlen(collection);
-        ScopedReadLock lock(m_lock);
         bool e;
-        auto status = _collExists(collection, name_len, &e);
-        if(status != Status::OK) return status;
+        {
+            ScopedReadLock lock(m_lock);
+            auto status = _collExists(collection, name_len, &e);
+            if(status != Status::OK) return status;
+        }
         if(!e) return Status::NotFound;
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
@@ -232,10 +266,12 @@ class DocumentStoreMixin : public DB {
         if(collection == nullptr || collection[0] == 0)
               return Status::InvalidArg;
         auto name_len = strlen(collection);
-        ScopedReadLock lock(m_lock);
         bool e;
-        auto status = _collExists(collection, name_len, &e);
-        if(status != Status::OK) return status;
+        {
+            ScopedReadLock lock(m_lock);
+            auto status = _collExists(collection, name_len, &e);
+            if(status != Status::OK) return status;
+        }
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
         return this->fetch(mode, keys, ksizes,
@@ -250,25 +286,26 @@ class DocumentStoreMixin : public DB {
                     const BasicUserMem<yk_id_t>& ids) override {
         if(collection == nullptr || collection[0] == 0)
             return Status::InvalidArg;
-        CollectionMetadata metadata;
         auto name_len = strlen(collection);
         auto keys = _keysFromIds(collection, name_len, ids);
         std::vector<size_t> ksizes(ids.size, name_len+1+sizeof(yk_id_t));
         std::vector<uint8_t> docs_exist(1+ids.size/8);
         auto docs_exist_bf = BitField{docs_exist.data(), ids.size};
-        ScopedWriteLock lock(m_lock);
-        auto status = exists(mode, keys, ksizes, docs_exist_bf);
+
+        std::shared_ptr<CollectionMetadata> meta;
+        auto status = _getOrLoadMetadata(collection, name_len, meta);
+        if(status != Status::OK) return status;
+
+        status = exists(mode, keys, ksizes, docs_exist_bf);
         if(status != Status::OK) return status;
         size_t num_keys_to_erase = 0;
         for(size_t i=0; i < ids.size; i++) {
             if(docs_exist_bf[i]) num_keys_to_erase += 1;
         }
-        status = _collGetMetadata(collection, name_len, &metadata);
-        if(status != Status::OK) return status;
         status = erase(mode, keys, ksizes);
         if(status != Status::OK) return status;
-        metadata.size -= num_keys_to_erase;
-        return _collPutMetadata(collection, name_len, &metadata);
+        meta->size.fetch_sub(num_keys_to_erase, std::memory_order_relaxed);
+        return _flushMetadata(collection, name_len, *meta);
     }
 
     Status docList(const char* collection,
@@ -289,14 +326,10 @@ class DocumentStoreMixin : public DB {
         auto count = ids.size;
         auto kv_filter = FilterFactory::docToKeyValueFilter(filter, collection);
 
-        CollectionMetadata metadata;
-        {
-            ScopedReadLock lock(m_lock);
-            status = _collGetMetadata(collection, name_len, &metadata);
-            if(status != Status::OK) {
-                return status;
-            }
-        }
+        std::shared_ptr<CollectionMetadata> meta;
+        status = _getOrLoadMetadata(collection, name_len, meta);
+        if(status != Status::OK) return status;
+        yk_id_t next_id = meta->next_id.load(std::memory_order_relaxed);
 
         if(isSorted()) { // use the underlying listKeyValues function
 
@@ -322,7 +355,7 @@ class DocumentStoreMixin : public DB {
             yk_id_t id = from_id;
             size_t docs_offset = 0;
             size_t i = 0;
-            while(i != count && id < metadata.next_id && docs_offset < documents.size) {
+            while(i != count && id < next_id && docs_offset < documents.size) {
                 auto key = _keyFromId(collection, name_len, id);
                 auto ksize = key.size();
                 auto doc_umem = UserMem{
@@ -369,14 +402,10 @@ class DocumentStoreMixin : public DB {
         auto name_len = strlen(collection);
         auto kv_filter = FilterFactory::docToKeyValueFilter(filter, collection);
 
-        CollectionMetadata metadata;
-        {
-            ScopedReadLock lock(m_lock);
-            status = _collGetMetadata(collection, name_len, &metadata);
-            if(status != Status::OK) {
-                return status;
-            }
-        }
+        std::shared_ptr<CollectionMetadata> meta;
+        status = _getOrLoadMetadata(collection, name_len, meta);
+        if(status != Status::OK) return status;
+        yk_id_t next_id = meta->next_id.load(std::memory_order_relaxed);
 
         if(isSorted()) { // use the underlying iters function
 
@@ -392,7 +421,7 @@ class DocumentStoreMixin : public DB {
 
             yk_id_t id = from_id;
             size_t i = 0;
-            while((max == 0 || i < max) && id < metadata.next_id) {
+            while((max == 0 || i < max) && id < next_id) {
                 auto key = _keyFromId(collection, name_len, id);
                 auto ksize = key.size();
                 auto kv_func   = [&func, &filter, &i, &collection, name_len](const UserMem& key, const UserMem& val) -> Status {
@@ -428,54 +457,69 @@ class DocumentStoreMixin : public DB {
         BasicUserMem<size_t> vsize_umem{&vlen, 1};
         auto stt = length(0, key_umem, ksize_umem, vsize_umem);
         if(stt == Status::OK)
-            *e = (vlen == sizeof(CollectionMetadata));
+            *e = (vlen == sizeof(CollectionMetadataDisk));
         return stt;
     }
 
-    Status _collGetMetadata(const char* name, size_t name_size, CollectionMetadata* metadata,
-                            bool from_disk=false) const {
-        if(name == nullptr || name[0] == '\0')
-            return Status::InvalidArg;
-        auto coll_name = std::string(name, name_size);
-        auto it = m_cached_metadata.find(coll_name);
-        if(it != m_cached_metadata.end() && !from_disk) {
-            *metadata = it->second;
-            return Status::OK;
-        }
+    /* Read the on-disk metadata directly, bypassing the cache. */
+    Status _readMetadataFromDisk(const char* name, size_t name_size,
+                                 CollectionMetadataDisk* disk) const {
         size_t klen = name_size;
-        size_t vlen = sizeof(*metadata);
+        size_t vlen = sizeof(*disk);
         UserMem key_umem{const_cast<char*>(name), klen};
         BasicUserMem<size_t> ksize_umem{&klen, 1};
-        UserMem val_umem{reinterpret_cast<char*>(metadata), vlen};
+        UserMem val_umem{reinterpret_cast<char*>(disk), vlen};
         BasicUserMem<size_t> vsize_umem{&vlen, 1};
-        auto status = const_cast<DocumentStoreMixin*>(this)->get(0, true, key_umem, ksize_umem, val_umem, vsize_umem);
+        auto status = const_cast<DocumentStoreMixin*>(this)->get(
+            0, true, key_umem, ksize_umem, val_umem, vsize_umem);
         if(status != Status::OK) return status;
         if(vlen == YOKAN_KEY_NOT_FOUND) return Status::NotFound;
-        if(vlen != sizeof(*metadata)) return Status::Corruption;
-        if(it != m_cached_metadata.end())
-            it->second = *metadata;
-        else
-            m_cached_metadata[coll_name] = *metadata;
+        if(vlen != sizeof(*disk)) return Status::Corruption;
         return Status::OK;
     }
 
-    Status _collPutMetadata(const char* name, size_t name_size, CollectionMetadata* metadata, bool flush_to_disk=true) {
+    /* Return a stable shared_ptr to the cached metadata, loading it from disk
+     * if this is the first time the collection is touched in this process. */
+    Status _getOrLoadMetadata(const char* name, size_t name_size,
+                              std::shared_ptr<CollectionMetadata>& out) const {
         if(name == nullptr || name[0] == '\0')
             return Status::InvalidArg;
-        if(flush_to_disk) {
-            size_t klen = name_size;
-            size_t vlen = sizeof(*metadata);
-            UserMem key_umem{const_cast<char*>(name), klen};
-            BasicUserMem<size_t> ksize_umem{&klen, 1};
-            UserMem val_umem{reinterpret_cast<char*>(metadata), vlen};
-            BasicUserMem<size_t> vsize_umem{&vlen, 1};
-            auto ret = put(0, key_umem, ksize_umem, val_umem, vsize_umem);
-            if(ret != Status::OK)
-                return ret;
+        std::string coll_name(name, name_size);
+        {
+            ScopedReadLock lock(m_lock);
+            auto it = m_cached_metadata.find(coll_name);
+            if(it != m_cached_metadata.end()) {
+                out = it->second;
+                return Status::OK;
+            }
         }
-        auto coll_name = std::string(name, name_size);
-        m_cached_metadata[coll_name] = *metadata;
+        CollectionMetadataDisk disk{0, 0};
+        auto status = _readMetadataFromDisk(name, name_size, &disk);
+        if(status != Status::OK) return status;
+        auto meta = std::make_shared<CollectionMetadata>();
+        meta->size.store(disk.size, std::memory_order_relaxed);
+        meta->next_id.store(disk.next_id, std::memory_order_relaxed);
+        {
+            ScopedWriteLock lock(m_lock);
+            auto& slot = m_cached_metadata[coll_name];
+            if(!slot) slot = std::move(meta);
+            out = slot;
+        }
         return Status::OK;
+    }
+
+    /* Snapshot the in-memory atomic counters and persist them. */
+    Status _flushMetadata(const char* name, size_t name_size, CollectionMetadata& meta) {
+        CollectionMetadataDisk disk;
+        disk.size    = meta.size.load(std::memory_order_relaxed);
+        disk.next_id = meta.next_id.load(std::memory_order_relaxed);
+        size_t klen = name_size;
+        size_t vlen = sizeof(disk);
+        UserMem key_umem{const_cast<char*>(name), klen};
+        BasicUserMem<size_t> ksize_umem{&klen, 1};
+        UserMem val_umem{reinterpret_cast<char*>(&disk), vlen};
+        BasicUserMem<size_t> vsize_umem{&vlen, 1};
+        return put(0, key_umem, ksize_umem, val_umem, vsize_umem);
     }
 
     static std::vector<char> _keysFromIds(const char* name, size_t name_size, const BasicUserMem<yk_id_t>& ids) {
