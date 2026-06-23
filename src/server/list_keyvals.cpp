@@ -100,13 +100,28 @@ void yk_list_keyvals_ult(hg_handle_t h)
                 keys, ksizes, vals, vsizes));
 
     if(out.ret == YOKAN_SUCCESS) {
-        size_to_transfer = 2*in.count*sizeof(size_t)
-                         + in.keys_buf_size + in.vals_buf_size;
+        // push ksizes + vsizes + actually-filled keys region (async); the
+        // unused tail of the keys region separates it from vals, so the
+        // vals region must be a second transfer
+        margo_request req = MARGO_REQUEST_NULL;
+        size_to_transfer = 2*in.count*sizeof(size_t) + keys.size;
         bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
-        hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
+        hret = margo_bulk_itransfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + ksizes_offset,
-                buffer->bulk, ksizes_offset, size_to_transfer, bulk_timeout);
-        CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
+                buffer->bulk, ksizes_offset, size_to_transfer, bulk_timeout, &req);
+        CHECK_HRET_OUT(hret, margo_bulk_itransfer_timed);
+
+        // push actually-filled vals region in parallel
+        if(vals.size != 0) {
+            bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
+            hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
+                    in.bulk, in.offset + vals_offset,
+                    buffer->bulk, vals_offset, vals.size, bulk_timeout);
+            CHECK_HRET_OUT(hret, margo_bulk_transfer_timed);
+        }
+
+        hret = margo_wait(req);
+        CHECK_HRET_OUT(hret, margo_wait);
     }
 }
 DEFINE_MARGO_RPC_HANDLER(yk_list_keyvals_ult)

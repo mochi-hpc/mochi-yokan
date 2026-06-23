@@ -84,7 +84,7 @@ void yk_doc_load_ult(hg_handle_t h)
             bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
             hret = margo_bulk_itransfer_timed(mid, HG_BULK_PUSH, origin_addr,
                     in.bulk, in.offset + docs_offset,
-                    buffer->bulk, docs_offset, in.size - docs_offset, bulk_timeout, &req);
+                    buffer->bulk, docs_offset, docs_umem.size, bulk_timeout, &req);
             CHECK_HRET_OUT(hret, margo_bulk_itransfer_timed);
         }
         // transfer doc sizes

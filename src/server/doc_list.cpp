@@ -100,7 +100,7 @@ void yk_doc_list_ult(hg_handle_t h)
     if(out.ret == YOKAN_SUCCESS) {
         size_to_transfer = in.count*sizeof(size_t)
                          + in.count*sizeof(yk_id_t)
-                         + in.docs_buf_size;
+                         + docs.size;
         bulk_timeout = yk_bulk_timeout_ms(timeout_ms, t_start);
         hret = margo_bulk_transfer_timed(mid, HG_BULK_PUSH, origin_addr,
                 in.bulk, in.offset + doc_sizes_offset,
