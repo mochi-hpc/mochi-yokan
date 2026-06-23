@@ -622,7 +622,7 @@ class SetDatabase : public DatabaseInterface {
             i += 1;
         }
         keys.size = key_offset;
-        vals.size = 0;
+        vals.size = val_offset;
         for(; i < max; i++) {
             keySizes[i] = YOKAN_NO_MORE_KEYS;
             valSizes[i] = YOKAN_NO_MORE_KEYS;

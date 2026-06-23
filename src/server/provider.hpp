@@ -36,7 +36,7 @@ typedef struct yk_provider {
                        std::list<std::pair<std::string, hg_addr_t>>::iterator>           addr_cache_index;
 
     /* Database */
-    yk_database_t db;
+    yk_database_t db = nullptr;
 
     /* RPC identifiers for clients */
     hg_id_t count_id;
