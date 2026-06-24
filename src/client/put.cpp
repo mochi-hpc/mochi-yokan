@@ -13,6 +13,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include "../common/extras.h"
+#include "../common/contiguous.hpp"
 
 static yk_return_t yk_put_direct(yk_database_handle_t dbh,
                                  int32_t mode,
@@ -150,8 +151,16 @@ extern "C" yk_return_t yk_put_multi(yk_database_handle_t dbh,
             return yk_put_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys[0], ksizes,
                                  values[0], vsizes, YK_REEMIT_EXTRAS(extras));
         }
+        const void* keys_base = yokan::contiguous_base(keys, ksizes, count);
+        const void* vals_base = yokan::contiguous_base(values, vsizes, count);
+        size_t total_vsize = std::accumulate(vsizes, vsizes+count, (size_t)0);
+        if(keys_base != nullptr && (vals_base != nullptr || total_vsize == 0)) {
+            return yk_put_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys_base,
+                                 ksizes, vals_base, vsizes,
+                                 YK_REEMIT_EXTRAS(extras));
+        }
         std::vector<char> packed_keys(std::accumulate(ksizes, ksizes+count, (size_t)0));
-        std::vector<char> packed_vals(std::accumulate(vsizes, vsizes+count, (size_t)0));
+        std::vector<char> packed_vals(total_vsize);
         size_t koffset = 0, voffset = 0;
         for(size_t i = 0; i < count; i++) {
             std::memcpy(packed_keys.data()+koffset, keys[i], ksizes[i]);

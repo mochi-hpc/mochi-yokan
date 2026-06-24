@@ -14,6 +14,7 @@
 #include "../common/logging.h"
 #include "../common/checks.h"
 #include "../common/extras.h"
+#include "../common/contiguous.hpp"
 
 static yk_return_t yk_exists_direct(yk_database_handle_t dbh,
                                     int32_t mode,
@@ -161,6 +162,10 @@ extern "C" yk_return_t yk_exists_multi(yk_database_handle_t dbh,
     if(mode & YOKAN_MODE_NO_RDMA) {
         if(count == 1) {
             return yk_exists_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys[0], ksizes, flags, YK_REEMIT_EXTRAS(extras));
+        }
+        const void* keys_base = yokan::contiguous_base(keys, ksizes, count);
+        if(keys_base != nullptr) {
+            return yk_exists_direct(dbh, YK_MODE_WITH_EXTRA(mode), count, keys_base, ksizes, flags, YK_REEMIT_EXTRAS(extras));
         }
         auto total_ksizes = std::accumulate(ksizes, ksizes+count, (size_t)0);
         std::vector<char> packed_keys(total_ksizes);
