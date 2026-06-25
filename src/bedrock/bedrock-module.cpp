@@ -6,6 +6,7 @@
 
 #include "yokan/cxx/server.hpp"
 #include <bedrock/AbstractComponent.hpp>
+#include <nlohmann/json.hpp>
 
 namespace tl = thallium;
 
@@ -30,6 +31,56 @@ class YokanComponent : public bedrock::AbstractComponent {
 
     std::string getConfig() override {
         return m_provider->getConfig();
+    }
+
+    void snapshot(const std::string& dest_path,
+                  const std::string& options_json,
+                  bool remove_source) override {
+        (void)options_json; // reserved for future per-backend knobs
+        yk_snapshot_options opts = { /* extra_config */ nullptr,
+                                     /* xfer_size    */ 0 };
+        if(!options_json.empty()) opts.extra_config = options_json.c_str();
+        auto ret = yk_provider_snapshot_database(
+            m_provider->handle(), dest_path.c_str(), remove_source, &opts);
+        if(ret != YOKAN_SUCCESS) {
+            throw bedrock::Exception{
+                std::string{"yk_provider_snapshot_database failed: "}
+                + std::to_string(static_cast<int>(ret))};
+        }
+    }
+
+    void restore(const std::string& src_path,
+                 const char* options_json) override {
+        // options_json may carry: { "new_root": "...", "extra_config": {...} }
+        std::string new_root;
+        std::string extra_config;
+        if(options_json && *options_json) {
+            try {
+                auto j = nlohmann::json::parse(options_json);
+                if(j.contains("new_root") && j["new_root"].is_string())
+                    new_root = j["new_root"].get<std::string>();
+                if(j.contains("extra_config")) {
+                    extra_config = j["extra_config"].is_string()
+                        ? j["extra_config"].get<std::string>()
+                        : j["extra_config"].dump();
+                }
+            } catch(const std::exception& e) {
+                throw bedrock::Exception{
+                    std::string{"restore: invalid options_json: "} + e.what()};
+            }
+        }
+        yk_restore_options opts = {
+            /* new_root     */ new_root.empty() ? nullptr : new_root.c_str(),
+            /* extra_config */ extra_config.empty() ? nullptr : extra_config.c_str(),
+            /* xfer_size    */ 0
+        };
+        auto ret = yk_provider_restore_database(
+            m_provider->handle(), src_path.c_str(), &opts);
+        if(ret != YOKAN_SUCCESS) {
+            throw bedrock::Exception{
+                std::string{"yk_provider_restore_database failed: "}
+                + std::to_string(static_cast<int>(ret))};
+        }
     }
 
     static std::shared_ptr<bedrock::AbstractComponent>

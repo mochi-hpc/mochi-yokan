@@ -5,17 +5,31 @@
  */
 #ifndef __MIGRATION_H
 #define __MIGRATION_H
-#ifdef YOKAN_HAS_REMI
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <yokan/common.h>
 #include "../common/logging.h"
 #include "provider.hpp"
+
+using json = nlohmann::json;
+
+/* Attach a freshly-recovered database to the provider, updating the cached
+ * config block so that getConfig() reflects the new database. Shared between
+ * the REMI migration receive path and the local restore-from-snapshot path. */
+static inline void attach_recovered_database(yk_provider_t provider,
+                                             yk_database_t database,
+                                             const char* type)
+{
+    provider->db = database;
+    provider->config["database"] = json::object();
+    provider->config["database"]["type"] = type;
+    provider->config["database"]["config"] = json::parse(database->config());
+}
+
+#ifdef YOKAN_HAS_REMI
 #include <remi/remi-common.h>
 #include <remi/remi-client.h>
 #include <remi/remi-server.h>
-
-using json = nlohmann::json;
 
 static inline int32_t before_migration_cb(remi_fileset_t fileset, void* uargs)
 {
@@ -98,10 +112,7 @@ static inline int32_t after_migration_cb(remi_fileset_t fileset, void* uargs)
         return (int32_t)status;
     }
 
-    provider->db = database;
-    provider->config["database"] = json::object();
-    provider->config["database"]["type"] = type;
-    provider->config["database"]["config"] = json::parse(database->config());
+    attach_recovered_database(provider, database, type);
 
     return 0;
 }

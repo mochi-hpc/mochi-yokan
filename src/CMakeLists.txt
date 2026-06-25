@@ -26,6 +26,7 @@ set (server-src-files
      server/doc_list.cpp
      server/doc_iter.cpp
      server/get_remi_provider_id.cpp
+     server/snapshot.cpp
      server/util/filters.cpp
      buffer/dummy_bulk_cache.cpp
      buffer/lru_bulk_cache.cpp

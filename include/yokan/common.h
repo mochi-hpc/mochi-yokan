@@ -168,6 +168,19 @@ struct yk_migration_options {
     size_t      xfer_size;    /* transfer block size to use */
 };
 
+struct yk_snapshot_options {
+    const char* extra_config; /* extra JSON config, reserved for backend knobs */
+    size_t      xfer_size;    /* reserved; chunk size for the file copy loop */
+};
+
+struct yk_restore_options {
+    const char* new_root;     /* destination root for restored files
+                                 (typically a local SSD path). If NULL, the
+                                 database is opened in-place from src_path. */
+    const char* extra_config; /* JSON merged into the recovered db_config */
+    size_t      xfer_size;    /* reserved; chunk size for the file copy loop */
+};
+
 #ifdef __cplusplus
 }
 #endif

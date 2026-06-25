@@ -9,6 +9,7 @@
 #include <yokan/common.h>
 #include <yokan/bulk-cache.h>
 #include <margo.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,6 +81,57 @@ yk_return_t yk_provider_migrate_database(
         const char* dest_addr,
         uint16_t dest_provider_id,
         const struct yk_migration_options* options);
+
+/**
+ * @brief Snapshots the database currently attached to the provider into a
+ * directory accessible via the local filesystem (typically a parallel
+ * filesystem mount point). The directory is created if it does not exist.
+ *
+ * The snapshot contains the database's backing files plus a small manifest
+ * (yokan-snapshot.json) that records the backend type, original db_config,
+ * and file list. The manifest is what yk_provider_restore_database reads
+ * back.
+ *
+ * Unlike yk_provider_migrate_database, this does not require REMI and works
+ * regardless of how Yokan was built.
+ *
+ * @param provider       YOKAN provider whose database to snapshot.
+ * @param dest_path      Local directory path where the snapshot will be
+ *                       written. Created if missing.
+ * @param remove_source  If true, the local database is destroyed after a
+ *                       successful snapshot (analogous to migrate). If
+ *                       false, the database remains live and serving.
+ * @param options        Optional snapshot options (may be NULL).
+ *
+ * @return YOKAN_SUCCESS or an error code defined in common.h.
+ */
+yk_return_t yk_provider_snapshot_database(
+        yk_provider_t provider,
+        const char* dest_path,
+        bool remove_source,
+        const struct yk_snapshot_options* options);
+
+/**
+ * @brief Restores a database from a snapshot directory produced by
+ * yk_provider_snapshot_database, attaching it to the given provider.
+ *
+ * If the provider already has a database attached, it is destroyed first.
+ * If options->new_root is non-NULL, the snapshot's backing files are first
+ * copied from src_path to that new root (typical HPC pattern: snapshot lives
+ * on PFS, restore back to local SSD). Otherwise the database is opened
+ * in-place against src_path.
+ *
+ * @param provider  YOKAN provider to attach the restored database to.
+ * @param src_path  Local directory path containing a Yokan snapshot.
+ * @param options   Optional restore options (may be NULL).
+ *
+ * @return YOKAN_SUCCESS or an error code defined in common.h.
+ */
+yk_return_t yk_provider_restore_database(
+        yk_provider_t provider,
+        const char* src_path,
+        const struct yk_restore_options* options);
+
 /**
  * @brief Returns the internal configuration of the YOKAN
  * provider. The returned string must be free-ed by the caller.

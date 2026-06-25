@@ -68,6 +68,9 @@ class Provider {
         return result;
     }
 
+    /* Underlying C handle. Lifetime is tied to this Provider. */
+    yk_provider_t handle() const { return m_provider; }
+
     private:
 
     static void finalizeCallback(void* arg) {
