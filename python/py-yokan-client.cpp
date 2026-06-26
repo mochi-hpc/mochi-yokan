@@ -42,23 +42,30 @@ static auto get_buffer_info(const std::string& str) {
 
 template <typename KeyType, typename ValueType>
 static void put_helper(const yokan::Database& db, const KeyType& key,
-                       const ValueType& val, int32_t mode) {
+                       const ValueType& val, int32_t mode, double timeout_ms) {
     auto key_info = get_buffer_info(key);
     auto val_info = get_buffer_info(val);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     CHECK_BUFFER_IS_CONTIGUOUS(val_info);
     py::gil_scoped_release release;
-    db.put(key_info.ptr,
-            key_info.itemsize*key_info.size,
-            val_info.ptr,
-            val_info.itemsize*val_info.size,
-            mode);
+    if (timeout_ms > 0.0)
+        db.put(key_info.ptr,
+                key_info.itemsize*key_info.size,
+                val_info.ptr,
+                val_info.itemsize*val_info.size,
+                mode, yokan::Timeout{timeout_ms});
+    else
+        db.put(key_info.ptr,
+                key_info.itemsize*key_info.size,
+                val_info.ptr,
+                val_info.itemsize*val_info.size,
+                mode);
 }
 
 template <typename KeyType, typename ValueType>
 static void put_multi_helper(const yokan::Database& db,
                              const std::vector<std::pair<KeyType,ValueType>>& keyvals,
-                             int32_t mode) {
+                             int32_t mode, double timeout_ms) {
     auto count = keyvals.size();
     std::vector<const void*> keys(count);
     std::vector<const void*> vals(count);
@@ -75,17 +82,25 @@ static void put_multi_helper(const yokan::Database& db,
         val_sizes[i] = val_info.itemsize*val_info.size;
     }
     py::gil_scoped_release release;
-    db.putMulti(count,
-            keys.data(),
-            key_sizes.data(),
-            vals.data(),
-            val_sizes.data(),
-            mode);
+    if (timeout_ms > 0.0)
+        db.putMulti(count,
+                keys.data(),
+                key_sizes.data(),
+                vals.data(),
+                val_sizes.data(),
+                mode, yokan::Timeout{timeout_ms});
+    else
+        db.putMulti(count,
+                keys.data(),
+                key_sizes.data(),
+                vals.data(),
+                val_sizes.data(),
+                mode);
 }
 
 template<typename KeyType>
 static auto get_helper(const yokan::Database& db, const KeyType& key,
-                       py::buffer& val, int32_t mode) {
+                       py::buffer& val, int32_t mode, double timeout_ms) {
     auto key_info = get_buffer_info(key);
     auto val_info = val.request();
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -94,11 +109,18 @@ static auto get_helper(const yokan::Database& db, const KeyType& key,
     size_t vsize = val_info.itemsize*val_info.size;
     {
         py::gil_scoped_release release;
-        db.get(key_info.ptr,
-               key_info.itemsize*key_info.size,
-               val_info.ptr,
-               &vsize,
-               mode);
+        if (timeout_ms > 0.0)
+            db.get(key_info.ptr,
+                   key_info.itemsize*key_info.size,
+                   val_info.ptr,
+                   &vsize,
+                   mode, yokan::Timeout{timeout_ms});
+        else
+            db.get(key_info.ptr,
+                   key_info.itemsize*key_info.size,
+                   val_info.ptr,
+                   &vsize,
+                   mode);
     }
     return vsize;
 }
@@ -106,7 +128,7 @@ static auto get_helper(const yokan::Database& db, const KeyType& key,
 template<typename KeyType>
 static auto get_multi_helper(const yokan::Database& db,
                              const std::vector<std::pair<KeyType, py::buffer>>& keyvals,
-                             int32_t mode) {
+                             int32_t mode, double timeout_ms) {
     auto count = keyvals.size();
     std::vector<const void*> keys(count);
     std::vector<void*>       vals(count);
@@ -125,12 +147,20 @@ static auto get_multi_helper(const yokan::Database& db,
     }
     {
         py::gil_scoped_release release;
-        db.getMulti(count,
-                    keys.data(),
-                    key_sizes.data(),
-                    vals.data(),
-                    val_sizes.data(),
-                    mode);
+        if (timeout_ms > 0.0)
+            db.getMulti(count,
+                        keys.data(),
+                        key_sizes.data(),
+                        vals.data(),
+                        val_sizes.data(),
+                        mode, yokan::Timeout{timeout_ms});
+        else
+            db.getMulti(count,
+                        keys.data(),
+                        key_sizes.data(),
+                        vals.data(),
+                        val_sizes.data(),
+                        mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -146,18 +176,20 @@ static auto get_multi_helper(const yokan::Database& db,
 
 template<typename KeyType>
 static auto exists_helper(const yokan::Database& db,
-                          const KeyType& key, int32_t mode) {
+                          const KeyType& key, int32_t mode, double timeout_ms) {
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
     py::gil_scoped_release release;
+    if (timeout_ms > 0.0)
+        return db.exists(key_info.ptr, ksize, mode, yokan::Timeout{timeout_ms});
     return db.exists(key_info.ptr, ksize, mode);
 }
 
 template<typename KeyType>
 static auto exists_multi_helper(const yokan::Database& db,
                                 const std::vector<KeyType>& keys,
-                                int32_t mode) {
+                                int32_t mode, double timeout_ms) {
     const auto count = keys.size();
     std::vector<const void*> key_ptrs(count);
     std::vector<size_t>      key_size(count);
@@ -168,13 +200,16 @@ static auto exists_multi_helper(const yokan::Database& db,
         key_size[i] = key_info.itemsize*key_info.size;
     }
     py::gil_scoped_release release;
+    if (timeout_ms > 0.0)
+        return db.existsMulti(count, key_ptrs.data(), key_size.data(),
+                              mode, yokan::Timeout{timeout_ms});
     return db.existsMulti(count, key_ptrs.data(), key_size.data(), mode);
 }
 
 template<typename KeyType>
 static py::object length_helper(const yokan::Database& db,
                                 const KeyType& key,
-                                int32_t mode) {
+                                int32_t mode, double timeout_ms) {
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
@@ -182,7 +217,11 @@ static py::object length_helper(const yokan::Database& db,
         size_t len;
         {
             py::gil_scoped_release release;
-            len = db.length(key_info.ptr, ksize, mode);
+            if (timeout_ms > 0.0)
+                len = db.length(key_info.ptr, ksize, mode,
+                                yokan::Timeout{timeout_ms});
+            else
+                len = db.length(key_info.ptr, ksize, mode);
         }
         return py::cast(len);
     } catch(const yokan::Exception& e) {
@@ -195,7 +234,7 @@ static py::object length_helper(const yokan::Database& db,
 template<typename KeyType>
 static auto length_multi_helper(const yokan::Database& db,
                                 const std::vector<KeyType>& keys,
-                                int32_t mode) {
+                                int32_t mode, double timeout_ms) {
     const auto count = keys.size();
     std::vector<const void*> key_ptrs(count);
     std::vector<size_t>      key_size(count);
@@ -208,7 +247,12 @@ static auto length_multi_helper(const yokan::Database& db,
     }
     {
         py::gil_scoped_release release;
-        db.lengthMulti(count, key_ptrs.data(), key_size.data(), val_size.data(), mode);
+        if (timeout_ms > 0.0)
+            db.lengthMulti(count, key_ptrs.data(), key_size.data(),
+                           val_size.data(), mode, yokan::Timeout{timeout_ms});
+        else
+            db.lengthMulti(count, key_ptrs.data(), key_size.data(),
+                           val_size.data(), mode);
     }
     py::list result;
     for(size_t i = 0; i < count; i++) {
@@ -223,18 +267,21 @@ static auto length_multi_helper(const yokan::Database& db,
 template<typename KeyType>
 static void erase_helper(const yokan::Database& db,
                          const KeyType& key,
-                         int32_t mode) {
+                         int32_t mode, double timeout_ms) {
     auto key_info = get_buffer_info(key);
     CHECK_BUFFER_IS_CONTIGUOUS(key_info);
     size_t ksize = key_info.itemsize*key_info.size;
     py::gil_scoped_release release;
-    db.erase(key_info.ptr, ksize, mode);
+    if (timeout_ms > 0.0)
+        db.erase(key_info.ptr, ksize, mode, yokan::Timeout{timeout_ms});
+    else
+        db.erase(key_info.ptr, ksize, mode);
 }
 
 template<typename KeyType>
 static void erase_multi_helper(const yokan::Database& db,
                                const std::vector<KeyType>& keys,
-                               int32_t mode) {
+                               int32_t mode, double timeout_ms) {
     const auto count = keys.size();
     std::vector<const void*> key_ptrs(count);
     std::vector<size_t>      key_size(count);
@@ -245,7 +292,11 @@ static void erase_multi_helper(const yokan::Database& db,
         key_size[i] = key_info.itemsize*key_info.size;
     }
     py::gil_scoped_release release;
-    return db.eraseMulti(count, key_ptrs.data(), key_size.data(), mode);
+    if (timeout_ms > 0.0)
+        db.eraseMulti(count, key_ptrs.data(), key_size.data(),
+                      mode, yokan::Timeout{timeout_ms});
+    else
+        db.eraseMulti(count, key_ptrs.data(), key_size.data(), mode);
 }
 
 template<typename FromKeyType, typename FilterType>
@@ -253,7 +304,7 @@ static auto list_keys_helper(const yokan::Database& db,
                              std::vector<py::buffer>& keys,
                              const FromKeyType& from_key,
                              const FilterType& filter,
-                             int32_t mode) {
+                             int32_t mode, double timeout_ms) {
     auto count = keys.size();
     std::vector<void*>  keys_data(count);
     std::vector<size_t> keys_size(count);
@@ -270,14 +321,24 @@ static auto list_keys_helper(const yokan::Database& db,
     }
     {
         py::gil_scoped_release release;
-        db.listKeys(from_key_info.ptr,
-                from_key_info.itemsize*from_key_info.size,
-                filter_info.ptr,
-                filter_info.itemsize*filter_info.size,
-                count,
-                keys_data.data(),
-                keys_size.data(),
-                mode);
+        if (timeout_ms > 0.0)
+            db.listKeys(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_data.data(),
+                    keys_size.data(),
+                    mode, yokan::Timeout{timeout_ms});
+        else
+            db.listKeys(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_data.data(),
+                    keys_size.data(),
+                    mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -297,7 +358,7 @@ static auto list_keys_packed_helper(const yokan::Database& db,
                                     size_t count,
                                     const FromKeyType& from_key,
                                     const FilterType& filter,
-                                    int32_t mode) {
+                                    int32_t mode, double timeout_ms) {
     auto from_key_info = get_buffer_info(from_key);
     CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
     auto filter_info = get_buffer_info(filter);
@@ -309,15 +370,26 @@ static auto list_keys_packed_helper(const yokan::Database& db,
     std::vector<size_t> key_sizes(count);
     {
         py::gil_scoped_release release;
-        db.listKeysPacked(from_key_info.ptr,
-                from_key_info.itemsize*from_key_info.size,
-                filter_info.ptr,
-                filter_info.itemsize*filter_info.size,
-                count,
-                keys_info.ptr,
-                keys_buf_size,
-                key_sizes.data(),
-                mode);
+        if (timeout_ms > 0.0)
+            db.listKeysPacked(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_info.ptr,
+                    keys_buf_size,
+                    key_sizes.data(),
+                    mode, yokan::Timeout{timeout_ms});
+        else
+            db.listKeysPacked(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_info.ptr,
+                    keys_buf_size,
+                    key_sizes.data(),
+                    mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -336,7 +408,7 @@ static auto list_keyvals_helper(const yokan::Database& db,
                 std::vector<std::pair<py::buffer, py::buffer>>& pairs,
                 const FromKeyType& from_key,
                 const FilterType& filter,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
     auto count = pairs.size();
     std::vector<void*>  keys_data(count);
     std::vector<size_t> keys_size(count);
@@ -360,16 +432,28 @@ static auto list_keyvals_helper(const yokan::Database& db,
     }
     {
         py::gil_scoped_release release;
-        db.listKeyVals(from_key_info.ptr,
-                from_key_info.itemsize*from_key_info.size,
-                filter_info.ptr,
-                filter_info.itemsize*filter_info.size,
-                count,
-                keys_data.data(),
-                keys_size.data(),
-                vals_data.data(),
-                vals_size.data(),
-                mode);
+        if (timeout_ms > 0.0)
+            db.listKeyVals(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_data.data(),
+                    keys_size.data(),
+                    vals_data.data(),
+                    vals_size.data(),
+                    mode, yokan::Timeout{timeout_ms});
+        else
+            db.listKeyVals(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_data.data(),
+                    keys_size.data(),
+                    vals_data.data(),
+                    vals_size.data(),
+                    mode);
     }
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
@@ -391,7 +475,7 @@ static auto list_keyvals_packed_helper(
                 size_t count,
                 const FromKeyType& from_key,
                 const FilterType& filter,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
     auto from_key_info = get_buffer_info(from_key);
     CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
     auto filter_info = get_buffer_info(filter);
@@ -408,18 +492,32 @@ static auto list_keyvals_packed_helper(
     std::vector<size_t> val_sizes(count);
     {
         py::gil_scoped_release release;
-        db.listKeyValsPacked(from_key_info.ptr,
-                from_key_info.itemsize*from_key_info.size,
-                filter_info.ptr,
-                filter_info.itemsize*filter_info.size,
-                count,
-                keys_info.ptr,
-                kbuf_size,
-                key_sizes.data(),
-                vals_info.ptr,
-                vbuf_size,
-                val_sizes.data(),
-                mode);
+        if (timeout_ms > 0.0)
+            db.listKeyValsPacked(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_info.ptr,
+                    kbuf_size,
+                    key_sizes.data(),
+                    vals_info.ptr,
+                    vbuf_size,
+                    val_sizes.data(),
+                    mode, yokan::Timeout{timeout_ms});
+        else
+            db.listKeyValsPacked(from_key_info.ptr,
+                    from_key_info.itemsize*from_key_info.size,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count,
+                    keys_info.ptr,
+                    kbuf_size,
+                    key_sizes.data(),
+                    vals_info.ptr,
+                    vbuf_size,
+                    val_sizes.data(),
+                    mode);
     }
     std::vector<std::pair<ssize_t, ssize_t>> result;
     result.reserve(count);
@@ -456,7 +554,8 @@ static auto iter_helper(
                 std::function<void(size_t, const KeyType&, const py::object&)> cb,
                 const KeyType& from_key,
                 const FilterType& filter,
-                size_t count, int32_t mode, unsigned batch_size, bool ignore_values) {
+                size_t count, int32_t mode, unsigned batch_size, bool ignore_values,
+                double timeout_ms) {
     auto from_key_info = get_buffer_info(from_key);
     CHECK_BUFFER_IS_CONTIGUOUS(from_key_info);
     auto filter_info = get_buffer_info(filter);
@@ -481,26 +580,36 @@ static auto iter_helper(
     options.ignore_values = ignore_values;
     options.pool          = ABT_POOL_NULL;
     py::gil_scoped_release release;
-    db.iter(from_key_info.ptr,
-            from_key_info.itemsize*from_key_info.size,
-            filter_info.ptr,
-            filter_info.itemsize*filter_info.size,
-            count, func, &options, mode);
+    if (timeout_ms > 0.0)
+        db.iter(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count, func, &options, mode, yokan::Timeout{timeout_ms});
+    else
+        db.iter(from_key_info.ptr,
+                from_key_info.itemsize*from_key_info.size,
+                filter_info.ptr,
+                filter_info.itemsize*filter_info.size,
+                count, func, &options, mode);
 }
 
 template <typename DocType>
 static auto doc_store_helper(const yokan::Collection& coll,
-                             const DocType& doc, int32_t mode) {
+                             const DocType& doc, int32_t mode, double timeout_ms) {
     auto doc_info = get_buffer_info(doc);
     CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
     py::gil_scoped_release release;
+    if (timeout_ms > 0.0)
+        return coll.store(doc_info.ptr, doc_info.itemsize*doc_info.size,
+                          mode, yokan::Timeout{timeout_ms});
     return coll.store(doc_info.ptr, doc_info.itemsize*doc_info.size, mode);
 }
 
 template <typename DocType>
 static auto doc_store_multi_helper(const yokan::Collection& coll,
                                    const std::vector<DocType>& docs,
-                                   int32_t mode) {
+                                   int32_t mode, double timeout_ms) {
     auto count = docs.size();
     std::vector<yk_id_t> ids(count);
     std::vector<const void*> doc_ptrs(count);
@@ -513,26 +622,34 @@ static auto doc_store_multi_helper(const yokan::Collection& coll,
     }
     {
         py::gil_scoped_release release;
-        coll.storeMulti(count, doc_ptrs.data(), doc_sizes.data(),
-                        ids.data(), mode);
+        if (timeout_ms > 0.0)
+            coll.storeMulti(count, doc_ptrs.data(), doc_sizes.data(),
+                            ids.data(), mode, yokan::Timeout{timeout_ms});
+        else
+            coll.storeMulti(count, doc_ptrs.data(), doc_sizes.data(),
+                            ids.data(), mode);
     }
     return ids;
 }
 
 template <typename DocType>
 static void doc_update_helper(const yokan::Collection& coll, yk_id_t id,
-                              const DocType& doc, int32_t mode) {
+                              const DocType& doc, int32_t mode, double timeout_ms) {
     auto doc_info = get_buffer_info(doc);
     CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
     py::gil_scoped_release release;
-    coll.update(id, doc_info.ptr, doc_info.itemsize*doc_info.size, mode);
+    if (timeout_ms > 0.0)
+        coll.update(id, doc_info.ptr, doc_info.itemsize*doc_info.size,
+                    mode, yokan::Timeout{timeout_ms});
+    else
+        coll.update(id, doc_info.ptr, doc_info.itemsize*doc_info.size, mode);
 }
 
 template <typename DocType>
 static void doc_update_multi_helper(const yokan::Collection& coll,
                                     const std::vector<yk_id_t>& ids,
                                     const std::vector<DocType>& docs,
-                                    int32_t mode) {
+                                    int32_t mode, double timeout_ms) {
     auto count = docs.size();
     if(ids.size() != count) {
         throw std::length_error("\"ids\" and \"documents\" arguments should be the same size");
@@ -546,18 +663,25 @@ static void doc_update_multi_helper(const yokan::Collection& coll,
         doc_sizes[i] = doc_info.itemsize*doc_info.size;
     }
     py::gil_scoped_release release;
-    coll.updateMulti(count, ids.data(), doc_ptrs.data(), doc_sizes.data(), mode);
+    if (timeout_ms > 0.0)
+        coll.updateMulti(count, ids.data(), doc_ptrs.data(), doc_sizes.data(),
+                         mode, yokan::Timeout{timeout_ms});
+    else
+        coll.updateMulti(count, ids.data(), doc_ptrs.data(), doc_sizes.data(), mode);
 }
 
 static auto doc_load_helper(const yokan::Collection& coll, yk_id_t id,
-                            py::buffer& val, int32_t mode) {
+                            py::buffer& val, int32_t mode, double timeout_ms) {
     auto val_info = val.request();
     CHECK_BUFFER_IS_CONTIGUOUS(val_info);
     CHECK_BUFFER_IS_WRITABLE(val_info);
     size_t vsize = val_info.itemsize*val_info.size;
     {
         py::gil_scoped_release release;
-        coll.load(id, val_info.ptr, &vsize, mode);
+        if (timeout_ms > 0.0)
+            coll.load(id, val_info.ptr, &vsize, mode, yokan::Timeout{timeout_ms});
+        else
+            coll.load(id, val_info.ptr, &vsize, mode);
     }
     return vsize;
 }
@@ -565,7 +689,7 @@ static auto doc_load_helper(const yokan::Collection& coll, yk_id_t id,
 static auto doc_load_multi_helper(const yokan::Collection& coll,
                                   const std::vector<yk_id_t>& ids,
                                   const std::vector<py::buffer>& docs,
-                                  int32_t mode) {
+                                  int32_t mode, double timeout_ms) {
     if(docs.size() != ids.size()) {
         throw std::length_error("\"ids\" and \"buffers\" arguments should have the same size");
     }
@@ -581,8 +705,13 @@ static auto doc_load_multi_helper(const yokan::Collection& coll,
     }
     {
         py::gil_scoped_release release;
-        coll.loadMulti(count, ids.data(),
-                       doc_ptrs.data(), doc_sizes.data(), mode);
+        if (timeout_ms > 0.0)
+            coll.loadMulti(count, ids.data(),
+                           doc_ptrs.data(), doc_sizes.data(),
+                           mode, yokan::Timeout{timeout_ms});
+        else
+            coll.loadMulti(count, ids.data(),
+                           doc_ptrs.data(), doc_sizes.data(), mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -601,7 +730,7 @@ static auto list_docs_helper(const yokan::Collection& coll,
                              yk_id_t start_id,
                              std::vector<py::buffer>& buffers,
                              const FilterType& filter,
-                             int32_t mode) {
+                             int32_t mode, double timeout_ms) {
     auto count = buffers.size();
     std::vector<void*>  buf_data(count);
     std::vector<size_t> buf_size(count);
@@ -617,13 +746,22 @@ static auto list_docs_helper(const yokan::Collection& coll,
     std::vector<yk_id_t> ids(count);
     {
         py::gil_scoped_release release;
-        coll.list(start_id,
-                  filter_info.ptr,
-                  filter_info.itemsize*filter_info.size,
-                  count, ids.data(),
-                  buf_data.data(),
-                  buf_size.data(),
-                  mode);
+        if (timeout_ms > 0.0)
+            coll.list(start_id,
+                      filter_info.ptr,
+                      filter_info.itemsize*filter_info.size,
+                      count, ids.data(),
+                      buf_data.data(),
+                      buf_size.data(),
+                      mode, yokan::Timeout{timeout_ms});
+        else
+            coll.list(start_id,
+                      filter_info.ptr,
+                      filter_info.itemsize*filter_info.size,
+                      count, ids.data(),
+                      buf_data.data(),
+                      buf_size.data(),
+                      mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -645,7 +783,7 @@ static auto list_docs_packed_helper(const yokan::Collection& coll,
                                     py::buffer& buffer,
                                     size_t count,
                                     const FilterType& filter,
-                                    int32_t mode) {
+                                    int32_t mode, double timeout_ms) {
     auto filter_info = get_buffer_info(filter);
     CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
     auto buf_info = get_buffer_info(buffer);
@@ -656,14 +794,24 @@ static auto list_docs_packed_helper(const yokan::Collection& coll,
     std::vector<yk_id_t> ids(count);
     {
         py::gil_scoped_release release;
-        coll.listPacked(start_id,
-                filter_info.ptr,
-                filter_info.itemsize*filter_info.size,
-                count, ids.data(),
-                buf_size,
-                buf_info.ptr,
-                doc_sizes.data(),
-                mode);
+        if (timeout_ms > 0.0)
+            coll.listPacked(start_id,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count, ids.data(),
+                    buf_size,
+                    buf_info.ptr,
+                    doc_sizes.data(),
+                    mode, yokan::Timeout{timeout_ms});
+        else
+            coll.listPacked(start_id,
+                    filter_info.ptr,
+                    filter_info.itemsize*filter_info.size,
+                    count, ids.data(),
+                    buf_size,
+                    buf_info.ptr,
+                    doc_sizes.data(),
+                    mode);
     }
     py::list result;
     for(size_t i=0; i < count; i++) {
@@ -683,7 +831,8 @@ static auto doc_iter_helper(
                 std::function<void(size_t, yk_id_t, const py::buffer&)> cb,
                 yk_id_t from_id,
                 const FilterType& filter,
-                size_t max, int32_t mode, unsigned batch_size) {
+                size_t max, int32_t mode, unsigned batch_size,
+                double timeout_ms) {
     auto filter_info = get_buffer_info(filter);
     CHECK_BUFFER_IS_CONTIGUOUS(filter_info);
     yokan::Collection::iter_callback_type func =
@@ -701,8 +850,12 @@ static auto doc_iter_helper(
     options.batch_size    = batch_size;
     options.pool          = ABT_POOL_NULL;
     py::gil_scoped_release release;
-    coll.iter(from_id, filter_info.ptr, filter_info.itemsize*filter_info.size,
-              max, func, &options, mode);
+    if (timeout_ms > 0.0)
+        coll.iter(from_id, filter_info.ptr, filter_info.itemsize*filter_info.size,
+                  max, func, &options, mode, yokan::Timeout{timeout_ms});
+    else
+        coll.iter(from_id, filter_info.ptr, filter_info.itemsize*filter_info.size,
+                  max, func, &options, mode);
 }
 
 
@@ -755,43 +908,45 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // COUNT
         // --------------------------------------------------------------
         .def("count",
-             [](const yokan::Database& db, int32_t mode) {
+             [](const yokan::Database& db, int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
+                if (timeout_ms > 0.0)
+                    return db.count(mode, yokan::Timeout{timeout_ms});
                 return db.count(mode);
-             }, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // PUT
         // --------------------------------------------------------------
         .def("put",
              static_cast<void(*)(const yokan::Database&, const py::buffer&,
-                         const py::buffer&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const py::buffer&, int32_t, double)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("put",
              static_cast<void(*)(const yokan::Database&, const std::string&,
-                         const py::buffer&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const py::buffer&, int32_t, double)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("put",
              static_cast<void(*)(const yokan::Database&, const std::string&,
-                         const std::string&, int32_t)>(&put_helper),
-             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const std::string&, int32_t, double)>(&put_helper),
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // PUT_MULTI
         // --------------------------------------------------------------
         .def("put_multi",
              static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<py::buffer,py::buffer>>&,
-                int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("put_multi",
              static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string,py::buffer>>&,
-                int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("put_multi",
              static_cast<void(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string,std::string>>&,
-                int32_t)>(&put_multi_helper),
-             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&put_multi_helper),
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // PUT_PACKED
         // --------------------------------------------------------------
@@ -800,7 +955,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 const std::vector<size_t> key_sizes,
                 const py::buffer& vals,
                 const std::vector<size_t>& val_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 size_t count = key_sizes.size();
                 if(count != val_sizes.size()) {
                     throw std::length_error("key_sizes and value_sizes should have the same length");
@@ -818,37 +973,46 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("values buffer is smaller than accumulated value_sizes");
                 }
                 py::gil_scoped_release release;
-                db.putPacked(count,
-                       key_info.ptr,
-                       key_sizes.data(),
-                       val_info.ptr,
-                       val_sizes.data(),
-                       mode);
-             }, "keys"_a, "key_sizes"_a, "values"_a, "value_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                if (timeout_ms > 0.0)
+                    db.putPacked(count,
+                           key_info.ptr,
+                           key_sizes.data(),
+                           val_info.ptr,
+                           val_sizes.data(),
+                           mode, yokan::Timeout{timeout_ms});
+                else
+                    db.putPacked(count,
+                           key_info.ptr,
+                           key_sizes.data(),
+                           val_info.ptr,
+                           val_sizes.data(),
+                           mode);
+             }, "keys"_a, "key_sizes"_a, "values"_a, "value_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // GET
         // --------------------------------------------------------------
         .def("get",
              static_cast<size_t(*)(const yokan::Database&, const py::buffer&,
-                py::buffer&, int32_t)>(&get_helper),
-             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                py::buffer&, int32_t, double)>(&get_helper),
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("get",
              static_cast<size_t(*)(const yokan::Database&, const std::string&,
-                py::buffer&, int32_t)>(&get_helper),
-             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                py::buffer&, int32_t, double)>(&get_helper),
+             "key"_a, "value"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // GET_MULTI
         // --------------------------------------------------------------
         .def("get_multi",
              static_cast<py::list(*)(const yokan::Database&,
                 const std::vector<std::pair<py::buffer, py::buffer>>&,
-                int32_t)>(&get_multi_helper),
-             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&get_multi_helper),
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("get_multi",
              static_cast<py::list(*)(const yokan::Database&,
                 const std::vector<std::pair<std::string, py::buffer>>&,
-                int32_t)>(&get_multi_helper),
-             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&get_multi_helper),
+             "pairs"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // GET_PACKED
         // --------------------------------------------------------------
@@ -856,7 +1020,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
              [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
                 py::buffer& vals,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 auto count = key_sizes.size();
                 auto key_info = keys.request();
                 auto val_info = vals.request();
@@ -870,8 +1034,13 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::vector<size_t> val_sizes(count);
                 {
                     py::gil_scoped_release release;
-                    db.getPacked(count, key_info.ptr, key_sizes.data(),
-                                 vbuf_size, val_info.ptr, val_sizes.data(), mode);
+                    if (timeout_ms > 0.0)
+                        db.getPacked(count, key_info.ptr, key_sizes.data(),
+                                     vbuf_size, val_info.ptr, val_sizes.data(),
+                                     mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.getPacked(count, key_info.ptr, key_sizes.data(),
+                                     vbuf_size, val_info.ptr, val_sizes.data(), mode);
                 }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
@@ -881,13 +1050,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         result.append(py::none());
                 }
                 return result;
-             }, "keys"_a, "key_sizes"_a, "values"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a, "values"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // FETCH
         // --------------------------------------------------------------
         .def("fetch",
              [](const yokan::Database& db, const py::buffer& key,
-                std::function<void(size_t, const py::buffer&, const py::object&)> cb, int32_t mode) {
+                std::function<void(size_t, const py::buffer&, const py::object&)> cb,
+                int32_t mode, double timeout_ms) {
                 auto key_info = get_buffer_info(key);
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
                 std::optional<py::error_already_set> py_exception;
@@ -907,20 +1078,28 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     };
                 try {
                     py::gil_scoped_release release;
-                    db.fetch(
-                        (const void*)key_info.ptr,
-                        key_info.itemsize*key_info.size,
-                        func, mode);
+                    if (timeout_ms > 0.0)
+                        db.fetch(
+                            (const void*)key_info.ptr,
+                            key_info.itemsize*key_info.size,
+                            func, mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.fetch(
+                            (const void*)key_info.ptr,
+                            key_info.itemsize*key_info.size,
+                            func, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "key"_a, "callback"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("fetch",
              [](const yokan::Database& db, const std::string& key,
-                std::function<void(size_t, const std::string&, const py::object&)> cb, int32_t mode) {
+                std::function<void(size_t, const std::string&, const py::object&)> cb,
+                int32_t mode, double timeout_ms) {
                 auto key_info = get_buffer_info(key);
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
                 std::optional<py::error_already_set> py_exception;
@@ -940,24 +1119,31 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     };
                 try {
                     py::gil_scoped_release release;
-                    db.fetch(
-                        (const void*)key_info.ptr,
-                        key_info.itemsize*key_info.size,
-                        func, mode);
+                    if (timeout_ms > 0.0)
+                        db.fetch(
+                            (const void*)key_info.ptr,
+                            key_info.itemsize*key_info.size,
+                            func, mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.fetch(
+                            (const void*)key_info.ptr,
+                            key_info.itemsize*key_info.size,
+                            func, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "key"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "key"_a, "callback"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // FETCH_MULTI
         // --------------------------------------------------------------
         .def("fetch_multi",
              [](const yokan::Database& db, const std::vector<py::buffer>& keys,
                 std::function<void(size_t, const py::buffer&, const py::object&)> cb,
-                int32_t mode, unsigned batch_size) {
+                int32_t mode, unsigned batch_size, double timeout_ms) {
                 std::vector<const void*> key_ptrs;
                 std::vector<size_t>      key_sizes;
                 key_ptrs.reserve(keys.size());
@@ -988,20 +1174,26 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.batch_size = batch_size;
                 try {
                     py::gil_scoped_release release;
-                    db.fetchMulti(
-                        keys.size(), key_ptrs.data(), key_sizes.data(),
-                        func, &options, mode);
+                    if (timeout_ms > 0.0)
+                        db.fetchMulti(
+                            keys.size(), key_ptrs.data(), key_sizes.data(),
+                            func, &options, mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.fetchMulti(
+                            keys.size(), key_ptrs.data(), key_sizes.data(),
+                            func, &options, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT,
+             "batch_size"_a=0, "timeout_ms"_a=0.0)
         .def("fetch_multi",
              [](const yokan::Database& db, const std::vector<std::string>& keys,
                 std::function<void(size_t, const std::string&, const py::object&)> cb,
-                int32_t mode, unsigned batch_size) {
+                int32_t mode, unsigned batch_size, double timeout_ms) {
                 std::vector<const void*> key_ptrs;
                 std::vector<size_t>      key_sizes;
                 key_ptrs.reserve(keys.size());
@@ -1030,16 +1222,22 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.batch_size = batch_size;
                 try {
                     py::gil_scoped_release release;
-                    db.fetchMulti(
-                        keys.size(), key_ptrs.data(), key_sizes.data(),
-                        func, &options, mode);
+                    if (timeout_ms > 0.0)
+                        db.fetchMulti(
+                            keys.size(), key_ptrs.data(), key_sizes.data(),
+                            func, &options, mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.fetchMulti(
+                            keys.size(), key_ptrs.data(), key_sizes.data(),
+                            func, &options, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "keys"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT,
+             "batch_size"_a=0, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // FETCH_PACKED
         // --------------------------------------------------------------
@@ -1047,7 +1245,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
              [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& ksizes,
                 std::function<void(size_t, const py::buffer&, const py::object&)> cb,
-                int32_t mode, unsigned batch_size) {
+                int32_t mode, unsigned batch_size, double timeout_ms) {
                 auto key_info = get_buffer_info(keys);
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
                 auto total_key_size = std::accumulate(ksizes.begin(), ksizes.end(), (size_t)0);
@@ -1074,43 +1272,49 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.batch_size = batch_size;
                 try {
                     py::gil_scoped_release release;
-                    db.fetchPacked(ksizes.size(),
-                        key_info.ptr, ksizes.data(),
-                        func, &options, mode);
+                    if (timeout_ms > 0.0)
+                        db.fetchPacked(ksizes.size(),
+                            key_info.ptr, ksizes.data(),
+                            func, &options, mode, yokan::Timeout{timeout_ms});
+                    else
+                        db.fetchPacked(ksizes.size(),
+                            key_info.ptr, ksizes.data(),
+                            func, &options, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "keys"_a, "key_sizes"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "keys"_a, "key_sizes"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT,
+             "batch_size"_a=0, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // EXISTS
         // --------------------------------------------------------------
         .def("exists",
-             static_cast<bool(*)(const yokan::Database&, const std::string&, int32_t)>(&exists_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<bool(*)(const yokan::Database&, const std::string&, int32_t, double)>(&exists_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("exists",
-             static_cast<bool(*)(const yokan::Database&, const py::buffer&, int32_t)>(&exists_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<bool(*)(const yokan::Database&, const py::buffer&, int32_t, double)>(&exists_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // EXISTS_MULTI
         // --------------------------------------------------------------
         .def("exists_multi",
              static_cast<std::vector<bool>(*)(const yokan::Database&,
-                 const std::vector<std::string>&, int32_t)>(&exists_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                 const std::vector<std::string>&, int32_t, double)>(&exists_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("exists_multi",
              static_cast<std::vector<bool>(*)(const yokan::Database&,
-                 const std::vector<py::buffer>&, int32_t)>(&exists_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                 const std::vector<py::buffer>&, int32_t, double)>(&exists_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // EXISTS_PACKED
         // --------------------------------------------------------------
         .def("exists_packed",
              [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 auto count = key_sizes.size();
                 auto key_info = keys.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -1119,37 +1323,41 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
                 py::gil_scoped_release release;
+                if (timeout_ms > 0.0)
+                    return db.existsPacked(count, key_info.ptr, key_sizes.data(),
+                                           mode, yokan::Timeout{timeout_ms});
                 return db.existsPacked(count, key_info.ptr, key_sizes.data(), mode);
-             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
-             static_cast<py::object(*)(const yokan::Database&, const std::string&, int32_t)>(&length_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<py::object(*)(const yokan::Database&, const std::string&, int32_t, double)>(&length_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("length",
-             static_cast<py::object(*)(const yokan::Database&, const py::buffer&, int32_t)>(&length_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<py::object(*)(const yokan::Database&, const py::buffer&, int32_t, double)>(&length_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LENGTH_MULTI
         // --------------------------------------------------------------
         .def("length_multi",
              static_cast<py::list(*)(const yokan::Database&,
                          const std::vector<std::string>&,
-                         int32_t)>(&length_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         int32_t, double)>(&length_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("length_multi",
              static_cast<py::list(*)(const yokan::Database&,
                          const std::vector<py::buffer>&,
-                         int32_t)>(&length_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         int32_t, double)>(&length_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LENGTH_PACKED
         // --------------------------------------------------------------
         .def("length_packed",
              [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 auto count = key_sizes.size();
                 auto key_info = keys.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -1160,7 +1368,13 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::vector<size_t> val_sizes(count);
                 {
                     py::gil_scoped_release release;
-                    db.lengthPacked(count, key_info.ptr, key_sizes.data(), val_sizes.data(), mode);
+                    if (timeout_ms > 0.0)
+                        db.lengthPacked(count, key_info.ptr, key_sizes.data(),
+                                        val_sizes.data(), mode,
+                                        yokan::Timeout{timeout_ms});
+                    else
+                        db.lengthPacked(count, key_info.ptr, key_sizes.data(),
+                                        val_sizes.data(), mode);
                 }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
@@ -1170,36 +1384,37 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         result.append(py::none());
                 }
                 return result;
-             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "keys"_a, "key_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE
         // --------------------------------------------------------------
         .def("erase",
-             static_cast<void(*)(const yokan::Database&, const std::string&, int32_t)>(&erase_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<void(*)(const yokan::Database&, const std::string&, int32_t, double)>(&erase_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("erase",
-             static_cast<void(*)(const yokan::Database&, const py::buffer&, int32_t)>(&erase_helper),
-             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             static_cast<void(*)(const yokan::Database&, const py::buffer&, int32_t, double)>(&erase_helper),
+             "key"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE_MULTI
         // --------------------------------------------------------------
         .def("erase_multi",
              static_cast<void(*)(const yokan::Database&,
                                  const std::vector<std::string>&,
-                                 int32_t)>(&erase_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                                 int32_t, double)>(&erase_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("erase_multi",
              static_cast<void(*)(const yokan::Database&,
                                  const std::vector<py::buffer>&,
-                                 int32_t)>(&erase_multi_helper),
-             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                                 int32_t, double)>(&erase_multi_helper),
+             "keys"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE_PACKED
         // --------------------------------------------------------------
         .def("erase_packed",
              [](const yokan::Database& db, const py::buffer& keys,
                 const std::vector<size_t>& key_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 auto count = key_sizes.size();
                 auto key_info = keys.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(key_info);
@@ -1208,24 +1423,38 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw std::length_error("keys buffer size smaller than accumulated key_sizes");
                 }
                 py::gil_scoped_release release;
-                db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
-             }, "keys"_a, "key_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                if (timeout_ms > 0.0)
+                    db.erasePacked(count, key_info.ptr, key_sizes.data(),
+                                   mode, yokan::Timeout{timeout_ms});
+                else
+                    db.erasePacked(count, key_info.ptr, key_sizes.data(), mode);
+             }, "keys"_a, "key_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE_RANGE
         // --------------------------------------------------------------
         .def("erase_range",
-             [](const yokan::Database& db, const std::string& prefix, int32_t mode) {
+             [](const yokan::Database& db, const std::string& prefix,
+                int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
-                db.eraseRange(prefix.data(), prefix.size(), mode);
-             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                if (timeout_ms > 0.0)
+                    db.eraseRange(prefix.data(), prefix.size(),
+                                  mode, yokan::Timeout{timeout_ms});
+                else
+                    db.eraseRange(prefix.data(), prefix.size(), mode);
+             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("erase_range",
-             [](const yokan::Database& db, const py::buffer& prefix, int32_t mode) {
+             [](const yokan::Database& db, const py::buffer& prefix,
+                int32_t mode, double timeout_ms) {
                 auto info = get_buffer_info(prefix);
                 CHECK_BUFFER_IS_CONTIGUOUS(info);
                 size_t psize = info.itemsize*info.size;
                 py::gil_scoped_release release;
-                db.eraseRange(info.ptr, psize, mode);
-             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                if (timeout_ms > 0.0)
+                    db.eraseRange(info.ptr, psize, mode, yokan::Timeout{timeout_ms});
+                else
+                    db.eraseRange(info.ptr, psize, mode);
+             }, "prefix"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_KEYS
         // --------------------------------------------------------------
@@ -1234,60 +1463,64 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::vector<py::buffer>&,
                 const py::buffer&,
                 const py::buffer&,
-                int32_t)>(&list_keys_helper),
+                int32_t, double)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys",
              static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const py::buffer&,
                 const std::string&,
-                int32_t)>(&list_keys_helper),
+                int32_t, double)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys",
              static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const std::string&,
                 const py::buffer&,
-                int32_t)>(&list_keys_helper),
+                int32_t, double)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys",
              static_cast<py::list(*)(const yokan::Database&,
                 std::vector<py::buffer>&,
                 const std::string&,
                 const std::string&,
-                int32_t)>(&list_keys_helper),
+                int32_t, double)>(&list_keys_helper),
              "keys"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_KEYS_PACKED
         // --------------------------------------------------------------
         .def("list_keys_packed",
              static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const py::buffer&,
-                const py::buffer&, int32_t)>(&list_keys_packed_helper),
+                const py::buffer&, int32_t, double)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys_packed",
              static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const std::string&,
-                const py::buffer&, int32_t)>(&list_keys_packed_helper),
+                const py::buffer&, int32_t, double)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys_packed",
              static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const py::buffer&,
-                const std::string&, int32_t)>(&list_keys_packed_helper),
+                const std::string&, int32_t, double)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keys_packed",
              static_cast<py::list(*)(const yokan::Database&,
                 py::buffer&, size_t, const std::string&,
-                const std::string&, int32_t)>(&list_keys_packed_helper),
+                const std::string&, int32_t, double)>(&list_keys_packed_helper),
              "keys"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_KEYVALS
         // --------------------------------------------------------------
@@ -1296,33 +1529,33 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const py::buffer&, const py::buffer&,
-                int32_t)>(&list_keyvals_helper),
+                int32_t, double)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const std::string&, const py::buffer&,
-                int32_t)>(&list_keyvals_helper),
+                int32_t, double)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const py::buffer&, const std::string&,
-                int32_t)>(&list_keyvals_helper),
+                int32_t, double)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&,
                 std::vector<std::pair<py::buffer, py::buffer>>&,
                 const std::string&, const std::string&,
-                int32_t)>(&list_keyvals_helper),
+                int32_t, double)>(&list_keyvals_helper),
              "pairs"_a, "from_key"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_KEYVALS_PACKED
         // --------------------------------------------------------------
@@ -1330,30 +1563,34 @@ PYBIND11_MODULE(pyyokan_client, m) {
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const py::buffer&, const py::buffer&,
-                int32_t)>(&list_keyvals_packed_helper),
+                int32_t, double)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const std::string&, const py::buffer&,
-                int32_t)>(&list_keyvals_packed_helper),
+                int32_t, double)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const py::buffer&, const std::string&,
-                int32_t)>(&list_keyvals_packed_helper),
+                int32_t, double)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_keyvals_packed",
              static_cast<std::vector<std::pair<ssize_t, ssize_t>>(*)(
                 const yokan::Database&, py::buffer&, py::buffer&, size_t,
                 const std::string&, const std::string&,
-                int32_t)>(&list_keyvals_packed_helper),
+                int32_t, double)>(&list_keyvals_packed_helper),
              "keys"_a, "values"_a, "count"_a,
-             "from_key"_a, "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "from_key"_a, "filter"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ITER
         // --------------------------------------------------------------
@@ -1362,66 +1599,84 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 const yokan::Database&,
                 std::function<void(size_t, const py::buffer&, const py::object&)>,
                 const py::buffer&, const py::buffer&,
-                size_t, int32_t, unsigned, bool)>(&iter_helper),
+                size_t, int32_t, unsigned, bool, double)>(&iter_helper),
              "callback"_a,
              "from_key"_a=py::bytes{}, "filter"_a=py::bytes{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false,
+             "timeout_ms"_a=0.0)
         .def("iter",
              static_cast<void(*)(
                 const yokan::Database&,
                 std::function<void(size_t, const py::buffer&, const py::object&)>,
                 const py::buffer&, const std::string&,
-                size_t, int32_t, unsigned, bool)>(&iter_helper),
+                size_t, int32_t, unsigned, bool, double)>(&iter_helper),
              "callback"_a,
              "from_key"_a=py::bytes{}, "filter"_a=std::string{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false,
+             "timeout_ms"_a=0.0)
         .def("iter",
              static_cast<void(*)(
                 const yokan::Database&,
                 std::function<void(size_t, const std::string&, const py::object&)>,
                 const std::string&, const py::buffer&,
-                size_t, int32_t, unsigned, bool)>(&iter_helper),
+                size_t, int32_t, unsigned, bool, double)>(&iter_helper),
              "callback"_a,
              "from_key"_a=std::string{}, "filter"_a=py::bytes{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false,
+             "timeout_ms"_a=0.0)
         .def("iter",
              static_cast<void(*)(
                 const yokan::Database&,
                 std::function<void(size_t, const std::string&, const py::object&)>,
                 const std::string&, const std::string&,
-                size_t, int32_t, unsigned, bool)>(&iter_helper),
+                size_t, int32_t, unsigned, bool, double)>(&iter_helper),
              "callback"_a,
              "from_key"_a=std::string{}, "filter"_a=std::string{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "ignore_values"_a=false,
+             "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // COLLECTION MANAGEMENT
         // --------------------------------------------------------------
         .def("create_collection",
-             [](const yokan::Database& db, const std::string& name, int32_t mode) {
+             [](const yokan::Database& db, const std::string& name,
+                int32_t mode, double timeout_ms) {
                 {
                     py::gil_scoped_release release;
-                    db.createCollection(name.c_str(), mode);
+                    if (timeout_ms > 0.0)
+                        db.createCollection(name.c_str(), mode,
+                                            yokan::Timeout{timeout_ms});
+                    else
+                        db.createCollection(name.c_str(), mode);
                 }
                 return yokan::Collection(name.c_str(), db);
              },
-             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("open_collection",
              [](const yokan::Database& db, const std::string& name) {
                 return yokan::Collection(name.c_str(), db);
              },
              "name"_a)
         .def("drop_collection",
-             [](const yokan::Database& db, const std::string& name, int32_t mode) {
+             [](const yokan::Database& db, const std::string& name,
+                int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
-                db.dropCollection(name.c_str(), mode);
+                if (timeout_ms > 0.0)
+                    db.dropCollection(name.c_str(), mode,
+                                      yokan::Timeout{timeout_ms});
+                else
+                    db.dropCollection(name.c_str(), mode);
              },
-             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("collection_exists",
-             [](const yokan::Database& db, const std::string& name, int32_t mode) {
+             [](const yokan::Database& db, const std::string& name,
+                int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
+                if (timeout_ms > 0.0)
+                    return db.collectionExists(name.c_str(), mode,
+                                               yokan::Timeout{timeout_ms});
                 return db.collectionExists(name.c_str(), mode);
              },
-             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "name"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
     ;
 
     py::class_<yokan::Collection>(m, "Collection")
@@ -1431,34 +1686,36 @@ PYBIND11_MODULE(pyyokan_client, m) {
         // SIZE
         // --------------------------------------------------------------
         .def("size",
-             [](const yokan::Collection& coll, int32_t mode) {
+             [](const yokan::Collection& coll, int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
+                if (timeout_ms > 0.0)
+                    return coll.size(mode, yokan::Timeout{timeout_ms});
                 return coll.size(mode);
-             }, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // STORE
         // --------------------------------------------------------------
         .def("store",
              static_cast<yk_id_t(*)(const yokan::Collection&,
-                         const py::buffer&, int32_t)>(&doc_store_helper),
-             "document"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const py::buffer&, int32_t, double)>(&doc_store_helper),
+             "document"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("store",
              static_cast<yk_id_t(*)(const yokan::Collection&,
-                         const std::string&, int32_t)>(&doc_store_helper),
-             "document"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const std::string&, int32_t, double)>(&doc_store_helper),
+             "document"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // STORE_MULTI
         // --------------------------------------------------------------
         .def("store_multi",
              static_cast<std::vector<yk_id_t>(*)(const yokan::Collection&,
                 const std::vector<py::buffer>&,
-                int32_t)>(&doc_store_multi_helper),
-             "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&doc_store_multi_helper),
+             "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("store_multi",
              static_cast<std::vector<yk_id_t>(*)(const yokan::Collection&,
                 const std::vector<std::string>&,
-                int32_t)>(&doc_store_multi_helper),
-             "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&doc_store_multi_helper),
+             "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // STORE_PACKED
         // --------------------------------------------------------------
@@ -1466,7 +1723,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
              [](const yokan::Collection& coll,
                 const py::buffer& docs,
                 const std::vector<size_t>& doc_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 size_t count = doc_sizes.size();
                 auto docs_info = docs.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(docs_info);
@@ -1477,21 +1734,29 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::vector<yk_id_t> ids(count);
                 {
                     py::gil_scoped_release release;
-                    coll.storePacked(count, docs_info.ptr, doc_sizes.data(), ids.data(), mode);
+                    if (timeout_ms > 0.0)
+                        coll.storePacked(count, docs_info.ptr, doc_sizes.data(),
+                                         ids.data(), mode, yokan::Timeout{timeout_ms});
+                    else
+                        coll.storePacked(count, docs_info.ptr, doc_sizes.data(),
+                                         ids.data(), mode);
                 }
                 return ids;
-             }, "documents"_a, "doc_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "documents"_a, "doc_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // UPDATE
         // --------------------------------------------------------------
         .def("update",
              static_cast<void(*)(const yokan::Collection&, yk_id_t,
-                         const py::buffer&, int32_t)>(&doc_update_helper),
-             "id"_a, "document"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const py::buffer&, int32_t, double)>(&doc_update_helper),
+             "id"_a, "document"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("update",
              static_cast<void(*)(const yokan::Collection&, yk_id_t,
-                         const std::string&, int32_t)>(&doc_update_helper),
-             "id"_a, "document"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                         const std::string&, int32_t, double)>(&doc_update_helper),
+             "id"_a, "document"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // UPDATE_MULTI
         // --------------------------------------------------------------
@@ -1499,14 +1764,16 @@ PYBIND11_MODULE(pyyokan_client, m) {
              static_cast<void(*)(const yokan::Collection&,
                 const std::vector<yk_id_t>&,
                 const std::vector<py::buffer>&,
-                int32_t)>(&doc_update_multi_helper),
-             "ids"_a, "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&doc_update_multi_helper),
+             "ids"_a, "documents"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("update_multi",
              static_cast<void(*)(const yokan::Collection&,
                 const std::vector<yk_id_t>&,
                 const std::vector<std::string>&,
-                int32_t)>(&doc_update_multi_helper),
-             "ids"_a, "documents"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&doc_update_multi_helper),
+             "ids"_a, "documents"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // UPDATE_PACKED
         // --------------------------------------------------------------
@@ -1515,7 +1782,7 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 const std::vector<yk_id_t>& ids,
                 const py::buffer& docs,
                 const std::vector<size_t>& doc_sizes,
-                int32_t mode) {
+                int32_t mode, double timeout_ms) {
                 size_t count = doc_sizes.size();
                 if(count != ids.size()) {
                     throw std::length_error("\"ids\" and \"doc_sizes\" arguments should be the same size");
@@ -1528,17 +1795,25 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 }
                 {
                     py::gil_scoped_release release;
-                    coll.updatePacked(count, ids.data(), docs_info.ptr, doc_sizes.data(), mode);
+                    if (timeout_ms > 0.0)
+                        coll.updatePacked(count, ids.data(), docs_info.ptr,
+                                          doc_sizes.data(), mode,
+                                          yokan::Timeout{timeout_ms});
+                    else
+                        coll.updatePacked(count, ids.data(), docs_info.ptr,
+                                          doc_sizes.data(), mode);
                 }
                 return ids;
-             }, "ids"_a, "documents"_a, "doc_sizes"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "ids"_a, "documents"_a, "doc_sizes"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LOAD
         // --------------------------------------------------------------
         .def("load",
              static_cast<size_t(*)(const yokan::Collection&, yk_id_t,
-                py::buffer&, int32_t)>(&doc_load_helper),
-             "id"_a, "buffer"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                py::buffer&, int32_t, double)>(&doc_load_helper),
+             "id"_a, "buffer"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LOAD_MULTI
         // --------------------------------------------------------------
@@ -1546,14 +1821,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
              static_cast<py::list(*)(const yokan::Collection&,
                 const std::vector<yk_id_t>& ids,
                 const std::vector<py::buffer>&,
-                int32_t)>(&doc_load_multi_helper),
-             "ids"_a, "buffers"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+                int32_t, double)>(&doc_load_multi_helper),
+             "ids"_a, "buffers"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LOAD_PACKED
         // --------------------------------------------------------------
         .def("load_packed",
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
-                py::buffer& docs, int32_t mode) {
+                py::buffer& docs, int32_t mode, double timeout_ms) {
                 auto count = ids.size();
                 auto doc_info = docs.request();
                 CHECK_BUFFER_IS_CONTIGUOUS(doc_info);
@@ -1561,8 +1837,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 std::vector<size_t> doc_sizes(count);
                 {
                     py::gil_scoped_release release;
-                    coll.loadPacked(count, ids.data(),
-                                    doc_buf_size, doc_info.ptr, doc_sizes.data(), mode);
+                    if (timeout_ms > 0.0)
+                        coll.loadPacked(count, ids.data(),
+                                        doc_buf_size, doc_info.ptr,
+                                        doc_sizes.data(), mode,
+                                        yokan::Timeout{timeout_ms});
+                    else
+                        coll.loadPacked(count, ids.data(),
+                                        doc_buf_size, doc_info.ptr,
+                                        doc_sizes.data(), mode);
                 }
                 py::list result;
                 for(size_t i = 0; i < count; i++) {
@@ -1572,13 +1855,15 @@ PYBIND11_MODULE(pyyokan_client, m) {
                         result.append(py::none());
                 }
                 return result;
-             }, "ids"_a, "buffer"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             }, "ids"_a, "buffer"_a,
+                "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // FETCH
         // --------------------------------------------------------------
         .def("fetch",
              [](const yokan::Collection& coll, yk_id_t id,
-                std::function<void(size_t, yk_id_t, const py::object&)> cb, int32_t mode) {
+                std::function<void(size_t, yk_id_t, const py::object&)> cb,
+                int32_t mode, double timeout_ms) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
@@ -1596,21 +1881,25 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     };
                 try {
                     py::gil_scoped_release release;
-                    coll.fetch(id, func, mode);
+                    if (timeout_ms > 0.0)
+                        coll.fetch(id, func, mode, yokan::Timeout{timeout_ms});
+                    else
+                        coll.fetch(id, func, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "id"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "id"_a, "callback"_a,
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // FETCH_MULTI
         // --------------------------------------------------------------
         .def("fetch_multi",
              [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
                 std::function<void(size_t, yk_id_t, const py::object&)> cb,
-                int32_t mode, unsigned batch_size) {
+                int32_t mode, unsigned batch_size, double timeout_ms) {
                 std::optional<py::error_already_set> py_exception;
                 auto func =
                     [&cb, &py_exception](size_t index, yk_id_t id, const void* val, size_t vsize) -> yk_return_t {
@@ -1631,26 +1920,36 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 options.batch_size = batch_size;
                 try {
                     py::gil_scoped_release release;
-                    coll.fetchMulti(
-                        ids.size(), ids.data(),
-                        func, &options, mode);
+                    if (timeout_ms > 0.0)
+                        coll.fetchMulti(
+                            ids.size(), ids.data(),
+                            func, &options, mode, yokan::Timeout{timeout_ms});
+                    else
+                        coll.fetchMulti(
+                            ids.size(), ids.data(),
+                            func, &options, mode);
                 } catch(const yokan::Exception&) {
                     if(py_exception) throw std::move(*py_exception);
                     throw;
                 }
                 if(py_exception) throw std::move(*py_exception);
              },
-             "ids"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "ids"_a, "callback"_a, "mode"_a=YOKAN_MODE_DEFAULT,
+             "batch_size"_a=0, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LENGTH
         // --------------------------------------------------------------
         .def("length",
-             [](const yokan::Collection& coll, yk_id_t id, int32_t mode) -> py::object {
+             [](const yokan::Collection& coll, yk_id_t id,
+                int32_t mode, double timeout_ms) -> py::object {
                 try {
                     size_t len;
                     {
                         py::gil_scoped_release release;
-                        len = coll.length(id, mode);
+                        if (timeout_ms > 0.0)
+                            len = coll.length(id, mode, yokan::Timeout{timeout_ms});
+                        else
+                            len = coll.length(id, mode);
                     }
                     return py::cast(len);
                 } catch(const yokan::Exception& e) {
@@ -1659,16 +1958,21 @@ PYBIND11_MODULE(pyyokan_client, m) {
                     throw;
                 }
              },
-             "id"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "id"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LENGTH_MULTI
         // --------------------------------------------------------------
         .def("length_multi",
-             [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids, int32_t mode) {
+             [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
+                int32_t mode, double timeout_ms) {
                 std::vector<size_t> len(ids.size());
                 {
                     py::gil_scoped_release release;
-                    coll.lengthMulti(ids.size(), ids.data(), len.data(), mode);
+                    if (timeout_ms > 0.0)
+                        coll.lengthMulti(ids.size(), ids.data(), len.data(),
+                                         mode, yokan::Timeout{timeout_ms});
+                    else
+                        coll.lengthMulti(ids.size(), ids.data(), len.data(), mode);
                 }
                 py::list result;
                 for(size_t i = 0; i < ids.size(); i++) {
@@ -1679,25 +1983,34 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 }
                 return result;
              },
-             "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE
         // --------------------------------------------------------------
         .def("erase",
-             [](const yokan::Collection& coll, yk_id_t id, int32_t mode) {
+             [](const yokan::Collection& coll, yk_id_t id,
+                int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
-                coll.erase(id, mode);
+                if (timeout_ms > 0.0)
+                    coll.erase(id, mode, yokan::Timeout{timeout_ms});
+                else
+                    coll.erase(id, mode);
              },
-             "id"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "id"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // ERASE_MULTI
         // --------------------------------------------------------------
         .def("erase_multi",
-             [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids, int32_t mode) {
+             [](const yokan::Collection& coll, const std::vector<yk_id_t>& ids,
+                int32_t mode, double timeout_ms) {
                 py::gil_scoped_release release;
-                coll.eraseMulti(ids.size(), ids.data(), mode);
+                if (timeout_ms > 0.0)
+                    coll.eraseMulti(ids.size(), ids.data(), mode,
+                                    yokan::Timeout{timeout_ms});
+                else
+                    coll.eraseMulti(ids.size(), ids.data(), mode);
              },
-             "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "ids"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_DOCS
         // --------------------------------------------------------------
@@ -1706,32 +2019,34 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 yk_id_t,
                 std::vector<py::buffer>&,
                 const py::buffer&,
-                int32_t)>(&list_docs_helper),
+                int32_t, double)>(&list_docs_helper),
              "start_id"_a, "buffers"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_docs",
              static_cast<py::list(*)(const yokan::Collection&,
                 yk_id_t,
                 std::vector<py::buffer>&,
                 const std::string&,
-                int32_t)>(&list_docs_helper),
+                int32_t, double)>(&list_docs_helper),
              "start_id"_a, "buffers"_a,
-             "filter"_a=std::string(), "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a=std::string(),
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // LIST_DOCS_PACKED
         // --------------------------------------------------------------
         .def("list_docs_packed",
              static_cast<py::list(*)(const yokan::Collection&,
                 yk_id_t, py::buffer&, size_t, const py::buffer&,
-                int32_t)>(&list_docs_packed_helper),
+                int32_t, double)>(&list_docs_packed_helper),
              "start_id"_a, "buffer"_a, "count"_a,
-             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a, "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         .def("list_docs_packed",
              static_cast<py::list(*)(const yokan::Collection&,
                 yk_id_t, py::buffer&, size_t, const std::string&,
-                int32_t)>(&list_docs_packed_helper),
+                int32_t, double)>(&list_docs_packed_helper),
              "start_id"_a, "buffer"_a, "count"_a,
-             "filter"_a=std::string(), "mode"_a=YOKAN_MODE_DEFAULT)
+             "filter"_a=std::string(),
+             "mode"_a=YOKAN_MODE_DEFAULT, "timeout_ms"_a=0.0)
         // --------------------------------------------------------------
         // DOC_ITER
         // --------------------------------------------------------------
@@ -1740,19 +2055,19 @@ PYBIND11_MODULE(pyyokan_client, m) {
                 const yokan::Collection&,
                 std::function<void(size_t, yk_id_t, const py::buffer&)>,
                 yk_id_t, const py::buffer&,
-                size_t, int32_t, unsigned)>(&doc_iter_helper),
+                size_t, int32_t, unsigned, double)>(&doc_iter_helper),
              "callback"_a,
              "from_id"_a=0, "filter"_a=py::bytes{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "timeout_ms"_a=0.0)
         .def("iter",
              static_cast<void(*)(
                 const yokan::Collection&,
                 std::function<void(size_t, yk_id_t, const py::buffer&)>,
                 yk_id_t, const std::string&,
-                size_t, int32_t, unsigned)>(&doc_iter_helper),
+                size_t, int32_t, unsigned, double)>(&doc_iter_helper),
              "callback"_a,
              "from_id"_a=0, "filter"_a=std::string{}, "count"_a=0,
-             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0)
+             "mode"_a=YOKAN_MODE_DEFAULT, "batch_size"_a=0, "timeout_ms"_a=0.0)
         ;
 }
 

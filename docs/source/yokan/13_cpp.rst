@@ -132,6 +132,35 @@ Available modes include:
 - ``YOKAN_MODE_EXIST_ONLY`` - Only put if key exists
 - ``YOKAN_MODE_NO_RDMA`` - Disable RDMA for small data
 
+Per-Call Extras (Timeout, ...)
+------------------------------
+
+Every Database and Collection method that takes a ``mode`` is a variadic
+template: after ``mode`` you can pass any number of strongly-typed extras
+(currently just :code:`yokan::Timeout`). The wrappers translate these into
+the C-level ``YOKAN_MODE_EXTRA`` tagged-extras protocol; passing no extras
+preserves the pre-extras wire format and behavior byte-for-byte.
+
+.. code-block:: cpp
+
+   #include <yokan/cxx/extras.hpp>
+
+   // Default — no extras, identical to the old call shape:
+   db.put(k, ksize, v, vsize);
+
+   // With a 500 ms timeout. yokan::Timeout::ms defaults to 0.0,
+   // which is the C-side sentinel for "block forever".
+   db.put(k, ksize, v, vsize, YOKAN_MODE_DEFAULT, yokan::Timeout{500.0});
+
+   // Extras are order-independent and additive: a future yokan::Budget
+   // (or any new extra type) drops in alongside Timeout without touching
+   // existing call sites.
+   //   db.put(k, ksize, v, vsize, YOKAN_MODE_DEFAULT,
+   //          yokan::Budget{1 << 20}, yokan::Timeout{500.0});
+
+When a timeout fires, the wrapper throws :code:`yokan::Exception` with code
+``YOKAN_ERR_TIMEOUT``.
+
 Exception Handling
 ------------------
 

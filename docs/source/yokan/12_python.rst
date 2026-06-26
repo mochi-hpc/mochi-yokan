@@ -132,6 +132,31 @@ Yokan's mode system is available in Python through the ``mochi.yokan.mode`` modu
 Available modes have the same names as in C/C++.
 Modes can be combined using bitwise OR: ``mode.YOKAN_MODE_WAIT | Mode.YOKAN_MODE_CONSUME``
 
+Per-Call Timeout
+----------------
+
+Every Database and Collection method that takes a ``mode`` also accepts an
+optional ``timeout_ms`` keyword argument (a ``float``, milliseconds). The
+default is ``0.0``, which means "block forever" — the pre-existing behavior.
+A positive value caps the RPC's wall-clock duration; on expiry the call
+raises ``mochi.yokan.exception.Exception`` with code ``YOKAN_ERR_TIMEOUT``.
+
+.. code-block:: python
+
+    # default — same as before, no wire-format change
+    db.put(key="hello", value="world")
+
+    # cap this put at 500 ms
+    db.put(key="hello", value="world", timeout_ms=500.0)
+
+    # works on every operation that accepts a mode, including collections:
+    coll = db.create_collection("docs", timeout_ms=500.0)
+    coll.store(b"{}", timeout_ms=500.0)
+
+Under the hood, ``timeout_ms`` is routed through the C client's
+``YOKAN_MODE_EXTRA`` tagged-extras protocol — leaving it at ``0.0`` skips
+that protocol entirely, so existing call sites see no behavioral change.
+
 Document Store Operations
 --------------------------
 
